@@ -27,6 +27,16 @@ impl CallFrame {
 }
 
 /// The Zenlang virtual machine.
+/// Helper to build a SourceLocation from a function index and bytecode offset.
+fn source_loc_from_frame(functions: &[BytecodeFn], function_idx: usize, ip: usize) -> crate::span::SourceLocation {
+    let line = if let Some(chunk) = functions.get(function_idx).map(|f| &f.chunk) {
+        chunk.get_line(ip.saturating_sub(1))
+    } else {
+        0
+    };
+    crate::span::SourceLocation::new(None, crate::span::Span::new(0, 0), line, 0)
+}
+
 pub struct VM {
     stack: Vec<Value>,
     frames: Vec<CallFrame>,
@@ -191,10 +201,7 @@ impl VM {
     pub fn run_main(&mut self) -> Result<Value> {
         let main_idx = match self.natives.get("__main__") {
             Some(&idx) => idx,
-            None => return Err(Error::Runtime {
-                msg: "no main function found".into(),
-                stack_trace: Vec::new(),
-            }),
+            None => return Err(self.runtime_error("no main function found")),
         };
 
         // Initialize globals with nil
@@ -215,6 +222,21 @@ impl VM {
 
         // Return value is on top of stack
         Ok(self.stack.pop().unwrap_or(Value::Nil))
+    }
+
+    /// Build a runtime error with a stack trace from the current call frames.
+    fn runtime_error(&self, msg: impl Into<String>) -> Error {
+        let mut stack_trace: Vec<crate::span::SourceLocation> = self.frames
+            .iter()
+            .map(|frame| {
+                source_loc_from_frame(&self.functions, frame.function_idx, frame.ip)
+            })
+            .collect();
+        stack_trace.reverse(); // innermost frame first
+        Error::Runtime {
+            msg: msg.into(),
+            stack_trace,
+        }
     }
 
     fn chunk(&self) -> &Chunk {
@@ -250,10 +272,7 @@ impl VM {
             }
 
             let byte = self.read_byte();
-            let op = Opcode::from_byte(byte).ok_or_else(|| Error::Runtime {
-                msg: format!("unknown opcode: {}", byte),
-                stack_trace: Vec::new(),
-            })?;
+            let op = Opcode::from_byte(byte).ok_or_else(|| self.runtime_error(format!("unknown opcode: {}", byte)))?;
 
             match op {
                 Opcode::LoadConst(_) => {
@@ -324,10 +343,7 @@ impl VM {
                         (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 + bf)),
                         (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af + *bi as f64)),
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot add {} and {}", a.type_name(), b.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot add {} and {}", a.type_name(), b.type_name())));
                         }
                     }
                 }
@@ -341,10 +357,7 @@ impl VM {
                         (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 - bf)),
                         (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af - *bi as f64)),
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot subtract {} and {}", a.type_name(), b.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot subtract {} and {}", a.type_name(), b.type_name())));
                         }
                     }
                 }
@@ -358,10 +371,7 @@ impl VM {
                         (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 * bf)),
                         (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af * *bi as f64)),
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot multiply {} and {}", a.type_name(), b.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot multiply {} and {}", a.type_name(), b.type_name())));
                         }
                     }
                 }
@@ -372,10 +382,7 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => {
                             if *bi == 0 {
-                                return Err(Error::Runtime {
-                                    msg: "division by zero".into(),
-                                    stack_trace: Vec::new(),
-                                });
+                                return Err(self.runtime_error("division by zero"));
                             }
                             self.stack.push(Value::Int(ai / bi));
                         }
@@ -387,18 +394,12 @@ impl VM {
                         }
                         (Value::Float(af), Value::Int(bi)) => {
                             if *bi == 0 {
-                                return Err(Error::Runtime {
-                                    msg: "division by zero".into(),
-                                    stack_trace: Vec::new(),
-                                });
+                                return Err(self.runtime_error("division by zero"));
                             }
                             self.stack.push(Value::Float(af / *bi as f64));
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot divide {} and {}", a.type_name(), b.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot divide {} and {}", a.type_name(), b.type_name())));
                         }
                     }
                 }
@@ -409,18 +410,12 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => {
                             if *bi == 0 {
-                                return Err(Error::Runtime {
-                                    msg: "modulo by zero".into(),
-                                    stack_trace: Vec::new(),
-                                });
+                                return Err(self.runtime_error("modulo by zero"));
                             }
                             self.stack.push(Value::Int(ai % bi));
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot mod {} and {}", a.type_name(), b.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot mod {} and {}", a.type_name(), b.type_name())));
                         }
                     }
                 }
@@ -431,10 +426,7 @@ impl VM {
                         Value::Int(n) => self.stack.push(Value::Int(-n)),
                         Value::Float(n) => self.stack.push(Value::Float(-n)),
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot negate {}", a.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot negate {}", a.type_name())));
                         }
                     }
                 }
@@ -526,10 +518,7 @@ impl VM {
                             self.stack.push(result);
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot call {}", callee.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot call {}", callee.type_name())));
                         }
                     }
                 }
@@ -553,10 +542,7 @@ impl VM {
                                 Some(Ok(result)) => self.stack.push(result),
                                 Some(Err(e)) => return Err(e),
                                 None => {
-                                    return Err(Error::Runtime {
-                                        msg: format!("foreign type '{}' has no method '{}'", fv.borrow().type_name, method_name),
-                                        stack_trace: Vec::new(),
-                                    });
+                                    return Err(self.runtime_error(format!("foreign type '{}' has no method '{}'", fv.borrow().type_name, method_name)));
                                 }
                             }
                         }
@@ -580,10 +566,7 @@ impl VM {
                             self.stack.push(result);
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot call method on {}", obj.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot call method on {}", obj.type_name())));
                         }
                     }
                 }
@@ -664,18 +647,12 @@ impl VM {
                                 Some(Ok(val)) => self.stack.push(val),
                                 Some(Err(e)) => return Err(e),
                                 None => {
-                                    return Err(Error::Runtime {
-                                        msg: format!("foreign type '{}' has no field '{}'", fv.borrow().type_name, field_name),
-                                        stack_trace: Vec::new(),
-                                    });
+                                    return Err(self.runtime_error(format!("foreign type '{}' has no field '{}'", fv.borrow().type_name, field_name)));
                                 }
                             }
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot access field on {}", obj.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot access field on {}", obj.type_name())));
                         }
                     }
                 }
@@ -703,18 +680,12 @@ impl VM {
                                 Some(Ok(())) => self.stack.push(obj),
                                 Some(Err(e)) => return Err(e),
                                 None => {
-                                    return Err(Error::Runtime {
-                                        msg: format!("foreign type has no field '{}'", field_name),
-                                        stack_trace: Vec::new(),
-                                    });
+                                    return Err(self.runtime_error(format!("foreign type has no field '{}'", field_name)));
                                 }
                             }
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot set field on {}", obj.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot set field on {}", obj.type_name())));
                         }
                     }
                 }
@@ -729,10 +700,7 @@ impl VM {
                             self.stack.push(val);
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot index {} with {}", obj.type_name(), index.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
                         }
                     }
                 }
@@ -748,10 +716,7 @@ impl VM {
                             self.stack.push(obj);
                         }
                         _ => {
-                            return Err(Error::Runtime {
-                                msg: format!("cannot index {} with {}", obj.type_name(), index.type_name()),
-                                stack_trace: Vec::new(),
-                            });
+                            return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
                         }
                     }
                 }
@@ -787,7 +752,7 @@ mod tests {
         let native_names = crate::stdlib::native_names();
         let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -1126,7 +1091,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1139,7 +1104,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1155,7 +1120,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source1).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1169,7 +1134,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source2).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1190,7 +1155,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1203,7 +1168,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();

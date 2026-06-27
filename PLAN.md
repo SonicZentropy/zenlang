@@ -14,6 +14,13 @@ Progress
 2. **Phase 8 — Hot Reload**: File watcher, bytecode recompilation, state migration
 3. **Phase 9 — Std Library**: print, assert, type_of, len, math
 4. **Phase 10 — Tooling**: REPL, CLI, disassembler, stack traces
+5. Phase 11 — LSP** builds on top of that:
+- LSP server binary (`zenlang-lsp` or `zenlang lsp`)
+- `textDocument/didChange` → re-lex/re-parse/resolve/typeck (no compile needed)
+- `textDocument/hover` — show type info from TypeMap
+- `textDocument/completion` — symbol table lookups
+- `textDocument/definition` — source locations from AST spans
+- `textDocument/diagnostic` — push errors from pipeline
 
 
 ## User

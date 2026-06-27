@@ -110,7 +110,7 @@ impl HotReloader {
         let native_names = stdlib::native_names();
         let mut symbols = resolver::resolve_with_natives(&mut program, &native_names)?;
         let types = typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names)?;
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, &source)?;
 
         // Swap bytecode while migrating global state
         self.vm.reload_functions(fns, global_names)?;
