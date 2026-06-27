@@ -6,8 +6,8 @@ authors = ["Zenlang Contributors"]
 description = "Zenlang language support — syntax highlighting, LSP diagnostics, completions, hover, and more."
 
 [grammars.zenlang]
-repository = "file:///Z:/workspace/Rust/language_dev/zenlang/zed-extension/grammars/zenlang"
-rev = "HEAD"
+repository = "file:///Z:/workspace/Rust/language_dev/zenlang/grammars/zenlang"
+rev = "2ead1bdd6e99d2f8da2d84122309701479938729"
 
 [language_servers.zenlang-language-server]
 name = "Zenlang LSP"

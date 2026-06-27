@@ -1,43 +1,34 @@
-; Keywords
-[
-  "let"
-  "mut"
-  "fn"
-  "if"
-  "else"
-  "while"
-  "for"
-  "in"
-  "match"
-  "return"
-  "true"
-  "false"
-  "nil"
-  "struct"
-  "enum"
-  "impl"
-  "self"
-  "as"
-] @keyword
+; Keywords - match parent nodes that contain keywords
+(let_statement) @keyword
+(function_declaration) @keyword
+(if_expression) @keyword
+(match_expression) @keyword
+(return_statement) @keyword
+(struct_declaration) @keyword
+(enum_declaration) @keyword
+(impl_declaration) @keyword
+(while_loop) @keyword
+(for_loop) @keyword
+(bool_literal) @keyword
+(nil_literal) @keyword
 
 ; Types
 (type_identifier) @type
-(struct_declaration name: (type_identifier) @type)
-(enum_declaration name: (type_identifier) @type)
+(struct_declaration (type_identifier) @type)
+(enum_declaration (type_identifier) @type)
 
 ; Functions
-(function_declaration name: (identifier) @function)
-(call_expression function: (identifier) @function)
+(function_declaration (identifier) @function)
+(call_expression (identifier) @function)
 
 ; Parameters
-(parameter name: (identifier) @variable.parameter)
+(parameter (identifier) @variable.parameter)
 
 ; Variables
 (identifier) @variable
 
 ; String literals
 (string_literal) @string
-(escape_sequence) @string.escape
 
 ; Number literals
 (number_literal) @number
