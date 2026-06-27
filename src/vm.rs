@@ -32,6 +32,7 @@ pub struct VM {
     frames: Vec<CallFrame>,
     globals: Vec<Value>,
     functions: Vec<BytecodeFn>,
+    global_names: Vec<String>,
     natives: HashMap<String, usize>,
     native_fns: Vec<(String, NativeFn)>,
     pub foreign_registry: Rc<ForeignTypeRegistry>,
@@ -44,6 +45,7 @@ impl VM {
             frames: Vec::new(),
             globals: Vec::new(),
             functions: Vec::new(),
+            global_names: Vec::new(),
             natives: HashMap::new(),
             native_fns: Vec::new(),
             foreign_registry: Rc::new(ForeignTypeRegistry::new()),
@@ -56,6 +58,7 @@ impl VM {
             frames: Vec::new(),
             globals: Vec::new(),
             functions: Vec::new(),
+            global_names: Vec::new(),
             natives: HashMap::new(),
             native_fns: Vec::new(),
             foreign_registry: registry,
@@ -71,7 +74,7 @@ impl VM {
         registry.get_mut(&type_id).unwrap()
     }
 
-    pub fn load_bytecode(&mut self, fns: Vec<BytecodeFn>) {
+    pub fn load_bytecode(&mut self, fns: Vec<BytecodeFn>, global_names: Vec<String>) {
         let offset = self.functions.len();
         for (i, f) in fns.into_iter().enumerate() {
             let idx = offset + i;
@@ -80,12 +83,84 @@ impl VM {
                 self.natives.insert("__main__".into(), idx);
             }
         }
+        self.global_names = global_names;
     }
 
     pub fn register_native(&mut self, name: &str, f: NativeFn) {
         let idx = self.native_fns.len();
         self.natives.insert(name.to_string(), idx);
         self.native_fns.push((name.to_string(), f));
+    }
+
+    /// Snapshot global values by name for state migration across reloads.
+    pub fn snapshot_globals_by_name(&self) -> HashMap<String, Value> {
+        let mut snapshot = HashMap::new();
+        for (i, name) in self.global_names.iter().enumerate() {
+            if let Some(val) = self.globals.get(i) {
+                snapshot.insert(name.clone(), val.clone());
+            }
+        }
+        snapshot
+    }
+
+    /// Restore global values from a name-keyed snapshot, matching by name.
+    pub fn restore_globals_by_name(&mut self, snapshot: &HashMap<String, Value>) {
+        for (i, name) in self.global_names.iter().enumerate() {
+            if let Some(val) = snapshot.get(name) {
+                if i < self.globals.len() {
+                    self.globals[i] = val.clone();
+                } else {
+                    self.globals.push(val.clone());
+                }
+            }
+        }
+    }
+
+    /// Reload all function bytecode while migrating global state.
+    ///
+    /// Replaces `self.functions` with new compiled functions, remaps any
+    /// `Value::Function(old_idx)` references that may exist in global values
+    /// to point at the correct new indices, restores matching global values
+    /// by name, and updates `global_names`.
+    pub fn reload_functions(&mut self, fns: Vec<BytecodeFn>, new_global_names: Vec<String>) -> Result<()> {
+        // Build old name→idx map from current functions
+        let old_name_to_idx: HashMap<&str, usize> = self.functions
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.as_str(), i))
+            .collect();
+
+        // Build new name→idx map
+        let new_name_to_idx: HashMap<&str, usize> = fns
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.as_str(), i))
+            .collect();
+
+        // Snapshot globals, remapping Value::Function indices
+        let mut snapshot = self.snapshot_globals_by_name();
+        for val in snapshot.values_mut() {
+            remap_function_value(val, &old_name_to_idx, &new_name_to_idx);
+        }
+
+        // Replace functions and global_names
+        self.functions = fns;
+        self.global_names = new_global_names;
+
+        // Resize globals vec to fit new global count
+        self.globals.resize(self.global_names.len(), Value::Nil);
+
+        // Restore matching globals from snapshot
+        self.restore_globals_by_name(&snapshot);
+
+        // Update __main__ to point at new index 0
+        self.natives.insert("__main__".into(), 0);
+
+        // Reset stack and frames (no script running during reload)
+        self.stack.clear();
+        self.frames.clear();
+
+        Ok(())
     }
 
     /// Run the main function.
@@ -687,9 +762,9 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let fns = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
         let mut vm = VM::new();
-        vm.load_bytecode(fns);
+        vm.load_bytecode(fns, global_names);
         vm.run_main().unwrap()
     }
 
@@ -972,6 +1047,175 @@ mod tests {
         let ctx = &mut VMContext { registry: Rc::new(ForeignTypeRegistry::new()) };
         let result = double(ctx, &[Value::Int(5)]).unwrap();
         assert_eq!(result, Value::Int(10));
+    }
+
+    // --- Hot reload tests ---
+
+    #[test]
+    fn test_snapshot_and_restore_globals() {
+        let mut vm = VM::new();
+        vm.global_names = vec!["x".into(), "y".into(), "z".into()];
+        vm.globals = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+
+        let snapshot = vm.snapshot_globals_by_name();
+        assert_eq!(snapshot.get("x"), Some(&Value::Int(1)));
+        assert_eq!(snapshot.get("y"), Some(&Value::Int(2)));
+        assert_eq!(snapshot.get("z"), Some(&Value::Int(3)));
+
+        // Modify globals and restore
+        vm.globals[0] = Value::Int(99);
+        vm.restore_globals_by_name(&snapshot);
+        assert_eq!(vm.globals[0], Value::Int(1));
+        assert_eq!(vm.globals[1], Value::Int(2));
+        assert_eq!(vm.globals[2], Value::Int(3));
+    }
+
+    #[test]
+    fn test_snapshot_only_matches_by_name() {
+        let mut vm = VM::new();
+        vm.global_names = vec!["a".into(), "b".into()];
+        vm.globals = vec![Value::Int(10), Value::Int(20)];
+
+        let mut snapshot = HashMap::new();
+        snapshot.insert("b".into(), Value::Int(99));
+
+        vm.restore_globals_by_name(&snapshot);
+        assert_eq!(vm.globals[0], Value::Int(10)); // unchanged
+        assert_eq!(vm.globals[1], Value::Int(99)); // restored
+    }
+
+    #[test]
+    fn test_reload_functions_preserves_global_state() {
+        let source = r#"
+            let x = 10;
+            fn add_one(y: int) -> int {
+                y + 1
+            }
+            x
+        "#;
+
+        // Initial compilation
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(&tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+
+        let mut vm = VM::new();
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(10));
+
+        // Simulate a hot reload with the same source (no changes)
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(&tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+
+        vm.reload_functions(fns, global_names).unwrap();
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(10));
+    }
+
+    #[test]
+    fn test_reload_functions_with_modified_source() {
+        // Initial: let x = 5; x
+        let source1 = "let x = 5; x";
+        let tokens = Lexer::new(source1).tokenize().unwrap();
+        let parser = Parser::new(&tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+
+        let mut vm = VM::new();
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(5));
+
+        // Simulate changing x = 5 to x = 42 in the source and hot reload
+        let source2 = "let x = 42; x";
+        let tokens = Lexer::new(source2).tokenize().unwrap();
+        let parser = Parser::new(&tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+
+        vm.reload_functions(fns, global_names).unwrap();
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_reload_functions_remaps_function_references() {
+        let source = r#"
+            fn greet() -> int { 1 }
+            fn run() -> int { greet() }
+            run()
+        "#;
+
+        // Initial compilation
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(&tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+
+        let mut vm = VM::new();
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(1));
+
+        // Reload with same source (function indices should be stable)
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(&tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+
+        vm.reload_functions(fns, global_names).unwrap();
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(1));
+    }
+}
+
+/// Recursively remap `Value::Function` indices in a value tree from old
+/// function indices to new ones, using name-based lookup.
+fn remap_function_value(
+    val: &mut Value,
+    old_name_to_idx: &HashMap<&str, usize>,
+    new_name_to_idx: &HashMap<&str, usize>,
+) {
+    match val {
+        Value::Function(idx) => {
+            if let Some(name) = old_name_to_idx.iter().find(|(_, v)| **v == *idx).map(|(n, _)| *n) {
+                if let Some(&new_idx) = new_name_to_idx.get(name) {
+                    *idx = new_idx;
+                }
+            }
+        }
+        Value::Array(arr) => {
+            for v in arr.borrow_mut().iter_mut() {
+                remap_function_value(v, old_name_to_idx, new_name_to_idx);
+            }
+        }
+        Value::Struct(map) => {
+            for v in map.borrow_mut().values_mut() {
+                remap_function_value(v, old_name_to_idx, new_name_to_idx);
+            }
+        }
+        Value::Enum { data, .. } => {
+            for v in data.borrow_mut().iter_mut() {
+                remap_function_value(v, old_name_to_idx, new_name_to_idx);
+            }
+        }
+        _ => {}
     }
 }
 

@@ -12,15 +12,16 @@ pub fn compile(
     program: &Program,
     _types: &TypeMap,
     _symbols: &SymbolTable,
-) -> Result<Vec<BytecodeFn>> {
+) -> Result<(Vec<BytecodeFn>, Vec<String>)> {
     let mut globals: HashMap<String, u16> = HashMap::new();
+    let mut global_order: Vec<String> = Vec::new();
     let mut function_names: HashMap<String, usize> = HashMap::new();
     let mut errors: Vec<Error> = Vec::new();
     let mut functions: Vec<BytecodeFn> = Vec::new();
 
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
-        register_global_stmt(&stmt.node, &mut globals);
+        register_global_stmt(&stmt.node, &mut globals, &mut global_order);
         if let Stmt::Fn { name, .. } = &stmt.node {
             let idx = function_names.len() + 1; // +1 because main is index 0
             function_names.insert(name.clone(), idx);
@@ -83,23 +84,29 @@ pub fn compile(
     }
 
     if errors.is_empty() {
-        Ok(functions)
+        Ok((functions, global_order))
     } else {
         Err(Error::CompileMultiple { errors })
     }
 }
 
-fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>) {
+fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_order: &mut Vec<String>) {
     match stmt {
         Stmt::Fn { name, .. } | Stmt::Let { name, .. } => {
-            let idx = globals.len() as u16;
-            globals.insert(name.clone(), idx);
+            if !globals.contains_key(name) {
+                let idx = globals.len() as u16;
+                globals.insert(name.clone(), idx);
+                global_order.push(name.clone());
+            }
         }
         Stmt::Impl { methods, .. } => {
             for m in methods {
                 if let Stmt::Fn { name, .. } = &m.node {
-                    let idx = globals.len() as u16;
-                    globals.insert(name.clone(), idx);
+                    if !globals.contains_key(name) {
+                        let idx = globals.len() as u16;
+                        globals.insert(name.clone(), idx);
+                        global_order.push(name.clone());
+                    }
                 }
             }
         }
