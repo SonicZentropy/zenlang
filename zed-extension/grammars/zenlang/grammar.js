@@ -111,7 +111,7 @@ module.exports = grammar({
 
     binary_expression: ($) => prec.left(seq(
       $._expression,
-      choice("+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "||", ".."),
+      choice("+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "..", "="),
       $._expression,
     )),
 
@@ -175,7 +175,7 @@ module.exports = grammar({
       $.parameters,
       choice(
         $.block,
-        seq("->", $._expression),
+        seq("->", $.type),
       ),
     )),
 

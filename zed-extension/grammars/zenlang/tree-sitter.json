@@ -1,0 +1,23 @@
+{
+  "name": "zenlang",
+  "version": "0.1.0",
+  "description": "Zenlang grammar for tree-sitter",
+  "repository": "https://github.com/your-org/zenlang",
+  "license": "MIT",
+  "author": "Zenlang Contributors",
+  "grammars": [
+    {
+      "name": "zenlang",
+      "path": "."
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Zenlang grammar for tree-sitter",
+    "authors": ["Zenlang Contributors"],
+    "links": {
+      "repository": "https://github.com/your-org/zenlang"
+    }
+  }
+}

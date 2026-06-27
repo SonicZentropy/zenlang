@@ -1,0 +1,1 @@
+struct Point { x: Int, y: Int } enum Color { Red, Green, Blue } impl Point { fn distance(self) { 0 } }
