@@ -6,6 +6,7 @@ use crate::error::{Error, Result};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::resolver;
+use crate::stdlib;
 use crate::typeck;
 use crate::vm::VM;
 
@@ -106,9 +107,10 @@ impl HotReloader {
         let parser = Parser::new(&tokens);
         let mut program = parser.parse()?;
 
-        let mut symbols = resolver::resolve(&mut program)?;
+        let native_names = stdlib::native_names();
+        let mut symbols = resolver::resolve_with_natives(&mut program, &native_names)?;
         let types = typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols)?;
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names)?;
 
         // Swap bytecode while migrating global state
         self.vm.reload_functions(fns, global_names)?;

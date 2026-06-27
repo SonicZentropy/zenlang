@@ -6,7 +6,22 @@ use crate::symbol::*;
 /// Walk the AST and build a symbol table.
 /// Reports errors for duplicate declarations and undefined names.
 pub fn resolve(program: &mut Program) -> Result<SymbolTable> {
+    resolve_with_natives(program, &[])
+}
+
+/// Resolve a program with pre-registered native function names.
+/// Native functions registered here will be callable from scripts.
+pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> Result<SymbolTable> {
     let mut resolver = Resolver::new();
+    // Pre-register native functions so the resolver knows these names exist
+    for name in native_names {
+        let sig = FnSignature {
+            name: name.clone(),
+            params: vec![],
+            return_type: Some(Type::I32),
+        };
+        let _ = resolver.symbols.define(name, SymKind::Function(sig));
+    }
     resolver.resolve_program(program)?;
     Ok(resolver.symbols)
 }

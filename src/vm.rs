@@ -74,6 +74,11 @@ impl VM {
         registry.get_mut(&type_id).unwrap()
     }
 
+    /// Return the list of registered native function names.
+    pub fn native_names(&self) -> Vec<String> {
+        self.native_fns.iter().map(|(n, _)| n.clone()).collect()
+    }
+
     pub fn load_bytecode(&mut self, fns: Vec<BytecodeFn>, global_names: Vec<String>) {
         let offset = self.functions.len();
         for (i, f) in fns.into_iter().enumerate() {
@@ -84,6 +89,25 @@ impl VM {
             }
         }
         self.global_names = global_names;
+        self.populate_globals();
+    }
+
+    /// Fill globals with native function values or Nil for user globals.
+    fn populate_globals(&mut self) {
+        self.globals.clear();
+        for name in &self.global_names {
+            let val = if let Some(&idx) = self.natives.get(name.as_str()) {
+                if idx < self.native_fns.len() && self.native_fns[idx].0 == *name {
+                    Value::NativeFunction(self.native_fns[idx].1.clone())
+                } else {
+                    Value::Nil
+                }
+            } else {
+                Value::Nil
+            };
+            self.globals.push(val);
+        }
+        self.globals.resize(self.global_names.len(), Value::Nil);
     }
 
     pub fn register_native(&mut self, name: &str, f: NativeFn) {
@@ -147,10 +171,10 @@ impl VM {
         self.functions = fns;
         self.global_names = new_global_names;
 
-        // Resize globals vec to fit new global count
-        self.globals.resize(self.global_names.len(), Value::Nil);
+        // Re-populate globals (native fns get Value::NativeFunction, user globals get Nil)
+        self.populate_globals();
 
-        // Restore matching globals from snapshot
+        // Restore matching user globals from snapshot
         self.restore_globals_by_name(&snapshot);
 
         // Update __main__ to point at new index 0
@@ -760,10 +784,12 @@ mod tests {
         let tokens = Lexer::new(source).tokenize().unwrap();
         let parser = Parser::new(&tokens);
         let mut program = parser.parse().unwrap();
-        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names).unwrap();
         let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
         vm.run_main().unwrap()
     }
@@ -1100,7 +1126,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1113,7 +1139,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1129,7 +1155,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1143,7 +1169,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1164,7 +1190,7 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1177,11 +1203,169 @@ mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[]).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
         assert_eq!(result, Value::Int(1));
+    }
+
+    // --- Stdlib tests ---
+
+    #[test]
+    fn test_print() {
+        // print just returns nil
+        let result = run("print(42)");
+        assert_eq!(result, Value::Nil);
+    }
+
+    #[test]
+    fn test_type_of() {
+        let result = run("type_of(42)");
+        assert_eq!(result, Value::Str("int".into()));
+
+        let result = run("type_of(true)");
+        assert_eq!(result, Value::Str("bool".into()));
+    }
+
+    #[test]
+    fn test_len_string() {
+        let result = run("len(\"hello\")");
+        assert_eq!(result, Value::Int(5));
+    }
+
+    #[test]
+    fn test_contains() {
+        let result = run("contains(\"hello world\", \"world\")");
+        assert_eq!(result, Value::Bool(true));
+
+        let result = run("contains(\"hello world\", \"xyz\")");
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_trim() {
+        let result = run("trim(\"  hello  \")");
+        assert_eq!(result, Value::Str("hello".into()));
+    }
+
+    #[test]
+    fn test_to_upper() {
+        let result = run("to_upper(\"hello\")");
+        assert_eq!(result, Value::Str("HELLO".into()));
+    }
+
+    #[test]
+    fn test_to_lower() {
+        let result = run("to_lower(\"HELLO\")");
+        assert_eq!(result, Value::Str("hello".into()));
+    }
+
+    #[test]
+    fn test_substring() {
+        let result = run("substring(\"hello\", 1, 4)");
+        assert_eq!(result, Value::Str("ell".into()));
+    }
+
+    #[test]
+    fn test_abs() {
+        let result = run("abs(-5)");
+        assert_eq!(result, Value::Int(5));
+    }
+
+    #[test]
+    fn test_min_max() {
+        let result = run("min(3, 7)");
+        assert_eq!(result, Value::Int(3));
+
+        let result = run("max(3, 7)");
+        assert_eq!(result, Value::Int(7));
+    }
+
+    #[test]
+    fn test_sqrt() {
+        let result = run("sqrt(9.0)");
+        assert_eq!(result, Value::Float(3.0));
+    }
+
+    #[test]
+    fn test_array_push_pop() {
+        let result = run("
+            let arr = [1, 2, 3];
+            push(arr, 4);
+            len(arr)
+        ");
+        assert_eq!(result, Value::Int(4));
+
+        let result = run("
+            let arr = [10, 20];
+            pop(arr)
+        ");
+        assert_eq!(result, Value::Int(20));
+    }
+
+    #[test]
+    fn test_array_insert_remove() {
+        let result = run("
+            let arr = [1, 3];
+            insert(arr, 1, 2);
+            len(arr)
+        ");
+        assert_eq!(result, Value::Int(3));
+
+        let result = run("
+            let arr = [10, 20, 30];
+            remove(arr, 0)
+        ");
+        assert_eq!(result, Value::Int(10));
+    }
+
+    #[test]
+    fn test_len_array() {
+        let result = run("len([1, 2, 3, 4])");
+        assert_eq!(result, Value::Int(4));
+    }
+
+    #[test]
+    fn test_to_int() {
+        let result = run("to_int(42)");
+        assert_eq!(result, Value::Int(42));
+
+        let result = run("to_int(3.14)");
+        assert_eq!(result, Value::Int(3));
+
+        let result = run("to_int(\"123\")");
+        assert_eq!(result, Value::Int(123));
+
+        let result = run("to_int(true)");
+        assert_eq!(result, Value::Int(1));
+    }
+
+    #[test]
+    fn test_to_float() {
+        let result = run("to_float(3)");
+        assert_eq!(result, Value::Float(3.0));
+
+        let result = run("to_float(\"3.14\")");
+        assert_eq!(result, Value::Float(3.14));
+    }
+
+    #[test]
+    fn test_to_str() {
+        let result = run("to_str(42)");
+        assert_eq!(result, Value::Str("Int(42)".into()));
+    }
+
+    #[test]
+    fn test_native_function_call_script() {
+        let result = run("print(\"hello\"); 42");
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_print_multiple_args() {
+        let result = run("print(1, 2, 3)");
+        assert_eq!(result, Value::Nil);
     }
 }
 

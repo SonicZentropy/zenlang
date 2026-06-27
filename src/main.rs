@@ -49,9 +49,10 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&tokens);
     let mut program = parser.parse()?;
-    let mut symbols = zenlang::resolver::resolve(&mut program)?;
+    let native_names = zenlang::stdlib::native_names();
+    let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;
-    let (fns, global_names) = zenlang::compiler::compile(&program, &types, &symbols)?;
+    let (fns, global_names) = zenlang::compiler::compile(&program, &types, &symbols, &native_names)?;
 
     let mut vm = VM::new();
     zenlang::stdlib::register_builtins(&mut vm);

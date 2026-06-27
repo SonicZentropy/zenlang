@@ -12,12 +12,22 @@ pub fn compile(
     program: &Program,
     _types: &TypeMap,
     _symbols: &SymbolTable,
+    native_names: &[String],
 ) -> Result<(Vec<BytecodeFn>, Vec<String>)> {
     let mut globals: HashMap<String, u16> = HashMap::new();
     let mut global_order: Vec<String> = Vec::new();
     let mut function_names: HashMap<String, usize> = HashMap::new();
     let mut errors: Vec<Error> = Vec::new();
     let mut functions: Vec<BytecodeFn> = Vec::new();
+
+    // Pre-register native function names as globals (stable indices)
+    for name in native_names {
+        if !globals.contains_key(name) {
+            let idx = globals.len() as u16;
+            globals.insert(name.clone(), idx);
+            global_order.push(name.clone());
+        }
+    }
 
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
