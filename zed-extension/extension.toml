@@ -1,0 +1,15 @@
+id = "zenlang"
+name = "Zenlang"
+version = "0.1.0"
+schema_version = 1
+authors = ["Zenlang Contributors"]
+description = "Zenlang language support — syntax highlighting, LSP diagnostics, completions, hover, and more."
+repository = "https://github.com/your-org/zenlang"
+
+[grammars.zenlang]
+repository = "https://github.com/your-org/tree-sitter-zenlang"
+rev = "HEAD"
+
+[language_servers.zenlang-language-server]
+name = "Zenlang LSP"
+languages = ["Zenlang"]
