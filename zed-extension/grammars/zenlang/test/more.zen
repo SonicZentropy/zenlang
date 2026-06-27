@@ -1,1 +1,0 @@
-fn add(a: Int, b: Int) -> Int { a + b } let mut x = 42 if x > 0 { x = x - 1 } else { x = 0 } match x { 0 => "zero" _ => "other" } for i in 1..10 { i } while x > 0 { x = x - 1 }
