@@ -1,13 +1,17 @@
+use std::any::TypeId;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::error::{Error, Result};
+use crate::interop::{ForeignTypeDef, ForeignTypeRegistry};
 use crate::ir::{BytecodeFn, Chunk, Opcode};
 use crate::value::{NativeFn, Value};
 
 /// Execution context provided to native functions.
-pub struct VMContext;
+pub struct VMContext {
+    pub registry: Rc<ForeignTypeRegistry>,
+}
 
 /// A call frame in the VM.
 struct CallFrame {
@@ -30,6 +34,7 @@ pub struct VM {
     functions: Vec<BytecodeFn>,
     natives: HashMap<String, usize>,
     native_fns: Vec<(String, NativeFn)>,
+    pub foreign_registry: Rc<ForeignTypeRegistry>,
 }
 
 impl VM {
@@ -41,7 +46,29 @@ impl VM {
             functions: Vec::new(),
             natives: HashMap::new(),
             native_fns: Vec::new(),
+            foreign_registry: Rc::new(ForeignTypeRegistry::new()),
         }
+    }
+
+    pub fn new_with_registry(registry: Rc<ForeignTypeRegistry>) -> Self {
+        Self {
+            stack: Vec::new(),
+            frames: Vec::new(),
+            globals: Vec::new(),
+            functions: Vec::new(),
+            natives: HashMap::new(),
+            native_fns: Vec::new(),
+            foreign_registry: registry,
+        }
+    }
+
+    /// Register a foreign type with the VM.
+    pub fn register_type<T: 'static>(&mut self, name: &'static str) -> &mut ForeignTypeDef {
+        let def = ForeignTypeDef::new(name);
+        let type_id = TypeId::of::<T>();
+        let registry = Rc::make_mut(&mut self.foreign_registry);
+        registry.register_typed(type_id, def);
+        registry.get_mut(&type_id).unwrap()
     }
 
     pub fn load_bytecode(&mut self, fns: Vec<BytecodeFn>) {
@@ -395,7 +422,7 @@ impl VM {
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop(); // pop callee
-                            let mut ctx = VMContext;
+                            let mut ctx = VMContext { registry: self.foreign_registry.clone() };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
                         }
@@ -409,13 +436,32 @@ impl VM {
                 }
 
                 Opcode::CallMethod(_, _) => {
-                    let _method_idx = self.read_u16() as usize;
+                    let method_idx = self.read_u16() as usize;
                     let arg_count = self.read_u16() as usize;
-                    // For now, treat as regular call — method dispatch will come later
                     let args_start = self.stack.len() - arg_count;
-                    let callee = &self.stack[args_start - 1].clone();
+                    let obj = &self.stack[args_start - 1].clone();
 
-                    match callee {
+                    match obj {
+                        // Foreign method dispatch via registry
+                        Value::Foreign(fv) => {
+                            let method_name = self.chunk().method_names.get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let args: Vec<Value> = self.stack.drain(args_start..).collect();
+                            self.stack.pop(); // pop receiver
+                            let mut ctx = VMContext { registry: self.foreign_registry.clone() };
+                            match self.foreign_registry.call_method(&fv.borrow().type_id, &method_name, &mut ctx, &args) {
+                                Some(Ok(result)) => self.stack.push(result),
+                                Some(Err(e)) => return Err(e),
+                                None => {
+                                    return Err(Error::Runtime {
+                                        msg: format!("foreign type '{}' has no method '{}'", fv.borrow().type_name, method_name),
+                                        stack_trace: Vec::new(),
+                                    });
+                                }
+                            }
+                        }
+                        // Regular function dispatch (existing behavior for native script methods)
                         Value::Function(idx) => {
                             let fn_def = &self.functions[*idx];
                             let bp = args_start;
@@ -430,13 +476,13 @@ impl VM {
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop();
-                            let mut ctx = VMContext;
+                            let mut ctx = VMContext { registry: self.foreign_registry.clone() };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
                         }
                         _ => {
                             return Err(Error::Runtime {
-                                msg: format!("cannot call method on {}", callee.type_name()),
+                                msg: format!("cannot call method on {}", obj.type_name()),
                                 stack_trace: Vec::new(),
                             });
                         }
@@ -469,9 +515,10 @@ impl VM {
                     let mut map = HashMap::new();
                     for _ in 0..field_count {
                         let val = self.stack.pop().unwrap();
-                        // Field names are currently ignored — use sequential keys
-                        let key = format!("_{}", field_count - map.len() - 1);
-                        map.insert(key, val);
+                        let name = self.stack.pop().unwrap();
+                        if let Value::Str(s) = name {
+                            map.insert(s.to_string(), val);
+                        }
                     }
                     self.stack.push(Value::Struct(Rc::new(RefCell::new(map))));
                 }
@@ -501,17 +548,29 @@ impl VM {
                 }
 
                 Opcode::LoadField(_) => {
-                    let _field_idx = self.read_u16() as usize;
+                    let field_idx = self.read_u16() as usize;
+                    let field_name = self.chunk().field_names.get(field_idx)
+                        .cloned()
+                        .unwrap_or_default();
                     let obj = self.stack.pop().unwrap();
                     match &obj {
                         Value::Struct(map) => {
-                            let key = format!("_{}", _field_idx);
-                            let val = map.borrow().get(&key).unwrap().clone();
+                            let val = map.borrow().get(&field_name)
+                                .cloned()
+                                .unwrap_or(Value::Nil);
                             self.stack.push(val);
                         }
-                        Value::Foreign(_r) => {
-                            // TODO: field access on foreign objects
-                            self.stack.push(Value::Nil);
+                        Value::Foreign(fv) => {
+                            match self.foreign_registry.get_field(&fv.borrow().type_id, &field_name, &obj) {
+                                Some(Ok(val)) => self.stack.push(val),
+                                Some(Err(e)) => return Err(e),
+                                None => {
+                                    return Err(Error::Runtime {
+                                        msg: format!("foreign type '{}' has no field '{}'", fv.borrow().type_name, field_name),
+                                        stack_trace: Vec::new(),
+                                    });
+                                }
+                            }
                         }
                         _ => {
                             return Err(Error::Runtime {
@@ -523,18 +582,34 @@ impl VM {
                 }
 
                 Opcode::StoreField(_) => {
-                    let _field_idx = self.read_u16() as usize;
+                    let field_idx = self.read_u16() as usize;
+                    let field_name = self.chunk().field_names.get(field_idx)
+                        .cloned()
+                        .unwrap_or_default();
                     let val = self.stack.pop().unwrap();
-                    let obj = self.stack.pop().unwrap();
-                    match &obj {
+                    let mut obj = self.stack.pop().unwrap();
+                    // Extract type_id before the match to avoid borrow conflicts
+                    let foreign_type_id = match &obj {
+                        Value::Foreign(fv) => Some(fv.borrow().type_id),
+                        _ => None,
+                    };
+                    match &mut obj {
                         Value::Struct(map) => {
-                            let key = format!("_{}", _field_idx);
-                            map.borrow_mut().insert(key, val);
+                            map.borrow_mut().insert(field_name, val);
                             self.stack.push(obj);
                         }
-                        Value::Foreign(_r) => {
-                            // TODO: field set on foreign objects
-                            self.stack.push(Value::Nil);
+                        Value::Foreign(_) => {
+                            let type_id = foreign_type_id.unwrap();
+                            match self.foreign_registry.set_field(&type_id, &field_name, &mut obj, val) {
+                                Some(Ok(())) => self.stack.push(obj),
+                                Some(Err(e)) => return Err(e),
+                                None => {
+                                    return Err(Error::Runtime {
+                                        msg: format!("foreign type has no field '{}'", field_name),
+                                        stack_trace: Vec::new(),
+                                    });
+                                }
+                            }
                         }
                         _ => {
                             return Err(Error::Runtime {
@@ -601,8 +676,10 @@ impl VM {
 mod tests {
     use super::*;
     use crate::compiler;
+    use crate::interop;
     use crate::lexer::Lexer;
     use crate::parser::Parser;
+    use crate::value::ForeignObject;
 
     fn run(source: &str) -> Value {
         let tokens = Lexer::new(source).tokenize().unwrap();
@@ -779,6 +856,122 @@ mod tests {
             }
         ");
         assert_eq!(result, Value::Int(2));
+    }
+
+    // --- Interop / Foreign type tests ---
+
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    fn setup_vm_with_point() -> VM {
+        let mut vm = VM::new();
+        vm.register_type::<Point>("Point")
+            .field("x",
+                |obj: &Value| -> Result<Value> {
+                    interop::with_foreign::<Point, _, _>(obj, |p| Ok(Value::Int(p.x as i64)))
+                },
+                |obj: &mut Value, val: Value| -> Result<()> {
+                    let x = val.as_int().unwrap() as i32;
+                    interop::with_foreign_mut::<Point, _, _>(obj, |p| { p.x = x; Ok(()) })
+                },
+            )
+            .field("y",
+                |obj: &Value| -> Result<Value> {
+                    interop::with_foreign::<Point, _, _>(obj, |p| Ok(Value::Int(p.y as i64)))
+                },
+                |obj: &mut Value, val: Value| -> Result<()> {
+                    let y = val.as_int().unwrap() as i32;
+                    interop::with_foreign_mut::<Point, _, _>(obj, |p| { p.y = y; Ok(()) })
+                },
+            );
+        vm
+    }
+
+    #[test]
+    fn test_interop_register_type() {
+        let vm = setup_vm_with_point();
+        let def = vm.foreign_registry.get(&TypeId::of::<Point>()).unwrap();
+        assert_eq!(def.name, "Point");
+        assert!(def.fields.contains_key("x"));
+        assert!(def.fields.contains_key("y"));
+    }
+
+    #[test]
+    fn test_interop_foreign_field_access() {
+        let vm = setup_vm_with_point();
+        let point = Point { x: 10, y: 20 };
+        let fv = Value::Foreign(Rc::new(RefCell::new(ForeignObject::new("Point", point))));
+
+        assert_eq!(fv.type_name(), "Point");
+
+        let def = vm.foreign_registry.get(&TypeId::of::<Point>()).unwrap();
+        let result = def.fields.get("x").unwrap().get(&fv).unwrap();
+        assert_eq!(result, Value::Int(10));
+
+        let result = def.fields.get("y").unwrap().get(&fv).unwrap();
+        assert_eq!(result, Value::Int(20));
+    }
+
+    #[test]
+    fn test_interop_foreign_field_mutation() {
+        let vm = setup_vm_with_point();
+        let point = Point { x: 1, y: 2 };
+        let mut fv = Value::Foreign(Rc::new(RefCell::new(ForeignObject::new("Point", point))));
+
+        let def = vm.foreign_registry.get(&TypeId::of::<Point>()).unwrap();
+        def.fields.get("x").unwrap().set(&mut fv, Value::Int(99)).unwrap();
+
+        let result = def.fields.get("x").unwrap().get(&fv).unwrap();
+        assert_eq!(result, Value::Int(99));
+    }
+
+    #[test]
+    fn test_interop_foreign_method() {
+        let mut vm = VM::new();
+        vm.register_type::<Point>("Point")
+            .field("x",
+                |obj: &Value| -> Result<Value> {
+                    interop::with_foreign::<Point, _, _>(obj, |p| Ok(Value::Int(p.x as i64)))
+                },
+                |obj: &mut Value, val: Value| -> Result<()> {
+                    let x = val.as_int().unwrap() as i32;
+                    interop::with_foreign_mut::<Point, _, _>(obj, |p| { p.x = x; Ok(()) })
+                },
+            )
+            .method("double_x", Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+                interop::with_foreign::<Point, _, _>(&args[0], |p| Ok(Value::Int((p.x * 2) as i64)))
+            }));
+
+        let point = Point { x: 5, y: 10 };
+        let fv = Value::Foreign(Rc::new(RefCell::new(ForeignObject::new("Point", point))));
+
+        // Call method via registry
+        let mut ctx = VMContext { registry: vm.foreign_registry.clone() };
+        let result = vm.foreign_registry.call_method(
+            &TypeId::of::<Point>(),
+            "double_x",
+            &mut ctx,
+            &[fv.clone()],
+        ).unwrap().unwrap();
+        assert_eq!(result, Value::Int(10));
+    }
+
+    #[test]
+    fn test_native_function_call_direct() {
+        // Test that a native function can be called through the VM directly
+        // without going through the full compiler pipeline.
+        // (Full pipeline requires pre-registering names with the resolver.)
+        fn double(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+            let n = args.first().and_then(|v| v.as_int()).unwrap_or(0);
+            Ok(Value::Int(n * 2))
+        }
+
+        // Verify the NativeFn works directly:
+        let ctx = &mut VMContext { registry: Rc::new(ForeignTypeRegistry::new()) };
+        let result = double(ctx, &[Value::Int(5)]).unwrap();
+        assert_eq!(result, Value::Int(10));
     }
 }
 

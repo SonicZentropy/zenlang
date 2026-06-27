@@ -332,17 +332,19 @@ impl<'a> FunctionCompiler<'a> {
                 self.chunk.emit_op(Opcode::Call(args.len() as u16));
             }
 
-            Expr::MethodCall { obj, method: _, args } => {
+            Expr::MethodCall { obj, method, args } => {
                 self.compile_expr(obj);
                 for arg in args {
                     self.compile_expr(arg);
                 }
-                self.chunk.emit_op(Opcode::CallMethod(0, args.len() as u16));
+                let method_idx = self.chunk.add_method_name(method);
+                self.chunk.emit_op(Opcode::CallMethod(method_idx, args.len() as u16));
             }
 
-            Expr::Field { obj, field: _ } => {
+            Expr::Field { obj, field } => {
                 self.compile_expr(obj);
-                self.chunk.emit_op(Opcode::LoadField(0));
+                let idx = self.chunk.add_field_name(field);
+                self.chunk.emit_op(Opcode::LoadField(idx));
             }
 
             Expr::Index { obj, index } => {
@@ -566,7 +568,9 @@ impl<'a> FunctionCompiler<'a> {
             }
 
             Expr::StructLit { name: _, fields } => {
-                for (_, val) in fields {
+                // Push field names then values; MakeStruct pops in reverse order
+                for (field_name, val) in fields {
+                    self.load_const(Value::Str(field_name.clone().into()));
                     self.compile_expr(val);
                 }
                 self.chunk.emit_op(Opcode::MakeStruct(fields.len() as u16));
@@ -602,10 +606,11 @@ impl<'a> FunctionCompiler<'a> {
                     self.error(format!("cannot assign to undefined variable '{}'", name));
                 }
             }
-            Expr::Field { obj, field: _ } => {
+            Expr::Field { obj, field } => {
                 self.compile_expr(obj);
                 self.compile_expr(value);
-                self.chunk.emit_op(Opcode::StoreField(0));
+                let idx = self.chunk.add_field_name(field);
+                self.chunk.emit_op(Opcode::StoreField(idx));
             }
             Expr::Index { obj, index } => {
                 self.compile_expr(obj);

@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -8,6 +8,64 @@ use crate::error::Result;
 
 /// A native Rust function that can be called from Zenlang.
 pub type NativeFn = Rc<dyn Fn(&mut crate::vm::VMContext, &[Value]) -> Result<Value>>;
+
+/// Wrapper around a foreign (Rust) object stored in the VM.
+pub struct ForeignObject {
+    pub type_id: TypeId,
+    pub type_name: &'static str,
+    pub data: Rc<RefCell<dyn Any>>,
+}
+
+impl ForeignObject {
+    pub fn new<T: 'static>(type_name: &'static str, data: T) -> Self {
+        Self {
+            type_id: TypeId::of::<T>(),
+            type_name,
+            data: Rc::new(RefCell::new(data)),
+        }
+    }
+
+    pub fn downcast<T: 'static>(&self) -> Option<std::cell::Ref<'_, T>> {
+        let r = self.data.borrow();
+        if (*r).is::<T>() {
+            Some(std::cell::Ref::map(r, |d| d.downcast_ref::<T>().unwrap()))
+        } else {
+            None
+        }
+    }
+
+    pub fn downcast_mut<T: 'static>(&self) -> Option<std::cell::RefMut<'_, T>> {
+        let r = self.data.borrow_mut();
+        if (*r).is::<T>() {
+            Some(std::cell::RefMut::map(r, |d| d.downcast_mut::<T>().unwrap()))
+        } else {
+            None
+        }
+    }
+}
+
+impl fmt::Debug for ForeignObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Foreign({})", self.type_name)
+    }
+}
+
+impl Clone for ForeignObject {
+    fn clone(&self) -> Self {
+        // Create a new Rc pointing to the same data
+        Self {
+            type_id: self.type_id,
+            type_name: self.type_name,
+            data: self.data.clone(),
+        }
+    }
+}
+
+impl PartialEq for ForeignObject {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_id == other.type_id && Rc::ptr_eq(&self.data, &other.data)
+    }
+}
 
 pub enum Value {
     Nil,
@@ -20,7 +78,7 @@ pub enum Value {
     Enum { tag: u16, data: Rc<RefCell<Vec<Value>>> },
     Function(usize),
     NativeFunction(NativeFn),
-    Foreign(Rc<RefCell<dyn Any>>),
+    Foreign(Rc<RefCell<ForeignObject>>),
 }
 
 impl fmt::Debug for Value {
@@ -36,7 +94,7 @@ impl fmt::Debug for Value {
             Value::Enum { tag, .. } => write!(f, "Enum({})", tag),
             Value::Function(idx) => write!(f, "Function({})", idx),
             Value::NativeFunction(_) => write!(f, "NativeFunction(...)"),
-            Value::Foreign(_) => write!(f, "Foreign(...)"),
+            Value::Foreign(obj) => write!(f, "{:?}", obj.borrow()),
         }
     }
 }
@@ -73,6 +131,7 @@ impl PartialEq for Value {
                 ta == tb && Rc::ptr_eq(da, db)
             }
             (Value::Function(a), Value::Function(b)) => a == b,
+            (Value::Foreign(a), Value::Foreign(b)) => *a.borrow() == *b.borrow(),
             _ => false,
         }
     }
@@ -91,7 +150,7 @@ impl Value {
             Value::Enum { .. } => "enum",
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",
-            Value::Foreign(_) => "foreign",
+            Value::Foreign(obj) => obj.borrow().type_name,
         }
     }
 
@@ -100,6 +159,35 @@ impl Value {
             Value::Nil => false,
             Value::Bool(b) => *b,
             _ => true,
+        }
+    }
+
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            Value::Int(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            Value::Float(n) => Some(*n),
+            Value::Int(n) => Some(*n as f64),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<String> {
+        match self {
+            Value::Str(s) => Some(s.to_string()),
+            _ => None,
         }
     }
 }

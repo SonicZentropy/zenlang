@@ -150,16 +150,42 @@ pub struct Chunk {
     pub code: Vec<u8>,
     pub constants: Vec<Value>,
     pub locals: u32,
+    /// Field name for each field index (used by LoadField/StoreField).
+    pub field_names: Vec<String>,
+    /// Method name for each method index (used by CallMethod).
+    pub method_names: Vec<String>,
 }
 
 impl Chunk {
     pub fn new() -> Self {
-        Self { code: Vec::new(), constants: Vec::new(), locals: 0 }
+        Self { code: Vec::new(), constants: Vec::new(), locals: 0, field_names: Vec::new(), method_names: Vec::new() }
     }
 
     pub fn add_constant(&mut self, val: Value) -> u16 {
         let idx = self.constants.len() as u16;
         self.constants.push(val);
+        idx
+    }
+
+    pub fn add_field_name(&mut self, name: &str) -> u16 {
+        for (i, n) in self.field_names.iter().enumerate() {
+            if n == name {
+                return i as u16;
+            }
+        }
+        let idx = self.field_names.len() as u16;
+        self.field_names.push(name.to_string());
+        idx
+    }
+
+    pub fn add_method_name(&mut self, name: &str) -> u16 {
+        for (i, n) in self.method_names.iter().enumerate() {
+            if n == name {
+                return i as u16;
+            }
+        }
+        let idx = self.method_names.len() as u16;
+        self.method_names.push(name.to_string());
         idx
     }
 
