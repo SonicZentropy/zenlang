@@ -25,6 +25,8 @@ enum Command {
     Disasm { path: camino::Utf8PathBuf },
     /// Type-check only (no execution)
     Check { path: camino::Utf8PathBuf },
+    /// Start the LSP language server (stdin/stdout)
+    Lsp,
 }
 
 fn main() -> zenlang::Result<()> {
@@ -37,6 +39,10 @@ fn main() -> zenlang::Result<()> {
         Some(Command::Repl) => run_repl(),
         Some(Command::Disasm { path }) => run_disasm(path),
         Some(Command::Check { path }) => run_check(path),
+        Some(Command::Lsp) => {
+            zenlang::lsp::run_server();
+            Ok(())
+        }
         None => {
             if let Some(path) = &cli.file {
                 run_script(path)

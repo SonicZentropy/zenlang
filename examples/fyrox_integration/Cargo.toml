@@ -1,0 +1,8 @@
+[package]
+name = "zenlang-fyrox-example"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fyrox = "1.0"
+zenlang = { path = "../.." }

@@ -1,0 +1,8 @@
+[package]
+name = "zenlang-bevy-example"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.19"
+zenlang = { path = "../.." }

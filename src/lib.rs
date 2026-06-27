@@ -13,6 +13,7 @@ pub mod value;
 pub mod vm;
 pub mod interop;
 pub mod hotreload;
+pub mod lsp;
 pub mod stdlib;
 
 pub use error::{Error, Result};
