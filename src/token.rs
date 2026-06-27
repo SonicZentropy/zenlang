@@ -1,0 +1,194 @@
+use compact_str::CompactString;
+use std::fmt;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenKind {
+    // Literals
+    Int(i64),
+    Float(f64),
+    Str(CompactString),
+    Bool(bool),
+
+    // Keywords
+    Fn,
+    Let,
+    Mut,
+    If,
+    Else,
+    While,
+    For,
+    Loop,
+    Break,
+    Continue,
+    Return,
+    Match,
+    In,
+    Struct,
+    Enum,
+    Impl,
+    Self_,
+    Pub,
+    Use,
+    Mod,
+    Const,
+    Type,
+    Underscore,
+
+    // Operators & Delimiters
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Eq,
+    EqEq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    And,
+    AndAnd,
+    Or,
+    OrOr,
+    Bang,
+    Dot,
+    DotDot,
+    DotDotEq,
+    Comma,
+    Semi,
+    Colon,
+    ColonColon,
+    Arrow,
+    FatArrow,
+    Hash,
+    At,
+    Question,
+
+    // Grouping
+    OpenParen,
+    CloseParen,
+    OpenBrace,
+    CloseBrace,
+    OpenBracket,
+    CloseBracket,
+
+    // Special
+    Ident(CompactString),
+    Eof,
+}
+
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenKind::Int(n) => write!(f, "int literal `{n}`"),
+            TokenKind::Float(n) => write!(f, "float literal `{n}`"),
+            TokenKind::Str(s) => write!(f, "string literal `{s}`"),
+            TokenKind::Bool(b) => write!(f, "bool literal `{b}`"),
+            TokenKind::Fn => write!(f, "`fn`"),
+            TokenKind::Let => write!(f, "`let`"),
+            TokenKind::Mut => write!(f, "`mut`"),
+            TokenKind::If => write!(f, "`if`"),
+            TokenKind::Else => write!(f, "`else`"),
+            TokenKind::While => write!(f, "`while`"),
+            TokenKind::For => write!(f, "`for`"),
+            TokenKind::Loop => write!(f, "`loop`"),
+            TokenKind::Break => write!(f, "`break`"),
+            TokenKind::Continue => write!(f, "`continue`"),
+            TokenKind::Return => write!(f, "`return`"),
+            TokenKind::Match => write!(f, "`match`"),
+            TokenKind::In => write!(f, "`in`"),
+            TokenKind::Struct => write!(f, "`struct`"),
+            TokenKind::Enum => write!(f, "`enum`"),
+            TokenKind::Impl => write!(f, "`impl`"),
+            TokenKind::Self_ => write!(f, "`self`"),
+            TokenKind::Pub => write!(f, "`pub`"),
+            TokenKind::Use => write!(f, "`use`"),
+            TokenKind::Mod => write!(f, "`mod`"),
+            TokenKind::Const => write!(f, "`const`"),
+            TokenKind::Type => write!(f, "`type`"),
+            TokenKind::Underscore => write!(f, "`_`"),
+            TokenKind::Plus => write!(f, "`+`"),
+            TokenKind::Minus => write!(f, "`-`"),
+            TokenKind::Star => write!(f, "`*`"),
+            TokenKind::Slash => write!(f, "`/`"),
+            TokenKind::Percent => write!(f, "`%`"),
+            TokenKind::Eq => write!(f, "`=`"),
+            TokenKind::EqEq => write!(f, "`==`"),
+            TokenKind::Ne => write!(f, "`!=`"),
+            TokenKind::Lt => write!(f, "`<`"),
+            TokenKind::Gt => write!(f, "`>`"),
+            TokenKind::Le => write!(f, "`<=`"),
+            TokenKind::Ge => write!(f, "`>=`"),
+            TokenKind::And => write!(f, "`&`"),
+            TokenKind::AndAnd => write!(f, "`&&`"),
+            TokenKind::Or => write!(f, "`|`"),
+            TokenKind::OrOr => write!(f, "`||`"),
+            TokenKind::Bang => write!(f, "`!`"),
+            TokenKind::Dot => write!(f, "`.`"),
+            TokenKind::DotDot => write!(f, "`..`"),
+            TokenKind::DotDotEq => write!(f, "`..=`"),
+            TokenKind::Comma => write!(f, "`,`"),
+            TokenKind::Semi => write!(f, "`;`"),
+            TokenKind::Colon => write!(f, "`:`"),
+            TokenKind::ColonColon => write!(f, "`::`"),
+            TokenKind::Arrow => write!(f, "`->`"),
+            TokenKind::FatArrow => write!(f, "`=>`"),
+            TokenKind::Hash => write!(f, "`#`"),
+            TokenKind::At => write!(f, "`@`"),
+            TokenKind::Question => write!(f, "`?`"),
+            TokenKind::OpenParen => write!(f, "`(`"),
+            TokenKind::CloseParen => write!(f, "`)`"),
+            TokenKind::OpenBrace => write!(f, "`{{`"),
+            TokenKind::CloseBrace => write!(f, "`}}`"),
+            TokenKind::OpenBracket => write!(f, "`[`"),
+            TokenKind::CloseBracket => write!(f, "`]`"),
+            TokenKind::Ident(s) => write!(f, "identifier `{s}`"),
+            TokenKind::Eof => write!(f, "end of file"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub lexeme: CompactString,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, lexeme: impl Into<CompactString>) -> Self {
+        Self { kind, lexeme: lexeme.into() }
+    }
+}
+
+/// Try to match a keyword from an identifier string.
+pub fn match_keyword(ident: &str) -> Option<TokenKind> {
+    match ident {
+        "fn" => Some(TokenKind::Fn),
+        "let" => Some(TokenKind::Let),
+        "mut" => Some(TokenKind::Mut),
+        "if" => Some(TokenKind::If),
+        "else" => Some(TokenKind::Else),
+        "while" => Some(TokenKind::While),
+        "for" => Some(TokenKind::For),
+        "loop" => Some(TokenKind::Loop),
+        "break" => Some(TokenKind::Break),
+        "continue" => Some(TokenKind::Continue),
+        "return" => Some(TokenKind::Return),
+        "match" => Some(TokenKind::Match),
+        "in" => Some(TokenKind::In),
+        "true" => Some(TokenKind::Bool(true)),
+        "false" => Some(TokenKind::Bool(false)),
+        "struct" => Some(TokenKind::Struct),
+        "enum" => Some(TokenKind::Enum),
+        "impl" => Some(TokenKind::Impl),
+        "self" => Some(TokenKind::Self_),
+        "pub" => Some(TokenKind::Pub),
+        "use" => Some(TokenKind::Use),
+        "mod" => Some(TokenKind::Mod),
+        "const" => Some(TokenKind::Const),
+        "type" => Some(TokenKind::Type),
+        "_" => Some(TokenKind::Underscore),
+        _ => None,
+    }
+}

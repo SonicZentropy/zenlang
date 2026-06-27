@@ -1,3 +1,21 @@
+Progress
+### Done
+- **Phases 0-5 complete**: Project scaffolding, lexer, parser, name resolver, type checker, bytecode compiler — all tests pass
+- **Value/IR updates**: Opcode with And/Or, Value with full runtime types (Str, Array, Struct, Enum, Function, NativeFunction, Foreign), Chunk with read_u16_static
+- **VM fixes**: JumpIfFalse pops condition; read_byte/read_u16 borrow issues fixed; functions referenced via constants not globals; calling convention fixed (bp = args_start, correct local slot allocation, arity propagated from params)
+- **Parser fixes**: Optional `;` after for/while/loop/if/block; return_stmt uses `r#match`
+- **Type checker fixes**: Uses `&mut SymbolTable`, properly enters/exits scopes; `let` bindings update inferred types (via `remove_from_current_scope` + `insert_into_current_scope` to handle shadowing); `Named("int"/"float"/"bool"/"str")` aliased to native types; for-loop variable type inferred from range start
+- **SymbolTable additions**: `update_variable_type`, `remove_from_current_scope`, `insert_into_current_scope`
+- **Compiler fixes**: Jump patch offset points to operand (not opcode); `chunk.locals` starts at 0; arity stored and propagated to `BytecodeFn`
+- **Phase 6 (VM)**: **64/64 tests pass** — all VM tests, type checker tests, resolver tests, parser tests, lexer tests pass
+
+### Next Steps
+1. **Phase 7 — Rust Interop**: ForeignType registry, FieldAccessor, bind macro
+2. **Phase 8 — Hot Reload**: File watcher, bytecode recompilation, state migration
+3. **Phase 9 — Std Library**: print, assert, type_of, len, math
+4. **Phase 10 — Tooling**: REPL, CLI, disassembler, stack traces
+
+
 ## User
 
 I'm interested in building my own basic programming language using Rust.  The idea is that it is specifically designed to be used as an embedded scripting language within a Rust game engine.  My goals are to make interop with Rust itself painless and some mechanism to ensure  I can hot-reload the scripting language without restarting my game/engine.  The syntax should be as close to Rust syntax as possible and there should be no sort of borrow checking or lifetime tracking.  Please develop a skeleton plan ffor this language divided into discrete modules that a LLM can follow to implement it
