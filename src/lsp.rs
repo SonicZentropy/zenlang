@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use lsp_types::notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification};
+use lsp_types::notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification};
 use lsp_types::request::{HoverRequest, Request};
 use lsp_types::*;
 use tracing::{debug, info, trace, warn};
@@ -42,6 +42,27 @@ fn offset_to_position(source: &str, offset: usize) -> Position {
         }
     }
     Position { line, character: col }
+}
+
+fn position_to_offset(source: &str, pos: Position) -> Option<usize> {
+    let mut line = 0u32;
+    let mut col = 0u32;
+    for (i, c) in source.char_indices() {
+        if line == pos.line && col == pos.character {
+            return Some(i);
+        }
+        if c == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+    // Position at EOF
+    if line == pos.line && col == pos.character {
+        return Some(source.len());
+    }
+    None
 }
 
 fn span_to_range(source: &str, span: Span) -> Range {
@@ -200,6 +221,9 @@ pub fn run_server() {
 
     let capabilities = ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        // NOTE: Kind(FULL/INCREMENTAL) and Options({change,openClose,save})
+        // have both been tried — Zed still does NOT send didChange/didSave.
+        // The root cause appears to be on the client (Zed) side.
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec![".".to_string(), ":".to_string()]),
             ..Default::default()
@@ -228,9 +252,7 @@ pub fn run_server() {
         ..Default::default()
     };
 
-    let init = serde_json::json!({
-        "capabilities": capabilities,
-    });
+    let init = serde_json::to_value(&capabilities).unwrap();
     connection.initialize(init).unwrap();
     info!("LSP server initialized with capabilities");
 
@@ -259,7 +281,7 @@ fn main_loop(connection: &mut lsp_server::Connection, docs: &mut HashMap<DocUri,
                 handle_request(connection, docs, req);
             }
             lsp_server::Message::Notification(notif) => {
-                trace!("received notification: {}", notif.method);
+                debug!("received notification: {}", notif.method);
                 handle_notification(connection, docs, notif);
             }
             lsp_server::Message::Response(resp) => {
@@ -380,15 +402,77 @@ fn handle_notification(
             let uri_clone = params.text_document.uri.clone();
             debug!("didChange: {uri_clone:?}");
 
-            if let Some(change) = params.content_changes.into_iter().last() {
-                let source = change.text;
+            // Apply every content change to the stored source (supports
+            // both INCREMENTAL and FULL sync).
+            let changed = params.content_changes.iter().any(|c| c.range.is_some());
+            let source = if let Some(state) = docs.get_mut(&uri_clone) {
+                for change in params.content_changes {
+                    if let Some(range) = change.range {
+                        // Incremental — replace the range with the new text.
+                        if let (Some(start), Some(end)) = (
+                            position_to_offset(&state.source, range.start),
+                            position_to_offset(&state.source, range.end),
+                        ) {
+                            let mut buf = String::with_capacity(
+                                state.source.len() + change.text.len() - (end - start),
+                            );
+                            buf.push_str(&state.source[..start]);
+                            buf.push_str(&change.text);
+                            buf.push_str(&state.source[end..]);
+                            state.source = buf;
+                        } else {
+                            warn!("didChange: invalid range for {uri_clone:?}, skipping");
+                        }
+                    } else {
+                        // Full — replace the whole document.
+                        state.source = change.text;
+                    }
+                }
+                if changed {
+                    trace!("source after incremental changes:\n{}", &state.source[..state.source.len().min(512)]);
+                }
+                state.source.clone()
+            } else {
+                warn!("didChange: no prior state for {uri_clone:?}, treating as open");
+                params.content_changes.into_iter().last().map(|c| c.text).unwrap_or_default()
+            };
+
+            match compile_source(&source) {
+                Ok(new_state) => {
+                    docs.insert(uri_clone.clone(), new_state);
+                    send_diagnostics(connection, uri_clone, Vec::new());
+                }
+                Err(diags) => {
+                    debug!("didChange: compilation produced {} diagnostic(s) for {uri_clone:?}", diags.len());
+                    // If we can parse, salvage partial state for semantic tokens etc.
+                    let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
+                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
+                        let mut p = parser;
+                        let native_names = crate::stdlib::native_names();
+                        let mut s = resolver::resolve_with_natives(&mut p, &native_names).ok().unwrap_or_else(SymbolTable::new);
+                        let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
+                        (p, s, t)
+                    } else {
+                        (Program::new(), SymbolTable::new(), TypeMap::new())
+                    };
+                    docs.insert(uri_clone.clone(), DocumentState { source, program, symbols, types });
+                    send_diagnostics(connection, uri_clone, diags);
+                }
+            }
+        }
+        DidSaveTextDocument::METHOD => {
+            let params: DidSaveTextDocumentParams = serde_json::from_value(notif.params).unwrap();
+            let uri = &params.text_document.uri;
+            debug!("didSave: {uri:?}");
+            if let Some(state) = docs.get(uri) {
+                let source = state.source.clone();
                 match compile_source(&source) {
-                    Ok(state) => {
-                        docs.insert(uri_clone.clone(), state);
-                        send_diagnostics(connection, uri_clone, Vec::new());
+                    Ok(new_state) => {
+                        docs.insert(uri.clone(), new_state);
+                        send_diagnostics(connection, uri.clone(), Vec::new());
                     }
                     Err(diags) => {
-                        debug!("didChange: compilation produced {} diagnostic(s) for {uri_clone:?}", diags.len());
+                        debug!("didSave: compilation produced {} diagnostic(s) for {uri:?}", diags.len());
                         let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
                         let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
                             let mut p = parser;
@@ -399,8 +483,8 @@ fn handle_notification(
                         } else {
                             (Program::new(), SymbolTable::new(), TypeMap::new())
                         };
-                        docs.insert(uri_clone.clone(), DocumentState { source, program, symbols, types });
-                        send_diagnostics(connection, uri_clone, diags);
+                        docs.insert(uri.clone(), DocumentState { source, program, symbols, types });
+                        send_diagnostics(connection, uri.clone(), diags);
                     }
                 }
             }
@@ -411,7 +495,7 @@ fn handle_notification(
             info!("didClose: {:?}", params.text_document.uri);
         }
         method => {
-            trace!("unhandled notification: {method}");
+            debug!("unhandled notification: {method}");
         }
     }
 }

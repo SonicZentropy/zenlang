@@ -1,7 +1,0 @@
-[zenlang lsp] starting, log: Z:\workspace\Rust\language_dev\zenlang\zenlang-lsp.log
-[zenlang lsp] ready
-2026-06-28T21:23:10.946554Z  INFO zenlang::lsp: LSP server starting
-
-thread 'main' (18716) panicked at src\lsp.rs:234:33:
-called `Result::unwrap()` on an `Err` value: ProtocolError("disconnected channel", true)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

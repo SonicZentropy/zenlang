@@ -22,24 +22,12 @@ impl zed::Extension for ZenlangExtension {
 }
 
 impl ZenlangExtension {
-    /// Locate the `zenlang` binary.
-    ///
-    /// Inside WASM we cannot use `std::path::Path::exists()` (WASI lacks
-    /// filesystem access), so we construct the path without checking.
-    ///
-    /// 1. `zenlang` on `$PATH`
-    /// 2. `{worktree_root}/target/debug/zenlang` (or `.exe` on Windows)
-    /// 3. `{worktree_root}/target/release/zenlang`
     fn lsp_path(&self, worktree: &zed::Worktree) -> String {
-        // Priority 1 — on PATH
-        if let Some(p) = worktree.which("zenlang") {
-            return p;
-        }
-
-        // Priority 2 — local cargo build
+        // Hardcode to the local cargo build. worktree.which() is
+        // unreliable from WASM on Windows, and PATH copy/which
+        // introduced more problems than it solved during dev.
         let root = worktree.root_path();
-        let exe = if cfg!(windows) { "zenlang.exe" } else { "zenlang" };
-        format!("{root}/target/debug/{exe}")
+        format!("{root}/target/debug/zenlang.exe")
     }
 }
 

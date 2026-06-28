@@ -1,3 +1,4 @@
 fn main() -> int {
-	"test"
+	//"test"
+	42
 }
