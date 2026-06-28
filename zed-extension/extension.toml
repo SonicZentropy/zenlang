@@ -12,3 +12,5 @@ rev = "2ead1bdd6e99d2f8da2d84122309701479938729"
 [language_servers.zenlang-language-server]
 name = "Zenlang LSP"
 languages = ["Zenlang"]
+command = "zenlang"
+args = ["lsp"]
