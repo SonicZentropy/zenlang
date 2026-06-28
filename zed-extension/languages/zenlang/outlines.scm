@@ -1,19 +1,19 @@
 ; Outline queries - match named definitions
 
 ; Functions
-(function_declaration (identifier) @function)
+(function_declaration (identifier) @_function)
 
 ; Structs
-(struct_declaration (type_identifier) @type)
+(struct_declaration (type_identifier) @_type)
 
 ; Enums
-(enum_declaration (type_identifier) @type)
+(enum_declaration (type_identifier) @_type)
 
 ; Impl blocks
-(impl_declaration (type_identifier) @type)
+(impl_declaration (type_identifier) @_type)
 
 ; Constants/variables
-(let_statement (identifier) @variable)
+(let_statement (identifier) @_variable)
 
 ; Types
-(type_identifier) @type
+(type_identifier) @_type

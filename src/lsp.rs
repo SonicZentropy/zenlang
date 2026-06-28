@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use lsp_types::notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification};
 use lsp_types::request::{HoverRequest, Request};
 use lsp_types::*;
+use tracing::{debug, info, trace, warn};
 
 use crate::ast::{Program, Stmt};
 use crate::compiler;
@@ -88,31 +89,113 @@ fn error_to_diagnostics(source: &str, err: &Error) -> Vec<Diagnostic> {
 }
 
 fn compile_source(source: &str) -> Result<DocumentState, Vec<Diagnostic>> {
+    trace!("compilation: lexing");
     let _tokens = match Lexer::new(source).tokenize() {
         Ok(t) => t,
-        Err(e) => return Err(error_to_diagnostics(source, &e)),
+        Err(e) => {
+            trace!("compilation: lexing failed");
+            return Err(error_to_diagnostics(source, &e));
+        }
     };
+    trace!("compilation: parsing");
     let parser = Parser::new(&_tokens);
     let mut program = match parser.parse() {
         Ok(p) => p,
-        Err(e) => return Err(error_to_diagnostics(source, &e)),
+        Err(e) => {
+            trace!("compilation: parsing failed");
+            return Err(error_to_diagnostics(source, &e));
+        }
     };
+    trace!("compilation: resolving");
     let native_names = crate::stdlib::native_names();
     let mut symbols = match resolver::resolve_with_natives(&mut program, &native_names) {
         Ok(s) => s,
-        Err(e) => return Err(error_to_diagnostics(source, &e)),
+        Err(e) => {
+            trace!("compilation: resolution failed");
+            return Err(error_to_diagnostics(source, &e));
+        }
     };
+    trace!("compilation: type-checking");
     let types = match typeck::check(&program, &mut symbols) {
         Ok(t) => t,
-        Err(e) => return Err(error_to_diagnostics(source, &e)),
+        Err(e) => {
+            trace!("compilation: type-checking failed");
+            return Err(error_to_diagnostics(source, &e));
+        }
     };
+    trace!("compilation: codegen");
     if let Err(e) = compiler::compile(&program, &types, &symbols, &native_names, source) {
+        trace!("compilation: codegen failed");
         return Err(error_to_diagnostics(source, &e));
     }
+    trace!("compilation: success");
     Ok(DocumentState { source: source.to_string(), program, symbols, types })
 }
 
+/// Resolve the path for the persistent log file.
+///
+/// Order of precedence:
+/// 1. `ZENLANG_LSP_LOG` env var
+/// 2. `./zenlang-lsp.log` (cwd)
+/// 3. `{temp_dir}/zenlang-lsp.log`
+fn resolve_log_path() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("ZENLANG_LSP_LOG") {
+        return std::path::PathBuf::from(p);
+    }
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let candidate = cwd.join("zenlang-lsp.log");
+    if std::fs::OpenOptions::new().create(true).append(true).open(&candidate).is_ok() {
+        return candidate;
+    }
+    std::env::temp_dir().join("zenlang-lsp.log")
+}
+
+/// Initialise tracing for the LSP server.
+///
+/// Writes to **stderr** (primary — Zed always captures this and surfaces
+/// it in its logs / LSP pane) and to a file for persistence (path resolved
+/// by [`resolve_log_path`]).
+fn init_lsp_tracing() -> tracing_appender::non_blocking::WorkerGuard {
+    let log_path = resolve_log_path();
+
+    eprintln!("[zenlang lsp] starting, log: {}", log_path.display());
+
+    // File writer (non‑blocking so the LSP is never stalled by I/O)
+    let log_dir  = log_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+    let log_name = log_path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "zenlang-lsp.log".into());
+    let file_appender = tracing_appender::rolling::never(&log_dir, &log_name);
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
+    // Two layers: one for stderr, one for the file.
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
+
+    let stderr_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_ansi(false)
+        .with_filter(tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| "zenlang=info".into()));
+
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking)
+        .with_ansi(false)
+        .with_filter(tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| "zenlang=debug".into()));
+
+    tracing_subscriber::registry()
+        .with(stderr_layer)
+        .with(file_layer)
+        .init();
+
+    eprintln!("[zenlang lsp] ready");
+    guard
+}
+
 pub fn run_server() {
+    let _guard = init_lsp_tracing();
+    info!("LSP server starting");
+
     let (mut connection, io_threads) = lsp_server::Connection::stdio();
 
     let capabilities = ServerCapabilities {
@@ -149,9 +232,11 @@ pub fn run_server() {
         "capabilities": capabilities,
     });
     connection.initialize(init).unwrap();
+    info!("LSP server initialized with capabilities");
 
     let mut docs: HashMap<DocUri, DocumentState> = HashMap::new();
     main_loop(&mut connection, &mut docs);
+    info!("LSP server shutting down");
     io_threads.join().unwrap();
 }
 
@@ -159,19 +244,27 @@ fn main_loop(connection: &mut lsp_server::Connection, docs: &mut HashMap<DocUri,
     loop {
         let msg = match connection.receiver.recv() {
             Ok(msg) => msg,
-            Err(_) => return,
+            Err(e) => {
+                debug!("main_loop recv error: {e}");
+                return;
+            }
         };
         match msg {
             lsp_server::Message::Request(req) => {
+                debug!("received request: {} (id={:?})", req.method, req.id);
                 if connection.handle_shutdown(&req).unwrap_or(false) {
+                    info!("received shutdown request");
                     return;
                 }
                 handle_request(connection, docs, req);
             }
             lsp_server::Message::Notification(notif) => {
+                trace!("received notification: {}", notif.method);
                 handle_notification(connection, docs, notif);
             }
-            lsp_server::Message::Response(_resp) => {}
+            lsp_server::Message::Response(resp) => {
+                trace!("received response (id={:?})", resp.id);
+            }
         }
     }
 }
@@ -181,24 +274,46 @@ fn handle_request(
     docs: &HashMap<DocUri, DocumentState>,
     req: lsp_server::Request,
 ) {
+    let uri_hint: String = match req.params.get("textDocument").and_then(|td| td.get("uri")).and_then(|u| u.as_str()) {
+        Some(u) => u.to_string(),
+        None => "<unknown>".into(),
+    };
+    debug!("handling request: {} for {}", req.method, uri_hint);
+
     let result: Option<serde_json::Value> = match req.method.as_str() {
         HoverRequest::METHOD => {
             let params: HoverParams = serde_json::from_value(req.params).unwrap();
             let uri = params.text_document_position_params.text_document.uri;
             let state = docs.get(&uri);
             let pos = params.text_document_position_params.position;
-            serde_json::to_value(state.and_then(|s| hover(s, &pos))).ok()
+            let r = state.and_then(|s| hover(s, &pos));
+            if r.is_some() {
+                debug!("hover: returning result for {uri:?}");
+            } else {
+                trace!("hover: no result for {uri:?}");
+            }
+            serde_json::to_value(r).ok()
         }
         "textDocument/completion" => {
             let params: CompletionParams = serde_json::from_value(req.params).unwrap();
             let uri = params.text_document_position.text_document.uri;
             let state = docs.get(&uri);
             let pos = params.text_document_position.position;
-            serde_json::to_value(state.and_then(|s| completion(s, &pos))).ok()
+            let r = state.and_then(|s| completion(s, &pos));
+            debug!(
+                "completion: {} items for {uri:?}",
+                r.as_ref().map(|c| match c {
+                    CompletionResponse::Array(items) => items.len(),
+                    _ => 0,
+                }).unwrap_or(0)
+            );
+            serde_json::to_value(r).ok()
         }
         "textDocument/definition" => {
             let params: GotoDefinitionParams = serde_json::from_value(req.params).unwrap();
-            serde_json::to_value(goto_definition(docs, &params.text_document_position_params)).ok()
+            let r = goto_definition(docs, &params.text_document_position_params);
+            trace!("definition: returning {r:?}");
+            serde_json::to_value(r).ok()
         }
         "textDocument/documentSymbol" => {
             let params: DocumentSymbolParams = serde_json::from_value(req.params).unwrap();
@@ -212,7 +327,10 @@ fn handle_request(
             let state = docs.get(&uri);
             serde_json::to_value(state.and_then(semantic_tokens)).ok()
         }
-        _ => None,
+        method => {
+            debug!("unhandled request method: {method}");
+            None
+        }
     };
     let response = lsp_server::Response {
         id: req.id,
@@ -232,12 +350,16 @@ fn handle_notification(
             let params: DidOpenTextDocumentParams = serde_json::from_value(notif.params).unwrap();
             let uri_clone = params.text_document.uri.clone();
             let source = params.text_document.text;
+            info!("didOpen: {uri_clone:?}");
+            trace!("didOpen source ({} chars):\n{}", source.len(), &source[..source.len().min(512)]);
+
             match compile_source(&source) {
                 Ok(state) => {
                     docs.insert(uri_clone.clone(), state);
                     send_diagnostics(connection, uri_clone, Vec::new());
                 }
                 Err(diags) => {
+                    warn!("didOpen: compilation produced {} diagnostic(s) for {uri_clone:?}", diags.len());
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
                     let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
                         let mut p = parser;
@@ -256,6 +378,8 @@ fn handle_notification(
         DidChangeTextDocument::METHOD => {
             let params: DidChangeTextDocumentParams = serde_json::from_value(notif.params).unwrap();
             let uri_clone = params.text_document.uri.clone();
+            debug!("didChange: {uri_clone:?}");
+
             if let Some(change) = params.content_changes.into_iter().last() {
                 let source = change.text;
                 match compile_source(&source) {
@@ -264,6 +388,7 @@ fn handle_notification(
                         send_diagnostics(connection, uri_clone, Vec::new());
                     }
                     Err(diags) => {
+                        debug!("didChange: compilation produced {} diagnostic(s) for {uri_clone:?}", diags.len());
                         let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
                         let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
                             let mut p = parser;
@@ -283,12 +408,24 @@ fn handle_notification(
         DidCloseTextDocument::METHOD => {
             let params: DidCloseTextDocumentParams = serde_json::from_value(notif.params).unwrap();
             docs.remove(&params.text_document.uri);
+            info!("didClose: {:?}", params.text_document.uri);
         }
-        _ => {}
+        method => {
+            trace!("unhandled notification: {method}");
+        }
     }
 }
 
 fn send_diagnostics(connection: &mut lsp_server::Connection, uri: DocUri, diags: Vec<Diagnostic>) {
+    debug!("send_diagnostics: {} diagnostic(s) for {uri:?}", diags.len());
+    for d in &diags {
+        trace!(
+            "  diag: line {}:{} - {}",
+            d.range.start.line,
+            d.range.start.character,
+            d.message,
+        );
+    }
     let params = PublishDiagnosticsParams {
         uri,
         diagnostics: diags,

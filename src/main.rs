@@ -30,9 +30,12 @@ enum Command {
 }
 
 fn main() -> zenlang::Result<()> {
-    zenlang::init_tracing();
-
     let cli = Cli::parse();
+
+    // LSP sets up its own file-based tracing; all other commands use stderr.
+    if !matches!(&cli.command, Some(Command::Lsp)) {
+        zenlang::init_tracing();
+    }
 
     match &cli.command {
         Some(Command::Run { path }) => run_script(path),
