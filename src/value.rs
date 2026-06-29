@@ -4,6 +4,13 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
+/// Data stored in a closure value: function index and captured upvalues.
+#[derive(Debug, Clone)]
+pub struct ClosureData {
+    pub fn_idx: usize,
+    pub upvalues: Vec<Value>,
+}
+
 use crate::error::Result;
 
 /// A native Rust function that can be called from Zenlang.
@@ -79,6 +86,7 @@ pub enum Value {
     Function(usize),
     NativeFunction(NativeFn),
     Foreign(Rc<RefCell<ForeignObject>>),
+    Closure(Rc<RefCell<ClosureData>>),
 }
 
 impl fmt::Debug for Value {
@@ -95,6 +103,7 @@ impl fmt::Debug for Value {
             Value::Function(idx) => write!(f, "Function({})", idx),
             Value::NativeFunction(_) => write!(f, "NativeFunction(...)"),
             Value::Foreign(obj) => write!(f, "{:?}", obj.borrow()),
+            Value::Closure(c) => write!(f, "Closure(fn={}, up_count={})", c.borrow().fn_idx, c.borrow().upvalues.len()),
         }
     }
 }
@@ -113,6 +122,7 @@ impl Clone for Value {
             Value::Function(idx) => Value::Function(*idx),
             Value::NativeFunction(f) => Value::NativeFunction(f.clone()),
             Value::Foreign(r) => Value::Foreign(r.clone()),
+            Value::Closure(c) => Value::Closure(c.clone()),
         }
     }
 }
@@ -132,6 +142,11 @@ impl PartialEq for Value {
             }
             (Value::Function(a), Value::Function(b)) => a == b,
             (Value::Foreign(a), Value::Foreign(b)) => *a.borrow() == *b.borrow(),
+            (Value::Closure(a), Value::Closure(b)) => {
+                let ca = a.borrow();
+                let cb = b.borrow();
+                ca.fn_idx == cb.fn_idx && ca.upvalues == cb.upvalues
+            }
             _ => false,
         }
     }
@@ -151,6 +166,7 @@ impl Value {
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",
             Value::Foreign(obj) => obj.borrow().type_name,
+            Value::Closure(_) => "closure",
         }
     }
 

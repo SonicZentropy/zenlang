@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::ir::*;
-use crate::span::{SourceLocation, Span};
+use crate::span::{SourceLocation, Span, Spanned};
 use crate::symbol::*;
 use crate::typeck::TypeMap;
 use crate::value::Value;
@@ -35,7 +37,7 @@ pub fn compile(
     source: &str,
 ) -> Result<(Vec<BytecodeFn>, Vec<String>)> {
     let line_offsets = build_line_offsets(source);
-    let mut globals: HashMap<String, u16> = HashMap::new();
+    let globals: Rc<RefCell<HashMap<String, u16>>> = Rc::new(RefCell::new(HashMap::new()));
     let mut global_order: Vec<String> = Vec::new();
     let mut function_names: HashMap<String, usize> = HashMap::new();
     let mut errors: Vec<Error> = Vec::new();
@@ -43,25 +45,36 @@ pub fn compile(
 
     // Pre-register native function names as globals (stable indices)
     for name in native_names {
-        if !globals.contains_key(name) {
-            let idx = globals.len() as u16;
-            globals.insert(name.clone(), idx);
+        let mut g = globals.borrow_mut();
+        if !g.contains_key(name) {
+            let idx = g.len() as u16;
+            g.insert(name.clone(), idx);
             global_order.push(name.clone());
         }
     }
 
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
-        register_global_stmt(&stmt.node, &mut globals, &mut global_order);
+        register_global_stmt(&stmt.node, &mut *globals.borrow_mut(), &mut global_order);
         if let Stmt::Fn { name, .. } = &stmt.node {
-            let idx = function_names.len() + 1; // +1 because main is index 0
+            let idx = function_names.len() + 1;
             function_names.insert(name.to_string(), idx);
         }
     }
 
+    // Count lambdas and compute function indices
+    let user_fn_count = program.stmts.iter().filter(|s| matches!(&s.node, Stmt::Fn {..})).count();
+    let _lambda_count = count_lambdas_in_stmts(&program.stmts);
+    let lambda_base = 1 + user_fn_count; // main=0, user functions start at 1
+    let lambda_counter = Rc::new(RefCell::new(lambda_base));
+    let lambda_fns: Rc<RefCell<Vec<BytecodeFn>>> = Rc::new(RefCell::new(Vec::new()));
+
     // Second pass: compile top-level statements into a main function
     {
-        let mut fc = FunctionCompiler::new("__main__".into(), 0, &mut globals, &function_names, &mut errors, &line_offsets);
+        let mut fc = FunctionCompiler::new(
+            "__main__".into(), 0, globals.clone(), &function_names,
+            &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(),
+        );
         let stmt_count = program.stmts.len();
         for (i, stmt) in program.stmts.iter().enumerate() {
             fc.set_line_by_offset(stmt.span.start());
@@ -86,7 +99,10 @@ pub fn compile(
     for stmt in &program.stmts {
         if let Stmt::Fn { name, params, return_type: _, body } = &stmt.node {
             let arity = params.len() as u32;
-            let mut fc = FunctionCompiler::new(name.to_string(), arity, &mut globals, &function_names, &mut errors, &line_offsets);
+            let mut fc = FunctionCompiler::new(
+                name.to_string(), arity, globals.clone(), &function_names,
+                &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(),
+            );
 
             fc.enter_scope();
             for param in params {
@@ -116,10 +132,192 @@ pub fn compile(
         }
     }
 
+    // Append all collected lambda functions
+    functions.extend(std::mem::take(&mut *lambda_fns.borrow_mut()));
+
     if errors.is_empty() {
         Ok((functions, global_order))
     } else {
         Err(Error::CompileMultiple { errors })
+    }
+}
+
+/// Count the number of `Expr::Lambda` nodes in a program.
+fn count_lambdas_in_stmts(stmts: &[Spanned<Stmt>]) -> usize {
+    stmts.iter().map(|s| count_lambdas_in_stmt(&s.node)).sum()
+}
+
+fn count_lambdas_in_stmt(stmt: &Stmt) -> usize {
+    match stmt {
+        Stmt::Fn { body, .. } => count_lambdas_in_stmts(body),
+        Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
+        Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
+        Stmt::Impl { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
+        _ => 0,
+    }
+}
+
+fn count_lambdas_in_expr(expr: &Expr) -> usize {
+    match expr {
+        Expr::Lambda { body, .. } => 1 + count_lambdas_in_expr(body),
+        Expr::Block(stmts) => count_lambdas_in_stmts(stmts),
+        Expr::If { cond, then, else_ } => {
+            count_lambdas_in_expr(cond)
+                + count_lambdas_in_expr(then)
+                + else_.as_ref().map_or(0, |e| count_lambdas_in_expr(e))
+        }
+        Expr::While { cond, body } => count_lambdas_in_expr(cond) + count_lambdas_in_expr(body),
+        Expr::Loop(body) => count_lambdas_in_expr(body),
+        Expr::For { iter, body, .. } => count_lambdas_in_expr(iter) + count_lambdas_in_expr(body),
+        Expr::Match { expr, arms } => {
+            count_lambdas_in_expr(expr)
+                + arms.iter().map(|arm| {
+                    let mut c = count_lambdas_in_expr(&arm.body);
+                    if let Some(g) = &arm.guard {
+                        c += count_lambdas_in_expr(g);
+                    }
+                    c
+                }).sum::<usize>()
+        }
+        Expr::Binary { lhs, rhs, .. } => count_lambdas_in_expr(lhs) + count_lambdas_in_expr(rhs),
+        Expr::Unary { expr, .. } => count_lambdas_in_expr(expr),
+        Expr::Call { func, args } => {
+            count_lambdas_in_expr(func) + args.iter().map(count_lambdas_in_expr).sum::<usize>()
+        }
+        Expr::MethodCall { obj, args, .. } => {
+            count_lambdas_in_expr(obj) + args.iter().map(count_lambdas_in_expr).sum::<usize>()
+        }
+        Expr::Field { obj, .. } => count_lambdas_in_expr(obj),
+        Expr::Index { obj, index } => count_lambdas_in_expr(obj) + count_lambdas_in_expr(index),
+        Expr::StructLit { fields, .. } => fields.iter().map(|(_, v)| count_lambdas_in_expr(v)).sum(),
+        Expr::Array(elems) => elems.iter().map(count_lambdas_in_expr).sum(),
+        Expr::Range { start, end, .. } => count_lambdas_in_expr(start) + count_lambdas_in_expr(end),
+        Expr::Return(Some(inner)) => count_lambdas_in_expr(inner),
+        _ => 0,
+    }
+}
+
+/// Collect free (captured) variable names from a lambda body.
+/// Returns names referenced in `expr` that are NOT in `own_names` (params/locals of the lambda).
+fn collect_free_vars(expr: &Expr, own_names: &HashSet<String>) -> Vec<String> {
+    let mut vars = Vec::new();
+    collect_free_vars_inner(expr, own_names, &mut vars);
+    vars
+}
+
+fn collect_free_vars_inner(expr: &Expr, own: &HashSet<String>, result: &mut Vec<String>) {
+    match expr {
+        Expr::Ident(name) => {
+            if !own.contains(name.as_str()) && !result.iter().any(|s| s == name.as_str()) {
+                result.push(name.to_string());
+            }
+        }
+        Expr::Block(stmts) => collect_free_in_stmts(stmts, own, result),
+        Expr::Lambda { params, body, .. } => {
+            let mut local_own = own.clone();
+            for p in params {
+                local_own.insert(p.name.to_string());
+            }
+            collect_free_vars_inner(body, &local_own, result);
+        }
+        Expr::If { cond, then, else_ } => {
+            collect_free_vars_inner(cond, own, result);
+            collect_free_vars_inner(then, own, result);
+            if let Some(e) = else_ {
+                collect_free_vars_inner(e, own, result);
+            }
+        }
+        Expr::While { cond, body } => {
+            collect_free_vars_inner(cond, own, result);
+            collect_free_vars_inner(body, own, result);
+        }
+        Expr::Loop(body) => collect_free_vars_inner(body, own, result),
+        Expr::For { iter, body, .. } => {
+            collect_free_vars_inner(iter, own, result);
+            collect_free_vars_inner(body, own, result);
+        }
+        Expr::Match { expr, arms } => {
+            collect_free_vars_inner(expr, own, result);
+            for arm in arms {
+                if let Some(g) = &arm.guard {
+                    collect_free_vars_inner(g, own, result);
+                }
+                collect_free_vars_inner(&arm.body, own, result);
+            }
+        }
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_free_vars_inner(lhs, own, result);
+            collect_free_vars_inner(rhs, own, result);
+        }
+        Expr::Unary { expr, .. } => collect_free_vars_inner(expr, own, result),
+        Expr::Call { func, args } => {
+            collect_free_vars_inner(func, own, result);
+            for arg in args {
+                collect_free_vars_inner(arg, own, result);
+            }
+        }
+        Expr::MethodCall { obj, args, .. } => {
+            collect_free_vars_inner(obj, own, result);
+            for arg in args {
+                collect_free_vars_inner(arg, own, result);
+            }
+        }
+        Expr::Field { obj, .. } => collect_free_vars_inner(obj, own, result),
+        Expr::Index { obj, index } => {
+            collect_free_vars_inner(obj, own, result);
+            collect_free_vars_inner(index, own, result);
+        }
+        Expr::StructLit { fields, .. } => {
+            for (_, v) in fields {
+                collect_free_vars_inner(v, own, result);
+            }
+        }
+        Expr::Array(elems) => {
+            for e in elems {
+                collect_free_vars_inner(e, own, result);
+            }
+        }
+        Expr::Range { start, end, .. } => {
+            collect_free_vars_inner(start, own, result);
+            collect_free_vars_inner(end, own, result);
+        }
+        Expr::Return(Some(inner)) => collect_free_vars_inner(inner, own, result),
+        _ => {}
+    }
+}
+
+fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result: &mut Vec<String>) {
+    let mut local_own = own.clone();
+    for stmt in stmts {
+        match &stmt.node {
+            Stmt::Let { name, init, .. } => {
+                if let Some(init_expr) = init {
+                    collect_free_vars_inner(init_expr, &local_own, result);
+                }
+                local_own.insert(name.to_string());
+            }
+            Stmt::Expr(expr) | Stmt::Return(Some(expr)) => {
+                collect_free_vars_inner(expr, &local_own, result);
+            }
+            Stmt::Fn { params, body, .. } => {
+                let mut fn_own = local_own.clone();
+                for p in params {
+                    fn_own.insert(p.name.to_string());
+                }
+                collect_free_in_stmts(body, &fn_own, result);
+            }
+            Stmt::Impl { methods, .. } => {
+                for m in methods {
+                    collect_free_in_stmts(
+                        &[Spanned::new(m.node.clone(), m.span)], // cheap clone for analysis
+                        &local_own,
+                        result,
+                    );
+                }
+            }
+            Stmt::Return(None) => {}
+            _ => {}
+        }
     }
 }
 
@@ -156,12 +354,14 @@ struct FunctionCompiler<'a> {
     loop_start: Vec<usize>,
     loop_continue: Vec<usize>,
     loop_end_jumps: Vec<Vec<usize>>,
-    globals: &'a mut HashMap<String, u16>,
+    globals: Rc<RefCell<HashMap<String, u16>>>,
     function_names: &'a HashMap<String, usize>,
     errors: &'a mut Vec<Error>,
     current_line: usize,
     line_offsets: &'a [usize],
     const_map: HashMap<u64, u16>,
+    lambda_counter: Rc<RefCell<usize>>,
+    lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
 }
 
 struct Local {
@@ -174,10 +374,12 @@ impl<'a> FunctionCompiler<'a> {
     fn new(
         name: String,
         arity: u32,
-        globals: &'a mut HashMap<String, u16>,
+        globals: Rc<RefCell<HashMap<String, u16>>>,
         function_names: &'a HashMap<String, usize>,
         errors: &'a mut Vec<Error>,
         line_offsets: &'a [usize],
+        lambda_counter: Rc<RefCell<usize>>,
+        lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.locals = 0;
@@ -196,6 +398,8 @@ impl<'a> FunctionCompiler<'a> {
             errors,
             current_line: 0,
             line_offsets,
+            lambda_counter,
+            lambda_fns,
         }
     }
 
@@ -274,7 +478,7 @@ impl<'a> FunctionCompiler<'a> {
     }
 
     fn resolve_global(&self, name: &str) -> Option<u16> {
-        self.globals.get(name).copied()
+        self.globals.borrow().get(name).copied()
     }
 
     fn enter_scope(&mut self) {
@@ -305,8 +509,8 @@ impl<'a> FunctionCompiler<'a> {
                     if let Some(idx) = self.resolve_global(name) {
                         self.emit_op(Opcode::StoreGlobal(idx));
                     } else {
-                        let idx = self.globals.len() as u16;
-                        self.globals.insert(name.to_string(), idx);
+                        let idx = self.globals.borrow().len() as u16;
+                        self.globals.borrow_mut().insert(name.to_string(), idx);
                         self.emit_op(Opcode::StoreGlobal(idx));
                     }
                 } else {
@@ -362,8 +566,8 @@ impl<'a> FunctionCompiler<'a> {
                 } else if let Some(idx) = self.resolve_global(name) {
                     self.emit_op(Opcode::LoadGlobal(idx));
                 } else {
-                    let idx = self.globals.len() as u16;
-                    self.globals.insert(name.to_string(), idx);
+                    let idx = self.globals.borrow().len() as u16;
+                    self.globals.borrow_mut().insert(name.to_string(), idx);
                     self.emit_op(Opcode::LoadGlobal(idx));
                 }
             }
@@ -718,10 +922,68 @@ impl<'a> FunctionCompiler<'a> {
                 self.compile_expr(end);
             }
 
-            Expr::Lambda { .. } => {
-                self.error("closures not yet supported");
+            Expr::Lambda { params, body, .. } => {
+                self.compile_lambda(params, body);
             }
         }
+    }
+
+    fn compile_lambda(&mut self, params: &[Param], body: &Expr) {
+        // Collect free variables referenced in the lambda body
+        let own_names: HashSet<String> = params.iter().map(|p| p.name.to_string()).collect();
+        let free_vars = collect_free_vars(body, &own_names);
+
+        // For each free var, verify it's a local in the current function and emit LoadLocal
+        let mut upvalue_names: Vec<String> = Vec::new();
+        for var in &free_vars {
+            if let Some(idx) = self.resolve_local(var) {
+                self.emit_op(Opcode::LoadLocal(idx));
+                upvalue_names.push(var.clone());
+            }
+            // If not local, it'll be resolved via globals in the lambda body; no capture needed
+        }
+
+        // Assign a function index for this lambda
+        let fn_idx = {
+            let mut c = self.lambda_counter.borrow_mut();
+            let idx = *c;
+            *c += 1;
+            idx
+        };
+
+        // Create a new FunctionCompiler for the lambda body
+        let actual_arity = upvalue_names.len() as u32 + params.len() as u32;
+        let mut lambda_fc = FunctionCompiler::new(
+            format!("__lambda_{}", fn_idx),
+            actual_arity,
+            self.globals.clone(),
+            self.function_names,
+            self.errors,
+            self.line_offsets,
+            self.lambda_counter.clone(),
+            self.lambda_fns.clone(),
+        );
+
+        // Enter scope, add upvalues as locals first, then params
+        lambda_fc.enter_scope();
+        for name in &upvalue_names {
+            lambda_fc.add_local(name);
+        }
+        for param in params {
+            lambda_fc.add_local(&param.name);
+        }
+
+        // Compile the lambda body
+        lambda_fc.compile_expr(body);
+        lambda_fc.none();
+        lambda_fc.emit_op(Opcode::Return);
+        lambda_fc.exit_scope();
+
+        // Store the compiled lambda
+        self.lambda_fns.borrow_mut().push(lambda_fc.finalize());
+
+        // Emit NewClosure with function index and upvalue count
+        self.emit_op(Opcode::NewClosure(fn_idx as u16, upvalue_names.len() as u16));
     }
 
     fn compile_assignment(&mut self, target: &Expr, value: &Expr) {
@@ -794,7 +1056,8 @@ fn const_hash(val: &Value) -> u64 {
         }
         Value::Function(idx) => 5 ^ (*idx as u64),
         Value::Array(_) | Value::Struct(_) | Value::Enum { .. }
-        | Value::NativeFunction(_) | Value::Foreign(_) => {
+        | Value::NativeFunction(_) | Value::Foreign(_)
+        | Value::Closure(_) => {
             // These types use pointer identity, hash is not stable;
             // fall back to linear scan (handled in add_const)
             6

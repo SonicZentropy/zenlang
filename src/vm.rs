@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crate::error::{Error, Result};
 use crate::interop::{ForeignTypeDef, ForeignTypeRegistry};
 use crate::ir::{BytecodeFn, Chunk, Opcode};
-use crate::value::{NativeFn, Value};
+use crate::value::{ClosureData, NativeFn, Value};
 
 /// Execution context provided to native functions.
 pub struct VMContext {
@@ -515,6 +515,32 @@ impl VM {
                                 self.stack.push(Value::Nil);
                             }
                         }
+                        Value::Closure(closure) => {
+                            let data = closure.borrow();
+                            let fn_idx = data.fn_idx;
+                            let up_count = data.upvalues.len();
+                            // Pop the arguments (excluding callee)
+                            let args: Vec<Value> = self.stack.drain(args_start..).collect();
+                            self.stack.pop(); // pop closure
+                            // Push upvalues first
+                            for uv in &data.upvalues {
+                                self.stack.push(uv.clone());
+                            }
+                            // Push the actual arguments
+                            for arg in &args {
+                                self.stack.push(arg.clone());
+                            }
+                            // bp points to the first upvalue
+                            let bp = self.stack.len() - up_count - args.len();
+                            let frame = CallFrame::new(fn_idx, bp);
+                            self.frames.push(frame);
+
+                            let fn_def = &self.functions[fn_idx];
+                            let slot_count = fn_def.chunk.locals as usize;
+                            while self.stack.len() < bp + slot_count {
+                                self.stack.push(Value::Nil);
+                            }
+                        }
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop(); // pop callee
@@ -741,9 +767,15 @@ impl VM {
                 }
 
                 Opcode::NewClosure(_, _) => {
-                    let _fn_idx = self.read_u16() as usize;
-                    let _up_count = self.read_u16() as usize;
-                    self.stack.push(Value::Function(_fn_idx));
+                    let fn_idx = self.read_u16() as usize;
+                    let up_count = self.read_u16() as usize;
+                    let mut upvalues = Vec::with_capacity(up_count);
+                    for _ in 0..up_count {
+                        upvalues.push(self.stack.pop().unwrap());
+                    }
+                    upvalues.reverse();
+                    let data = Rc::new(RefCell::new(ClosureData { fn_idx, upvalues }));
+                    self.stack.push(Value::Closure(data));
                 }
 
                 Opcode::BitAnd => {
@@ -1433,6 +1465,17 @@ fn remap_function_value(
                 }
             }
         }
+        Value::Closure(c) => {
+            let mut data = c.borrow_mut();
+            if let Some(name) = old_name_to_idx.iter().find(|(_, v)| **v == data.fn_idx).map(|(n, _)| *n) {
+                if let Some(&new_idx) = new_name_to_idx.get(name) {
+                    data.fn_idx = new_idx;
+                }
+            }
+            for uv in data.upvalues.iter_mut() {
+                remap_function_value(uv, old_name_to_idx, new_name_to_idx);
+            }
+        }
         Value::Array(arr) => {
             for v in arr.borrow_mut().iter_mut() {
                 remap_function_value(v, old_name_to_idx, new_name_to_idx);
@@ -1459,5 +1502,46 @@ fn compare_lt(a: &Value, b: &Value) -> bool {
         (Value::Int(ai), Value::Float(bf)) => (*ai as f64) < *bf,
         (Value::Float(af), Value::Int(bi)) => *af < (*bi as f64),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod closure_tests {
+    use super::*;
+    use crate::compiler;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn run(source: &str) -> Value {
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let mut program = Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(
+            &program, &types, &symbols, &native_names, source
+        ).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.run_main().unwrap()
+    }
+
+    #[test]
+    fn test_simple_closure() {
+        let result = run("let f = || 42; f()");
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_closure_with_params() {
+        let result = run("let f = |x, y| x + y; f(3, 4)");
+        assert_eq!(result, Value::Int(7));
+    }
+
+    #[test]
+    fn test_closure_captures_upvalue() {
+        let result = run("let x = 10; let f = || x + 5; f()");
+        assert_eq!(result, Value::Int(15));
     }
 }

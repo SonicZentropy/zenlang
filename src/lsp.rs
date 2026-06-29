@@ -10,7 +10,7 @@ use lsp_types::request::{Formatting, HoverRequest, Request};
 use lsp_types::*;
 use tracing::{debug, info, trace, warn};
 
-use crate::ast::{Program, Stmt};
+use crate::ast::{Expr, Pattern, Program, Stmt};
 use crate::compiler;
 use crate::error::Error;
 use crate::lexer::Lexer;
@@ -758,10 +758,231 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
 }
 
 fn goto_definition(
-    _docs: &HashMap<DocUri, DocumentState>,
-    _params: &TextDocumentPositionParams,
+    docs: &HashMap<DocUri, DocumentState>,
+    params: &TextDocumentPositionParams,
 ) -> Option<GotoDefinitionResponse> {
+    let uri = &params.text_document.uri;
+    let state = docs.get(uri)?;
+    let offset = position_to_offset(&state.source, params.position)?;
+    let source = state.source.as_bytes();
+    if offset >= source.len()
+        || !(source[offset].is_ascii_alphanumeric() || source[offset] == b'_')
+    {
+        return None;
+    }
+    let start = (0..offset)
+        .rev()
+        .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
+        .last()
+        .unwrap_or(offset);
+    let end = offset
+        + 1
+        + (offset + 1..source.len())
+            .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
+            .count();
+    let name = &state.source[start..end];
+
+    // Verify the symbol exists in the symbol table
+    state.symbols.lookup(name)?;
+
+    // Walk the AST to find the definition span
+    let def_span = find_definition_in_stmts(&state.program.stmts, &state.source, name)?;
+    let range = span_to_range(&state.source, def_span);
+    Some(GotoDefinitionResponse::Scalar(Location {
+        uri: uri.clone(),
+        range,
+    }))
+}
+
+/// Recursively search statements for a definition of `name`.
+fn find_definition_in_stmts(
+    stmts: &[Spanned<Stmt>],
+    source: &str,
+    name: &str,
+) -> Option<Span> {
+    for stmt in stmts {
+        if let Some(span) = find_definition_in_stmt(stmt, source, name) {
+            return Some(span);
+        }
+    }
     None
+}
+
+fn find_definition_in_stmt(
+    stmt: &Spanned<Stmt>,
+    source: &str,
+    name: &str,
+) -> Option<Span> {
+    match &stmt.node {
+        Stmt::Fn { name: fn_name, params, body, .. } => {
+            if fn_name.as_str() == name {
+                return Some(name_span_in_source(source, stmt.span, name)?);
+            }
+            // Check params
+            for param in params {
+                if param.name.as_str() == name {
+                    return Some(name_span_in_source(source, stmt.span, name)?);
+                }
+            }
+            // Check body statements
+            find_definition_in_stmts(body, source, name)
+        }
+        Stmt::Let { name: let_name, init, .. } => {
+            if let_name.as_str() == name {
+                return Some(name_span_in_source(source, stmt.span, name)?);
+            }
+            if let Some(init_expr) = init {
+                find_definition_in_expr(init_expr, source, name)
+            } else {
+                None
+            }
+        }
+        Stmt::Struct { name: struct_name, .. }
+        | Stmt::Enum { name: struct_name, .. } => {
+            if struct_name.as_str() == name {
+                return Some(name_span_in_source(source, stmt.span, name)?);
+            }
+            None
+        }
+        Stmt::Impl { methods, .. } => {
+            for method in methods {
+                if let Some(span) = find_definition_in_stmt(method, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Stmt::Expr(expr) => find_definition_in_expr(expr, source, name),
+        Stmt::Return(Some(expr)) => find_definition_in_expr(expr, source, name),
+        Stmt::Return(None) => None,
+    }
+}
+
+fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span> {
+    match expr {
+        Expr::Block(stmts) => find_definition_in_stmts(stmts, source, name),
+        Expr::Lambda { params: _, body, .. } => {
+            find_definition_in_expr(body, source, name)
+        }
+        Expr::For { iter, body, .. } => {
+            // for-var definitions don't have individual spans, skip
+            find_definition_in_expr(iter, source, name)
+                .or_else(|| find_definition_in_expr(body, source, name))
+        }
+        Expr::Match { expr: match_expr, arms } => {
+            // Check match expr
+            if let Some(span) = find_definition_in_expr(match_expr, source, name) {
+                return Some(span);
+            }
+            for arm in arms {
+                if let Pattern::Ident(pat_name) = &arm.pattern {
+                    if pat_name.as_str() == name {
+                        // pattern identifiers don't have spans; skip
+                    }
+                }
+                if let Some(guard) = &arm.guard {
+                    if let Some(span) = find_definition_in_expr(guard, source, name) {
+                        return Some(span);
+                    }
+                }
+                if let Some(span) = find_definition_in_expr(&arm.body, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Expr::If { cond, then, else_ } => {
+            find_definition_in_expr(cond, source, name)
+                .or_else(|| find_definition_in_expr(then, source, name))
+                .or_else(|| {
+                    else_.as_ref()
+                        .and_then(|e| find_definition_in_expr(e, source, name))
+                })
+        }
+        Expr::While { cond, body } => find_definition_in_expr(cond, source, name)
+            .or_else(|| find_definition_in_expr(body, source, name)),
+        Expr::Loop(body) => find_definition_in_expr(body, source, name),
+        Expr::Binary { lhs, rhs, .. } => find_definition_in_expr(lhs, source, name)
+            .or_else(|| find_definition_in_expr(rhs, source, name)),
+        Expr::Unary { expr: inner, .. } => find_definition_in_expr(inner, source, name),
+        Expr::Call { func, args } => {
+            let mut result = find_definition_in_expr(func, source, name);
+            for arg in args {
+                if result.is_some() {
+                    break;
+                }
+                result = find_definition_in_expr(arg, source, name);
+            }
+            result
+        }
+        Expr::MethodCall { obj, args, .. } => {
+            let mut result = find_definition_in_expr(obj, source, name);
+            for arg in args {
+                if result.is_some() {
+                    break;
+                }
+                result = find_definition_in_expr(arg, source, name);
+            }
+            result
+        }
+        Expr::Field { obj, .. } => find_definition_in_expr(obj, source, name),
+        Expr::Index { obj, index } => find_definition_in_expr(obj, source, name)
+            .or_else(|| find_definition_in_expr(index, source, name)),
+        Expr::StructLit { fields, .. } => {
+            for (_, val) in fields {
+                if let Some(span) = find_definition_in_expr(val, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Expr::Array(elems) => {
+            for elem in elems {
+                if let Some(span) = find_definition_in_expr(elem, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Expr::Range { start, end, .. } => find_definition_in_expr(start, source, name)
+            .or_else(|| find_definition_in_expr(end, source, name)),
+        Expr::Return(Some(inner)) => find_definition_in_expr(inner, source, name),
+        // Literals and control-flow keywords have no sub-definitions
+        Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)
+        | Expr::Unit | Expr::Ident(_) | Expr::Break | Expr::Continue
+        | Expr::Return(None) => None,
+    }
+}
+
+/// Find the byte span of `name` considered as an identifier in `source`
+/// within the approximate range `hint_span` (used as fallback bounds).
+fn name_span_in_source(source: &str, hint_span: Span, name: &str) -> Option<Span> {
+    let search_start = hint_span.0.saturating_sub(16);
+    let search_end = (hint_span.1 + 16).min(source.len());
+    let search_slice = &source[search_start..search_end];
+    // Find the name as a whole word
+    let mut i = 0;
+    while i < search_slice.len() {
+        if let Some(pos) = search_slice[i..].find(name) {
+            let abs_pos = search_start + i + pos;
+            // Check word boundaries
+            let before = abs_pos.saturating_sub(1);
+            let after = abs_pos + name.len();
+            let prev_ok = before < search_start
+                || !source.as_bytes()[before].is_ascii_alphanumeric();
+            let next_ok = after >= search_end
+                || after >= source.len()
+                || !source.as_bytes()[after].is_ascii_alphanumeric();
+            if prev_ok && next_ok {
+                return Some(Span(abs_pos, abs_pos + name.len()));
+            }
+            i += pos + 1;
+        } else {
+            break;
+        }
+    }
+    // Fallback: just use the hint span
+    Some(Span(hint_span.0, hint_span.0 + name.len().min(hint_span.1 - hint_span.0)))
 }
 
 fn document_symbols(state: &DocumentState) -> Option<Vec<DocumentSymbol>> {
