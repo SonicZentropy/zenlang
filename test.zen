@@ -1,5 +1,6 @@
 fn main() -> int {
     //"test"
+    an_error();
     42
 }
 
@@ -7,6 +8,7 @@ fn testai() -> void {
     return ;
 }
 
+// This should return an error
 fn an_error() -> int {
     "test"
 }

@@ -246,9 +246,9 @@ mod tests {
             println!("{i:>3}: |{l}|");
         }
         // Exactly 1 blank line between each function
-        assert_eq!(result.lines().nth(4), Some("}"));
-        assert_eq!(result.lines().nth(5), Some(""));
-        assert_eq!(result.lines().nth(6), Some("fn testai() -> void {"));
+        assert_eq!(result.lines().nth(3), Some("}"));
+        assert_eq!(result.lines().nth(4), Some(""));
+        assert_eq!(result.lines().nth(5), Some("fn testai() -> void {"));
     }
 
     #[test]

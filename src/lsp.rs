@@ -531,11 +531,55 @@ fn send_diagnostics(connection: &mut lsp_server::Connection, uri: DocUri, diags:
     connection.sender.send(lsp_server::Message::Notification(notif)).unwrap();
 }
 
-fn hover(state: &DocumentState, _pos: &Position) -> Option<Hover> {
-    state.symbols.symbols.last().map(|(name, kind)| Hover {
-        contents: HoverContents::Scalar(MarkedString::String(format!("{}: {}", name, symkind_display(kind)))),
-        range: None,
-    })
+fn hover(state: &DocumentState, pos: &Position) -> Option<Hover> {
+    let offset = position_to_offset(&state.source, *pos)?;
+    for stmt in &state.program.stmts {
+        if stmt.span.start() <= offset && offset < stmt.span.end() {
+            let name = match &stmt.node {
+                Stmt::Fn { name, .. } => Some(name.as_str()),
+                Stmt::Struct { name, .. } => Some(name.as_str()),
+                Stmt::Enum { name, .. } => Some(name.as_str()),
+                Stmt::Impl { type_name, .. } => Some(type_name.as_str()),
+                _ => None,
+            };
+            if let Some(name) = name {
+                let kind = state.symbols.symbols.iter().rev().find(|(n, _)| n == name).map(|(_, k)| k);
+                if let Some(kind) = kind {
+                    let mut text = String::new();
+                    if let Some(c) = comment_before(&state.source, stmt.span.start()) {
+                        text.push_str(&c);
+                        text.push_str("\n\n");
+                    }
+                    text.push_str(&format!("`{}`: {}", name, symkind_display(kind)));
+                    return Some(Hover {
+                        contents: HoverContents::Scalar(MarkedString::String(text)),
+                        range: None,
+                    });
+                }
+            }
+        }
+    }
+    None
+}
+
+fn comment_before(source: &str, offset: usize) -> Option<String> {
+    let prefix = &source[..offset];
+    let mut comments = Vec::new();
+    for line in prefix.lines().rev() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("//") || trimmed.starts_with("/*") {
+            comments.push(trimmed);
+        } else if trimmed.is_empty() {
+            continue;
+        } else {
+            break;
+        }
+    }
+    if comments.is_empty() {
+        return None;
+    }
+    comments.reverse();
+    Some(comments.join("\n"))
 }
 
 fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionResponse> {
