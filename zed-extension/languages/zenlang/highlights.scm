@@ -14,6 +14,7 @@
 
 ; Types
 (type_identifier) @type
+(builtin_type) @type.builtin
 (struct_declaration (type_identifier) @type)
 (enum_declaration (type_identifier) @type)
 

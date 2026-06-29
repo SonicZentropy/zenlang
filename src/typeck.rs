@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::*;
 use crate::error::{Error, Result};
-use crate::span::SourceLocation;
+use crate::span::{SourceLocation, Span};
 use crate::symbol::*;
 
 pub type NodeId = usize;
@@ -48,7 +48,14 @@ struct TypeChecker<'a> {
 impl<'a> TypeChecker<'a> {
     fn error(&mut self, msg: impl Into<String>) {
         self.errors.push(Error::TypeError {
-            location: SourceLocation::new(None, crate::span::Span::new(0, 0), 0, 0),
+            location: SourceLocation::new(None, Span::new(0, 0), 0, 0),
+            msg: msg.into(),
+        });
+    }
+
+    fn error_at(&mut self, span: Span, msg: impl Into<String>) {
+        self.errors.push(Error::TypeError {
+            location: SourceLocation::new(None, span, 0, 0),
             msg: msg.into(),
         });
     }
@@ -109,7 +116,7 @@ impl<'a> TypeChecker<'a> {
                         let ty = self.check_expr(e);
                         if let Some(rt) = expected_ret {
                             if !self.types_compatible(&ty, rt) {
-                                self.error(format!(
+                                self.error_at(last.span, format!(
                                     "function return type mismatch: expected '{}', got '{}'",
                                     self.type_display(rt),
                                     self.type_display(&ty),

@@ -103,21 +103,29 @@ impl<'a> Parser<'a> {
         if self.r#match(TokenKind::Let) {
             self.let_stmt()
         } else if self.check(&TokenKind::If) {
-            let stmt = self.if_stmt().map(|e| Spanned::new(Stmt::Expr(e), Span::new(0, 0)));
+            let start = self.peek().span.start();
+            let expr = self.if_stmt()?;
+            let end = self.prev_span().end();
             self.r#match(TokenKind::Semi);
-            stmt
+            Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else if self.check(&TokenKind::While) {
-            let stmt = self.while_stmt().map(|e| Spanned::new(Stmt::Expr(e), Span::new(0, 0)));
+            let start = self.peek().span.start();
+            let expr = self.while_stmt()?;
+            let end = self.prev_span().end();
             self.r#match(TokenKind::Semi);
-            stmt
+            Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else if self.check(&TokenKind::For) {
-            let stmt = self.for_stmt().map(|e| Spanned::new(Stmt::Expr(e), Span::new(0, 0)));
+            let start = self.peek().span.start();
+            let expr = self.for_stmt()?;
+            let end = self.prev_span().end();
             self.r#match(TokenKind::Semi);
-            stmt
+            Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else if self.check(&TokenKind::Loop) {
-            let stmt = self.loop_stmt().map(|e| Spanned::new(Stmt::Expr(e), Span::new(0, 0)));
+            let start = self.peek().span.start();
+            let expr = self.loop_stmt()?;
+            let end = self.prev_span().end();
             self.r#match(TokenKind::Semi);
-            stmt
+            Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else if self.r#match(TokenKind::Return) {
             self.return_stmt()
         } else if self.r#match(TokenKind::Break) {
@@ -129,9 +137,11 @@ impl<'a> Parser<'a> {
             self.r#match(TokenKind::Semi);
             Ok(Spanned::new(Stmt::Expr(Expr::Continue), span))
         } else if self.check(&TokenKind::OpenBrace) {
-            let stmt = self.block().map(|e| Spanned::new(Stmt::Expr(e), Span::new(0, 0)));
+            let start = self.peek().span.start();
+            let expr = self.block()?;
+            let end = self.prev_span().end();
             self.r#match(TokenKind::Semi);
-            stmt
+            Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else {
             self.expr_stmt()
         }
@@ -160,10 +170,11 @@ impl<'a> Parser<'a> {
     }
 
     fn expr_stmt(&mut self) -> Result<Spanned<Stmt>> {
+        let start = self.peek().span.start();
         let expr = self.expression(Precedence::Lowest)?;
-        let span = Span::new(0, 0); // FIXME: capture proper span
-        // Consume semicolon if present, otherwise it's the last expression in a block
+        let end = self.prev_span().end();
         self.r#match(TokenKind::Semi);
+        let span = Span::new(start, end);
         Ok(Spanned::new(Stmt::Expr(expr), span))
     }
 

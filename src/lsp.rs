@@ -725,7 +725,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
             token_modifiers_bitset: 0,
         });
         prev_line = pos.line;
-        prev_col = pos.character + len;
+        prev_col = pos.character;
     }
 
     Some(SemanticTokensResult::Tokens(SemanticTokens {

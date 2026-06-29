@@ -94,3 +94,363 @@
 2026-06-28T23:37:27.395714Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
 2026-06-28T23:37:27.473072Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(20)))
 2026-06-28T23:37:27.473112Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:20.376443Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:20.376543Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:20.376766Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:20.431059Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(21)))
+2026-06-28T23:38:20.431155Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:22.193260Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:22.193313Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.193445Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.193553Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.194211Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(22)))
+2026-06-28T23:38:22.194247Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:22.194298Z DEBUG zenlang::lsp: completion: 18 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.249933Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(23)))
+2026-06-28T23:38:22.250008Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:22.268102Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:22.268157Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.268212Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.268255Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.326106Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(24)))
+2026-06-28T23:38:22.326160Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:22.659290Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:22.659392Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.659479Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.659533Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:22.714444Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(25)))
+2026-06-28T23:38:22.714501Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:24.647187Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:24.647285Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.647350Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.647438Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.647789Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(26)))
+2026-06-28T23:38:24.647817Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:24.647881Z DEBUG zenlang::lsp: completion: 18 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.697709Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:24.697763Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.697818Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.697859Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.767597Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(27)))
+2026-06-28T23:38:24.767673Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:24.809969Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(28)))
+2026-06-28T23:38:24.810041Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:24.926477Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:24.926570Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.926626Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.926698Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:24.979416Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(29)))
+2026-06-28T23:38:24.979471Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:25.026909Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:25.026978Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:25.027037Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:25.027080Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:25.041316Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(30)))
+2026-06-28T23:38:25.041364Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:25.088993Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(31)))
+2026-06-28T23:38:25.089073Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:25.901612Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:25.901698Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:25.901755Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:25.901797Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:25.957118Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(32)))
+2026-06-28T23:38:25.957182Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:26.006915Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(33)))
+2026-06-28T23:38:26.006972Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:26.007808Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:26.007892Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:26.007990Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:26.008050Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:26.065835Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(34)))
+2026-06-28T23:38:26.065879Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:26.117620Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(35)))
+2026-06-28T23:38:26.117702Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:28.124226Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:28.124297Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.124353Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.124396Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.178234Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(36)))
+2026-06-28T23:38:28.178273Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:28.192665Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:28.192736Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.192866Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.192933Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.255429Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(37)))
+2026-06-28T23:38:28.255486Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:28.374562Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:28.374690Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.374776Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.374833Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.441467Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(38)))
+2026-06-28T23:38:28.441502Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:28.653706Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:28.653799Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.653888Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.653968Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:28.706124Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(39)))
+2026-06-28T23:38:28.706160Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:29.037721Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:29.037791Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:29.037850Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:29.037922Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:29.090757Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(40)))
+2026-06-28T23:38:29.090833Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:29.150963Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:29.151062Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:29.151139Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:29.151181Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:29.214209Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(41)))
+2026-06-28T23:38:29.214246Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.206603Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:32.206680Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.206769Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.206849Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.207136Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(42)))
+2026-06-28T23:38:32.207177Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.207324Z DEBUG zenlang::lsp: completion: 18 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.266025Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(43)))
+2026-06-28T23:38:32.266078Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.316437Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(44)))
+2026-06-28T23:38:32.316507Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.316587Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(45)))
+2026-06-28T23:38:32.316610Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.332009Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:32.332097Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.332183Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.332228Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.332641Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(46)))
+2026-06-28T23:38:32.332662Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.332717Z DEBUG zenlang::lsp: completion: 18 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.390977Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(47)))
+2026-06-28T23:38:32.391038Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.406442Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:32.406531Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.406622Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.406680Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.407558Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(48)))
+2026-06-28T23:38:32.407580Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.407665Z DEBUG zenlang::lsp: completion: 18 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.468154Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(49)))
+2026-06-28T23:38:32.468209Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.508949Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:32.509036Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.509121Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.509189Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.510147Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(50)))
+2026-06-28T23:38:32.510208Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.510288Z DEBUG zenlang::lsp: completion: 18 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.518771Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(51)))
+2026-06-28T23:38:32.518830Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.575963Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(52)))
+2026-06-28T23:38:32.576021Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.665259Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:32.665315Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.665374Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.665419Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.730512Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(53)))
+2026-06-28T23:38:32.730570Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:32.888789Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:32.888891Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.888953Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.889025Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:32.947373Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(54)))
+2026-06-28T23:38:32.947439Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:33.272726Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:33.272796Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:33.272858Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:33.272926Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:33.334130Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(55)))
+2026-06-28T23:38:33.334184Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:33.849441Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:33.849569Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:33.849676Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:33.849763Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:33.910539Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(56)))
+2026-06-28T23:38:33.910613Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:34.497346Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:34.497403Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:34.497594Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:34.561779Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(57)))
+2026-06-28T23:38:34.561820Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:38:35.127471Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-28T23:38:35.127618Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:35.127862Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-28T23:38:35.181830Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(58)))
+2026-06-28T23:38:35.181884Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-28T23:39:34.344109Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-28T23:39:34.344149Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-28T23:42:43.625392Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-28T23:42:43.625441Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T01:26:29.209545Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T01:26:29.209682Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T01:26:29.246245Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(59)))
+2026-06-29T01:26:29.246324Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T02:09:40.735361Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T02:09:40.736366Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T02:09:40.736413Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T02:09:40.736551Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T02:09:40.737052Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T02:09:41.236903Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-06-29T02:09:41.236966Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///test.zen
+2026-06-29T02:09:41.237101Z DEBUG zenlang::lsp: main_loop recv error: receiving on an empty and disconnected channel
+2026-06-29T02:09:41.237144Z  INFO zenlang::lsp: LSP server shutting down
+2026-06-29T02:16:07.128292Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T02:16:07.129186Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T02:16:07.129216Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T02:16:07.129307Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T02:16:07.129569Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T02:16:07.429803Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-06-29T02:16:07.429930Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///test.zen
+2026-06-29T02:16:07.430358Z DEBUG zenlang::lsp: main_loop recv error: receiving on an empty and disconnected channel
+2026-06-29T02:16:07.430428Z  INFO zenlang::lsp: LSP server shutting down
+2026-06-29T04:11:30.611635Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T04:11:30.643700Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T04:11:30.643759Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T04:11:30.643784Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T04:11:30.643874Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T04:11:30.644075Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:30.644619Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:30.707339Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-06-29T04:11:30.707402Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:38.969520Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(3)))
+2026-06-29T04:11:38.969580Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:38.969675Z DEBUG zenlang::lsp: hover: returning result for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:40.115263Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(4)))
+2026-06-29T04:11:40.115315Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:40.126961Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(5)))
+2026-06-29T04:11:40.127004Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:40.128083Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(6)))
+2026-06-29T04:11:40.128121Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:40.150019Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(7)))
+2026-06-29T04:11:40.150079Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:42.878625Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:42.878750Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:42.879032Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:42.941496Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(8)))
+2026-06-29T04:11:42.941574Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:43.126322Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:43.126396Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:43.126625Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:43.126868Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:43.190766Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(9)))
+2026-06-29T04:11:43.190827Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:45.319087Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(10)))
+2026-06-29T04:11:45.319140Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.063896Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:47.063959Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.064273Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.065102Z DEBUG zenlang::lsp: received request: textDocument/completion (id=RequestId(I32(11)))
+2026-06-29T04:11:47.065172Z DEBUG zenlang::lsp: handling request: textDocument/completion for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.065326Z DEBUG zenlang::lsp: completion: 41 items for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.127303Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(12)))
+2026-06-29T04:11:47.127385Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.170645Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(13)))
+2026-06-29T04:11:47.170711Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.261335Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:47.261451Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.261830Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.329674Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(14)))
+2026-06-29T04:11:47.329864Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.373955Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(15)))
+2026-06-29T04:11:47.374009Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.792499Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:47.792576Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.792808Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.852340Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(16)))
+2026-06-29T04:11:47.852391Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.898985Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(17)))
+2026-06-29T04:11:47.899054Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:47.941195Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:47.941278Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.941607Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:47.993585Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(18)))
+2026-06-29T04:11:47.993640Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.010646Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:48.010720Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.010954Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.072981Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(19)))
+2026-06-29T04:11:48.073037Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.119429Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(20)))
+2026-06-29T04:11:48.119486Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.198777Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:48.198862Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.199088Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.258558Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(21)))
+2026-06-29T04:11:48.258602Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.300948Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(22)))
+2026-06-29T04:11:48.301000Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.312468Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:48.312554Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.312762Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.363828Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(23)))
+2026-06-29T04:11:48.363925Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.385943Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:48.386006Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.386233Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:48.440995Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(24)))
+2026-06-29T04:11:48.441050Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:48.488901Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(25)))
+2026-06-29T04:11:48.488970Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:50.245130Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:50.245225Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:50.245380Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:50.245507Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:50.308462Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(26)))
+2026-06-29T04:11:50.308521Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:50.415606Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:50.415705Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:50.416002Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:50.478461Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(27)))
+2026-06-29T04:11:50.478503Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:51.227168Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:51.227262Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:51.227348Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:51.227412Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:51.288650Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(28)))
+2026-06-29T04:11:51.288690Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:11:51.381425Z DEBUG zenlang::lsp: received notification: textDocument/didChange
+2026-06-29T04:11:51.381503Z DEBUG zenlang::lsp: didChange: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:51.381712Z DEBUG zenlang::lsp: didChange: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:51.381878Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T04:11:51.448369Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(29)))
+2026-06-29T04:11:51.448444Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T04:16:22.411528Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T04:16:22.412210Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T04:16:22.412254Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T04:16:22.412524Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:16:22.412877Z  WARN zenlang::lsp: didOpen: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:16:22.412996Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:16:22.902264Z DEBUG zenlang::lsp: main_loop recv error: receiving on an empty and disconnected channel
+2026-06-29T04:16:22.902360Z  INFO zenlang::lsp: LSP server shutting down
+2026-06-29T04:16:36.506827Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T04:16:36.507707Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T04:16:36.507760Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T04:16:36.507914Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:16:36.508304Z  WARN zenlang::lsp: didOpen: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:16:36.508501Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:18:45.192012Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T04:18:45.193278Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T04:18:45.193344Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T04:18:45.193579Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:18:45.194317Z  WARN zenlang::lsp: didOpen: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:18:45.194459Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:18:45.694000Z DEBUG zenlang::lsp: main_loop recv error: receiving on an empty and disconnected channel
+2026-06-29T04:18:45.694125Z  INFO zenlang::lsp: LSP server shutting down
+2026-06-29T04:19:39.729828Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T04:19:39.730776Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T04:19:39.730815Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T04:19:39.730951Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:19:39.731368Z  WARN zenlang::lsp: didOpen: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:19:39.731489Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/test.zen", query: None, fragment: None })
+2026-06-29T04:19:40.231444Z DEBUG zenlang::lsp: main_loop recv error: receiving on an empty and disconnected channel
+2026-06-29T04:19:40.231511Z  INFO zenlang::lsp: LSP server shutting down
+2026-06-29T06:24:37.035388Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T06:24:37.044944Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T06:24:37.045009Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T06:24:37.045052Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T06:24:37.045113Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T06:24:37.045278Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T06:24:37.045636Z  WARN zenlang::lsp: didOpen: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T06:24:37.045767Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T06:24:37.110258Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-06-29T06:24:37.110307Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
