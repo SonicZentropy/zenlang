@@ -533,33 +533,43 @@ fn send_diagnostics(connection: &mut lsp_server::Connection, uri: DocUri, diags:
 
 fn hover(state: &DocumentState, pos: &Position) -> Option<Hover> {
     let offset = position_to_offset(&state.source, *pos)?;
-    for stmt in &state.program.stmts {
-        if stmt.span.start() <= offset && offset < stmt.span.end() {
-            let name = match &stmt.node {
-                Stmt::Fn { name, .. } => Some(name.as_str()),
-                Stmt::Struct { name, .. } => Some(name.as_str()),
-                Stmt::Enum { name, .. } => Some(name.as_str()),
-                Stmt::Impl { type_name, .. } => Some(type_name.as_str()),
-                _ => None,
-            };
-            if let Some(name) = name {
-                let kind = state.symbols.symbols.iter().rev().find(|(n, _)| n == name).map(|(_, k)| k);
-                if let Some(kind) = kind {
-                    let mut text = String::new();
-                    if let Some(c) = comment_before(&state.source, stmt.span.start()) {
-                        text.push_str(&c);
-                        text.push_str("\n\n");
-                    }
-                    text.push_str(&format!("`{}`: {}", name, symkind_display(kind)));
-                    return Some(Hover {
-                        contents: HoverContents::Scalar(MarkedString::String(text)),
-                        range: None,
-                    });
-                }
-            }
+    let source = state.source.as_bytes();
+    if offset >= source.len() {
+        return None;
+    }
+    // Extract the identifier at the cursor
+    if !source[offset].is_ascii_alphanumeric() && source[offset] != b'_' {
+        return None;
+    }
+    let start = (0..offset).rev()
+        .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
+        .last()
+        .unwrap_or(offset);
+    let end = offset + 1 + (offset + 1..source.len())
+        .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
+        .count();
+    let name = &state.source[start..end];
+
+    let kind = state.symbols.symbols.iter().rev().find(|(n, _)| n == name).map(|(_, k)| k)?;
+    // Find the definition's top-level statement for its comment
+    let def_span = state.program.stmts.iter().find(|s| match &s.node {
+        Stmt::Fn { name: n, .. } | Stmt::Struct { name: n, .. } | Stmt::Enum { name: n, .. } => n == name,
+        Stmt::Impl { type_name, .. } => type_name == name,
+        _ => false,
+    }).map(|s| s.span);
+
+    let mut text = String::new();
+    if let Some(span) = def_span {
+        if let Some(c) = comment_before(&state.source, span.start()) {
+            text.push_str(&c);
+            text.push_str("\n\n");
         }
     }
-    None
+    text.push_str(&format!("`{}`: {}", name, symkind_display(kind)));
+    Some(Hover {
+        contents: HoverContents::Scalar(MarkedString::String(text)),
+        range: None,
+    })
 }
 
 fn comment_before(source: &str, offset: usize) -> Option<String> {

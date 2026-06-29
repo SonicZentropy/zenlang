@@ -1137,3 +1137,30 @@
 2026-06-29T08:31:27.643458Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
 2026-06-29T08:31:28.432464Z DEBUG zenlang::lsp: received request: textDocument/formatting (id=RequestId(I32(44)))
 2026-06-29T08:31:28.432508Z DEBUG zenlang::lsp: handling request: textDocument/formatting for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:11.281734Z  INFO zenlang::lsp: LSP server starting
+2026-06-29T08:38:11.286263Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-06-29T08:38:11.286330Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T08:38:11.286351Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T08:38:11.286516Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-06-29T08:38:11.286793Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T08:38:11.287605Z  WARN zenlang::lsp: didOpen: compilation produced 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T08:38:11.287818Z DEBUG zenlang::lsp: send_diagnostics: 1 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T08:38:11.348937Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-06-29T08:38:11.349012Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:14.265807Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(3)))
+2026-06-29T08:38:14.265899Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:14.513860Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(4)))
+2026-06-29T08:38:14.513935Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:15.525569Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(5)))
+2026-06-29T08:38:15.525617Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:15.853160Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(6)))
+2026-06-29T08:38:15.853216Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:15.853328Z DEBUG zenlang::lsp: hover: returning result for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T08:38:17.848696Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(7)))
+2026-06-29T08:38:17.848751Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:17.848811Z DEBUG zenlang::lsp: hover: returning result for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T08:38:19.709200Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(8)))
+2026-06-29T08:38:19.709245Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:20.457326Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(9)))
+2026-06-29T08:38:20.457398Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-06-29T08:38:20.457469Z DEBUG zenlang::lsp: hover: returning result for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
