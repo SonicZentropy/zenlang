@@ -44,6 +44,7 @@ impl Precedence {
                 | TokenKind::Gt | TokenKind::Ge => Precedence::Compare,
             TokenKind::Plus | TokenKind::Minus => Precedence::Term,
             TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Precedence::Factor,
+            TokenKind::OpenParen | TokenKind::Dot | TokenKind::OpenBracket => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }
@@ -399,11 +400,10 @@ impl<'a> Parser<'a> {
             TokenKind::Loop => self.loop_stmt(),
             TokenKind::Match => self.match_expr(),
 
-            // Identifiers (including struct literals)
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
-                // Check for struct literal: Ident { ... }
-                if self.r#match(TokenKind::OpenBrace) {
+                if self.is_struct_lit_start() {
+                    self.advance();
                     let mut fields = Vec::new();
                     while !self.check(&TokenKind::CloseBrace) && !self.is_at_end() {
                         let fname = self.expect_ident()?;
@@ -686,6 +686,29 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn is_struct_lit_start(&self) -> bool {
+        if !self.check(&TokenKind::OpenBrace) {
+            return false;
+        }
+        // Look ahead past `{` to see if it's a struct literal (ident: or })
+        let i = self.current;
+        if i + 1 >= self.tokens.len() {
+            return false;
+        }
+        let after_brace = &self.tokens[i + 1].node.kind;
+        // Empty struct: Foo {}
+        if matches!(after_brace, TokenKind::CloseBrace) {
+            return true;
+        }
+        // Struct with fields: Foo { field: value, ... }
+        if matches!(after_brace, TokenKind::Ident(_)) {
+            if i + 2 < self.tokens.len() {
+                return matches!(&self.tokens[i + 2].node.kind, TokenKind::Colon);
+            }
+        }
+        false
+    }
+
     fn check(&self, kind: &TokenKind) -> bool {
         !self.is_at_end() && &self.peek().node.kind == kind
     }
@@ -826,6 +849,79 @@ mod tests {
             }
             _ => panic!("expected let with if init"),
         }
+    }
+
+    #[test]
+    fn test_if_field_cond() {
+        parse("fn f() { if e.vx > m { 1 } }").unwrap();
+    }
+
+    #[test]
+    fn test_if_after_let() {
+        parse("fn f() { let x = 1; if x > m { 2 } }").unwrap();
+    }
+
+    #[test]
+    fn test_if_abs_condition() {
+        parse("fn f() { if abs(e.vx) > m { 1 } }").unwrap();
+    }
+
+    #[test]
+    fn test_field_access_in_rhs() {
+        // field access should work inside binary expression RHS
+        let prog = parse("let x = a + e.vx;").unwrap();
+        match &prog.stmts[0].node {
+            Stmt::Let { init: Some(Expr::Binary { op: BinOp::Add, lhs, rhs }), .. } => {
+                assert!(matches!(lhs.as_ref(), Expr::Ident(_)));
+                assert!(matches!(rhs.as_ref(), Expr::Field { .. }));
+            }
+            _ => panic!("expected binary add with field access"),
+        }
+    }
+
+    #[test]
+    fn test_call_in_rhs() {
+        // function call should work inside binary expression RHS
+        let prog = parse("let x = a + foo(1);").unwrap();
+        match &prog.stmts[0].node {
+            Stmt::Let { init: Some(Expr::Binary { op: BinOp::Add, lhs, rhs }), .. } => {
+                assert!(matches!(lhs.as_ref(), Expr::Ident(_)));
+                assert!(matches!(rhs.as_ref(), Expr::Call { .. }));
+            }
+            _ => panic!("expected binary add with function call"),
+        }
+    }
+
+    #[test]
+    fn test_full_script_parse() {
+        parse(r#"
+fn update() {
+    let i = 0;
+    while i < entity_count() {
+        let e = get_entity(i);
+        e.vx = e.vx + 1.0;
+        e.vy = e.vy + 1.0;
+        let max_speed = 300.0;
+        if abs(e.vx) > max_speed {
+            if e.vx > 0.0 { e.vx = max_speed; } else { e.vx = -max_speed; }
+        }
+        if abs(e.vy) > max_speed {
+            if e.vy > 0.0 { e.vy = max_speed; } else { e.vy = -max_speed; }
+        }
+        i = i + 1;
+    }
+}
+
+if entity_count() == 0 {
+    spawn_entity(100.0, 100.0, 0.0, 0.0, 8.0, 200.0, 200.0, 200.0);
+}
+
+if is_key_pressed("space") {
+    spawn_entity(200.0, 200.0, 0.0, 0.0, 10.0, 255.0, 80.0, 80.0);
+}
+
+update();
+"#).unwrap();
     }
 
     #[test]

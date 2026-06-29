@@ -1,0 +1,9 @@
+[package]
+name = "zenlang-macroquad-edict-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+macroquad = "0.4"
+edict = "0.6"
+zenlang = { path = "../.." }

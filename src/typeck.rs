@@ -402,12 +402,13 @@ impl<'a> TypeChecker<'a> {
         let a = self.resolve_named(a);
         let b = self.resolve_named(b);
         match (&a, &b) {
+            // Unit (from foreign field access, unknown at compile time) is compatible with everything
+            (Type::Unit, _) | (_, Type::Unit) => true,
             (Type::I32, Type::I32) => true,
             (Type::F64, Type::F64) => true,
             (Type::F64, Type::I32) | (Type::I32, Type::F64) => true, // implicit coercion
             (Type::Bool, Type::Bool) => true,
             (Type::Str, Type::Str) => true,
-            (Type::Unit, Type::Unit) => true,
             (Type::Named(a), Type::Named(b)) => a == b,
             (Type::Array(a), Type::Array(b)) => self.types_compatible(a, b),
             _ => false,

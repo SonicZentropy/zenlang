@@ -1164,3 +1164,13 @@
 2026-06-29T08:38:20.457326Z DEBUG zenlang::lsp: received request: textDocument/hover (id=RequestId(I32(9)))
 2026-06-29T08:38:20.457398Z DEBUG zenlang::lsp: handling request: textDocument/hover for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
 2026-06-29T08:38:20.457469Z DEBUG zenlang::lsp: hover: returning result for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-06-29T08:43:27.757187Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T08:43:27.757250Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T08:58:00.715346Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T08:58:00.715454Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T09:04:17.360586Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T09:04:17.360656Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T09:08:52.761235Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T09:08:52.761297Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-06-29T09:08:52.766761Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-06-29T09:08:52.766808Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
