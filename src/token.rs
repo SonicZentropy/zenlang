@@ -75,6 +75,7 @@ pub enum TokenKind {
 
     // Special
     Ident(CompactString),
+    Comment,
     Eof,
 }
 
@@ -144,6 +145,7 @@ impl fmt::Display for TokenKind {
             TokenKind::OpenBracket => write!(f, "`[`"),
             TokenKind::CloseBracket => write!(f, "`]`"),
             TokenKind::Ident(s) => write!(f, "identifier `{s}`"),
+            TokenKind::Comment => write!(f, "comment"),
             TokenKind::Eof => write!(f, "end of file"),
         }
     }

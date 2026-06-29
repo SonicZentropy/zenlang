@@ -1,13 +1,10 @@
 fn main() -> int {
-	//"test"
-	42
+    //"test"
+    42
 }
-
 fn testai() -> void {
-
+    return ;
 }
-
 fn an_error() -> int {
-	"test"
-	//42
+    "test"
 }

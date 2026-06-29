@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use lsp_types::notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification};
-use lsp_types::request::{HoverRequest, Request};
+use lsp_types::request::{Formatting, HoverRequest, Request};
 use lsp_types::*;
 use tracing::{debug, info, trace, warn};
 
@@ -249,6 +249,7 @@ pub fn run_server() {
                 ..Default::default()
             }),
         ),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
 
@@ -348,6 +349,14 @@ fn handle_request(
             let uri = params.text_document.uri;
             let state = docs.get(&uri);
             serde_json::to_value(state.and_then(semantic_tokens)).ok()
+        }
+        Formatting::METHOD => {
+            let params: DocumentFormattingParams = serde_json::from_value(req.params).unwrap();
+            let uri = params.text_document.uri;
+            let state = docs.get(&uri);
+            let tab_size = params.options.tab_size as usize;
+            let r = state.and_then(|s| format_document(s, &uri, tab_size));
+            serde_json::to_value(&r).ok()
         }
         method => {
             debug!("unhandled request method: {method}");
@@ -732,6 +741,18 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
         result_id: None,
         data: tokens,
     }))
+}
+
+fn format_document(state: &DocumentState, _uri: &DocUri, tab_size: usize) -> Option<Vec<TextEdit>> {
+    let formatted = crate::formatter::format_source(&state.source, tab_size).ok()?;
+    if formatted == state.source {
+        return Some(Vec::new());
+    }
+    let range = Range {
+        start: Position { line: 0, character: 0 },
+        end: offset_to_position(&state.source, state.source.len()),
+    };
+    Some(vec![TextEdit { range, new_text: formatted }])
 }
 
 fn token_type_index(ty: SemanticTokenType) -> u32 {

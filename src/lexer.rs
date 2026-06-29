@@ -25,8 +25,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Lex the entire source and return all tokens.
+    /// Lex the entire source and return all tokens (skipping comments).
+    /// Use `tokenize_with_comments()` if you need comment tokens (e.g. for formatting).
     pub fn tokenize(mut self) -> Result<Vec<Spanned<Token>>> {
+        let tokens = self.next_token_loop()?;
+        // Comments are discarded by default for backward compatibility.
+        // Use tokenize_with_comments() if you need them.
+        Ok(tokens.into_iter().filter(|t| !matches!(t.node.kind, TokenKind::Comment)).collect())
+    }
+
+    /// Lex the entire source and return all tokens **including** comments.
+    /// This is used by the formatter.
+    pub fn tokenize_with_comments(mut self) -> Result<Vec<Spanned<Token>>> {
+        self.next_token_loop()
+    }
+
+    fn next_token_loop(&mut self) -> Result<Vec<Spanned<Token>>> {
         let mut tokens = Vec::new();
         loop {
             let token = self.next_token();
@@ -91,11 +105,11 @@ impl<'a> Lexer<'a> {
             '*' => self.make_token(TokenKind::Star),
             '/' => {
                 if self.r#match('/') {
-                    self.skip_line_comment();
-                    return self.next_token();
+                    self.skip_to_eol();
+                    self.make_token(TokenKind::Comment)
                 } else if self.r#match('*') {
-                    self.skip_block_comment();
-                    return self.next_token();
+                    self.skip_to_block_end();
+                    self.make_token(TokenKind::Comment)
                 } else {
                     self.make_token(TokenKind::Slash)
                 }
@@ -220,13 +234,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn skip_line_comment(&mut self) {
+    fn skip_to_eol(&mut self) {
         while self.peek() != '\n' && !self.is_at_end() {
             self.advance();
         }
     }
 
-    fn skip_block_comment(&mut self) {
+    fn skip_to_block_end(&mut self) {
         let mut depth = 1;
         while depth > 0 {
             if self.is_at_end() {
