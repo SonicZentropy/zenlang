@@ -147,7 +147,7 @@ fn compile_source(source: &str) -> Result<DocumentState, Vec<Diagnostic>> {
         }
     };
     trace!("compilation: parsing");
-    let parser = Parser::new(&_tokens);
+    let parser = Parser::new(source, &_tokens);
     let mut program = match parser.parse() {
         Ok(p) => p,
         Err(e) => {
@@ -457,7 +457,7 @@ fn handle_notification(
                         diags.len()
                     );
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse()
+                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&source, &tokens).parse()
                     {
                         let mut p = parser;
                         let native_names = crate::stdlib::native_names();
@@ -542,7 +542,7 @@ fn handle_notification(
                     );
                     // If we can parse, salvage partial state for semantic tokens etc.
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse()
+                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&source, &tokens).parse()
                     {
                         let mut p = parser;
                         let native_names = crate::stdlib::native_names();
@@ -585,7 +585,7 @@ fn handle_notification(
                         );
                         let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
                         let (program, symbols, types) =
-                            if let Ok(parser) = Parser::new(&tokens).parse() {
+                            if let Ok(parser) = Parser::new(&source, &tokens).parse() {
                                 let mut p = parser;
                                 let native_names = crate::stdlib::native_names();
                                 let mut s = resolver::resolve_with_natives(&mut p, &native_names)
@@ -1049,7 +1049,8 @@ fn symkind_display(kind: &SymKind) -> String {
 
 fn type_display(ty: &crate::ast::Type) -> String {
     match ty {
-        crate::ast::Type::I32 => "int".into(),
+        crate::ast::Type::I64 => "int".into(),
+        crate::ast::Type::F32 => "f32".into(),
         crate::ast::Type::F64 => "float".into(),
         crate::ast::Type::Bool => "bool".into(),
         crate::ast::Type::Str => "str".into(),

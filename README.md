@@ -331,5 +331,6 @@ cd examples/fyrox_integration && cargo run
 $ cargo test
 ```
 
-93 tests covering lexer, parser, resolver, type checker, compiler, VM, interop,
-hot reload, and stdlib.
+## Resources
+- https://github.com/arcana-engine/evoke
+- https://github.com/open-source-force/dyrah

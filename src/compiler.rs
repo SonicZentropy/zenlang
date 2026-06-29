@@ -155,12 +155,13 @@ struct FunctionCompiler<'a> {
     scope_depth: usize,
     loop_start: Vec<usize>,
     loop_continue: Vec<usize>,
-    loop_end: Vec<usize>,
+    loop_end_jumps: Vec<Vec<usize>>,
     globals: &'a mut HashMap<String, u16>,
     function_names: &'a HashMap<String, usize>,
     errors: &'a mut Vec<Error>,
     current_line: usize,
     line_offsets: &'a [usize],
+    const_map: HashMap<u64, u16>,
 }
 
 struct Local {
@@ -188,7 +189,8 @@ impl<'a> FunctionCompiler<'a> {
             scope_depth: 0,
             loop_start: Vec::new(),
             loop_continue: Vec::new(),
-            loop_end: Vec::new(),
+            loop_end_jumps: Vec::new(),
+            const_map: HashMap::new(),
             globals,
             function_names,
             errors,
@@ -208,18 +210,29 @@ impl<'a> FunctionCompiler<'a> {
 
     fn error(&mut self, msg: impl Into<String>) {
         self.errors.push(Error::Compile {
-            location: SourceLocation::new(None, Span::new(0, 0), 0, 0),
+            location: SourceLocation::new(None, Span::new(0, 0), self.current_line, 0),
             msg: msg.into(),
         });
     }
 
     fn add_const(&mut self, val: Value) -> u16 {
+        let key = const_hash(&val);
+        if let Some(&idx) = self.const_map.get(&key) {
+            // Verify no collision (shouldn't happen with good hash, but safe)
+            if self.chunk.constants[idx as usize] == val {
+                return idx;
+            }
+        }
+        // Linear scan as fallback for hash collision or first insert
         for (i, c) in self.chunk.constants.iter().enumerate() {
             if *c == val {
+                self.const_map.insert(key, i as u16);
                 return i as u16;
             }
         }
-        self.chunk.add_constant(val)
+        let idx = self.chunk.add_constant(val);
+        self.const_map.insert(key, idx);
+        idx
     }
 
     fn load_const(&mut self, val: Value) {
@@ -439,13 +452,15 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::JumpIfFalse(0));
                 self.loop_start.push(start);
                 self.loop_continue.push(start);
-                self.loop_end.push(exit);
+                self.loop_end_jumps.push(vec![exit]);
                 self.compile_expr(body);
                 self.loop_start.pop();
                 self.loop_continue.pop();
-                self.loop_end.pop();
+                let jumps = self.loop_end_jumps.pop().unwrap();
                 self.emit_op(Opcode::Loop(start as u16));
-                self.patch_jump(exit);
+                for j in &jumps {
+                    self.patch_jump(*j);
+                }
                 self.none();
             }
 
@@ -453,64 +468,124 @@ impl<'a> FunctionCompiler<'a> {
                 let start = self.current_offset();
                 self.loop_start.push(start);
                 self.loop_continue.push(start);
-                let exit_placeholder = self.current_offset();
-                self.emit_op(Opcode::JumpIfFalse(0));
-                self.loop_end.push(exit_placeholder);
+                self.loop_end_jumps.push(Vec::new());
                 self.compile_expr(body);
                 self.loop_start.pop();
                 self.loop_continue.pop();
-                self.loop_end.pop();
+                let jumps = self.loop_end_jumps.pop().unwrap();
                 self.emit_op(Opcode::Loop(start as u16));
-                self.patch_jump(exit_placeholder);
+                for j in &jumps {
+                    self.patch_jump(*j);
+                }
                 self.none();
             }
 
             Expr::For { var, iter, body } => {
-                if let Expr::Range { start, end, inclusive } = iter.as_ref() {
-                    self.enter_scope();
-                    self.compile_expr(start);
-                    let var_slot = self.add_local("__i");
-                    self.emit_op(Opcode::StoreLocal(var_slot));
-                    self.compile_expr(end);
-                    let limit_slot = self.add_local("__limit");
-                    self.emit_op(Opcode::StoreLocal(limit_slot));
+                match iter.as_ref() {
+                    Expr::Range { start, end, inclusive } => {
+                        self.enter_scope();
+                        self.compile_expr(start);
+                        let var_slot = self.add_local("__i");
+                        self.emit_op(Opcode::StoreLocal(var_slot));
+                        self.compile_expr(end);
+                        let limit_slot = self.add_local("__limit");
+                        self.emit_op(Opcode::StoreLocal(limit_slot));
 
-                    let _user_var_slot = self.add_local(var);
+                        let _user_var_slot = self.add_local(var);
 
-                    let loop_start = self.current_offset();
-                    self.emit_op(Opcode::LoadLocal(var_slot));
-                    self.emit_op(Opcode::LoadLocal(limit_slot));
-                    if *inclusive {
-                        self.emit_op(Opcode::Le);
-                    } else {
-                        self.emit_op(Opcode::Lt);
+                        let loop_start = self.current_offset();
+                        self.emit_op(Opcode::LoadLocal(var_slot));
+                        self.emit_op(Opcode::LoadLocal(limit_slot));
+                        if *inclusive {
+                            self.emit_op(Opcode::Le);
+                        } else {
+                            self.emit_op(Opcode::Lt);
+                        }
+                        let exit = self.current_offset();
+                        self.emit_op(Opcode::JumpIfFalse(0));
+
+                        self.emit_op(Opcode::LoadLocal(var_slot));
+                        self.emit_op(Opcode::StoreLocal(_user_var_slot));
+
+                        self.loop_start.push(loop_start);
+                        self.loop_continue.push(loop_start);
+                        self.loop_end_jumps.push(vec![exit]);
+                        self.compile_expr(body);
+                        self.loop_start.pop();
+                        self.loop_continue.pop();
+                        let jumps = self.loop_end_jumps.pop().unwrap();
+
+                        let one = self.add_const(Value::Int(1));
+                        self.emit_op(Opcode::LoadLocal(var_slot));
+                        self.emit_op(Opcode::LoadConst(one));
+                        self.emit_op(Opcode::Add);
+                        self.emit_op(Opcode::StoreLocal(var_slot));
+                        self.emit_op(Opcode::Loop(loop_start as u16));
+
+                        for j in &jumps {
+                            self.patch_jump(*j);
+                        }
+                        self.exit_scope();
+                        self.none();
                     }
-                    let exit = self.current_offset();
-                    self.emit_op(Opcode::JumpIfFalse(0));
+                    _ => {
+                        // Generic iterable: array or string
+                        // Evaluate the iterable once and store it
+                        self.enter_scope();
+                        self.compile_expr(iter);
+                        let iter_slot = self.add_local("__iter");
+                        self.emit_op(Opcode::StoreLocal(iter_slot));
 
-                    self.emit_op(Opcode::LoadLocal(var_slot));
-                    self.emit_op(Opcode::StoreLocal(_user_var_slot));
+                        // __i = 0
+                        let zero = self.add_const(Value::Int(0));
+                        self.emit_op(Opcode::LoadConst(zero));
+                        let idx_slot = self.add_local("__i");
+                        self.emit_op(Opcode::StoreLocal(idx_slot));
 
-                    self.loop_start.push(loop_start);
-                    self.loop_continue.push(loop_start);
-                    self.loop_end.push(exit);
-                    self.compile_expr(body);
-                    self.loop_start.pop();
-                    self.loop_continue.pop();
-                    self.loop_end.pop();
+                        // __len = __iter.len()
+                        self.emit_op(Opcode::LoadLocal(iter_slot));
+                        self.emit_op(Opcode::Len);
+                        let len_slot = self.add_local("__len");
+                        self.emit_op(Opcode::StoreLocal(len_slot));
 
-                    let one = self.add_const(Value::Int(1));
-                    self.emit_op(Opcode::LoadLocal(var_slot));
-                    self.emit_op(Opcode::LoadConst(one));
-                    self.emit_op(Opcode::Add);
-                    self.emit_op(Opcode::StoreLocal(var_slot));
-                    self.emit_op(Opcode::Loop(loop_start as u16));
+                        let _user_var_slot = self.add_local(var);
 
-                    self.patch_jump(exit);
-                    self.exit_scope();
-                    self.none();
-                } else {
-                    self.error("for loop requires a range expression");
+                        let loop_start = self.current_offset();
+                        // while __i < __len
+                        self.emit_op(Opcode::LoadLocal(idx_slot));
+                        self.emit_op(Opcode::LoadLocal(len_slot));
+                        self.emit_op(Opcode::Lt);
+                        let exit = self.current_offset();
+                        self.emit_op(Opcode::JumpIfFalse(0));
+
+                        // var = __iter[__i]
+                        self.emit_op(Opcode::LoadLocal(iter_slot));
+                        self.emit_op(Opcode::LoadLocal(idx_slot));
+                        self.emit_op(Opcode::LoadIndex);
+                        self.emit_op(Opcode::StoreLocal(_user_var_slot));
+
+                        self.loop_start.push(loop_start);
+                        self.loop_continue.push(loop_start);
+                        self.loop_end_jumps.push(vec![exit]);
+                        self.compile_expr(body);
+                        self.loop_start.pop();
+                        self.loop_continue.pop();
+                        let jumps = self.loop_end_jumps.pop().unwrap();
+
+                        // __i += 1
+                        let one = self.add_const(Value::Int(1));
+                        self.emit_op(Opcode::LoadLocal(idx_slot));
+                        self.emit_op(Opcode::LoadConst(one));
+                        self.emit_op(Opcode::Add);
+                        self.emit_op(Opcode::StoreLocal(idx_slot));
+                        self.emit_op(Opcode::Loop(loop_start as u16));
+
+                        for j in &jumps {
+                            self.patch_jump(*j);
+                        }
+                        self.exit_scope();
+                        self.none();
+                    }
                 }
             }
 
@@ -528,9 +603,12 @@ impl<'a> FunctionCompiler<'a> {
                             end_jumps.push(j);
                             break;
                         }
-                        Pattern::Ident(_) => {
-                            self.emit_op(Opcode::Pop);
+                        Pattern::Ident(name) => {
+                            self.enter_scope();
+                            let slot = self.add_local(name);
+                            self.emit_op(Opcode::StoreLocal(slot));
                             self.compile_expr(&arm.body);
+                            self.exit_scope();
                             let j = self.current_offset();
                             self.emit_op(Opcode::Jump(0));
                             end_jumps.push(j);
@@ -594,9 +672,11 @@ impl<'a> FunctionCompiler<'a> {
             }
 
             Expr::Break => {
-                if let Some(&_end) = self.loop_end.last() {
-                    let _j = self.current_offset();
-                    self.emit_op(Opcode::JumpIfFalse(0));
+                if self.loop_end_jumps.last().is_some() {
+                    let len = self.loop_end_jumps.len();
+                    let j = self.current_offset();
+                    self.emit_op(Opcode::Jump(0));
+                    self.loop_end_jumps[len - 1].push(j);
                 }
             }
 
@@ -689,6 +769,29 @@ impl<'a> FunctionCompiler<'a> {
             BinOp::And => self.emit_op(Opcode::And),
             BinOp::Or => self.emit_op(Opcode::Or),
             BinOp::Assign => unreachable!(),
+        }
+    }
+}
+
+fn const_hash(val: &Value) -> u64 {
+    match val {
+        Value::Nil => 0,
+        Value::Bool(b) => 1 ^ ((*b as u64) << 1),
+        Value::Int(n) => 2 ^ (n.wrapping_mul(0x9e3779b97f4a7c15u64 as i64) as u64),
+        Value::Float(n) => 3 ^ n.to_bits(),
+        Value::Str(s) => {
+            let mut h = 4u64;
+            for b in s.as_bytes() {
+                h = h.wrapping_mul(31).wrapping_add(*b as u64);
+            }
+            h
+        }
+        Value::Function(idx) => 5 ^ (*idx as u64),
+        Value::Array(_) | Value::Struct(_) | Value::Enum { .. }
+        | Value::NativeFunction(_) | Value::Foreign(_) => {
+            // These types use pointer identity, hash is not stable;
+            // fall back to linear scan (handled in add_const)
+            6
         }
     }
 }

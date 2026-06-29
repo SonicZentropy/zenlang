@@ -24,7 +24,7 @@ answer
 
     // 2. Full pipeline: lex → parse → resolve → type-check → compile
     let tokens = Lexer::new(source).tokenize()?;
-    let mut program = Parser::new(&tokens).parse()?;
+    let mut program = Parser::new(source, &tokens).parse()?;
     let names = native_names();
     let mut symbols = resolve_with_natives(&mut program, &names)?;
     let types = check(&program, &mut symbols)?;

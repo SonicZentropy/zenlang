@@ -54,11 +54,27 @@ pub struct Parser<'a> {
     tokens: &'a [Spanned<Token>],
     current: usize,
     errors: Vec<Error>,
+    source: &'a str,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a [Spanned<Token>]) -> Self {
-        Self { tokens, current: 0, errors: Vec::new() }
+    pub fn new(source: &'a str, tokens: &'a [Spanned<Token>]) -> Self {
+        Self { tokens, current: 0, errors: Vec::new(), source }
+    }
+
+    fn byte_offset_to_line_col(&self, offset: usize) -> (usize, usize) {
+        let source = self.source;
+        let mut line = 1usize;
+        let mut col = 1usize;
+        for (_, c) in source[..offset.min(source.len())].chars().enumerate() {
+            if c == '\n' {
+                line += 1;
+                col = 1;
+            } else {
+                col += 1;
+            }
+        }
+        (line, col)
     }
 
     pub fn parse(mut self) -> Result<Program> {
@@ -91,7 +107,7 @@ impl<'a> Parser<'a> {
         } else if self.r#match(TokenKind::Impl) {
             self.impl_decl()
         } else if self.r#match(TokenKind::Pub) {
-            // 'pub' prefix, parse the following declaration
+            // TODO: visibility tracking not yet implemented - parse the declaration but ignore `pub`
             self.declaration()
         } else {
             self.statement()
@@ -599,7 +615,8 @@ impl<'a> Parser<'a> {
     fn parse_type(&mut self) -> Result<Type> {
         let tok = self.peek().node.kind.clone();
         match tok {
-            TokenKind::Ident(s) if s == "i32" => { self.advance(); Ok(Type::I32) }
+            TokenKind::Ident(s) if s == "i32" || s == "i64" => { self.advance(); Ok(Type::I64) }
+            TokenKind::Ident(s) if s == "f32" => { self.advance(); Ok(Type::F32) }
             TokenKind::Ident(s) if s == "f64" => { self.advance(); Ok(Type::F64) }
             TokenKind::Ident(s) if s == "bool" => { self.advance(); Ok(Type::Bool) }
             TokenKind::Ident(s) if s == "str" => { self.advance(); Ok(Type::Str) }
@@ -746,8 +763,10 @@ impl<'a> Parser<'a> {
     }
 
     fn error(&self, msg: &str) -> Error {
+        let span = self.peek().span;
+        let (line, col) = self.byte_offset_to_line_col(span.start());
         Error::Parse {
-            location: SourceLocation::new(None, Span::new(0, 0), 0, 0),
+            location: SourceLocation::new(None, span, line, col),
             msg: msg.into(),
         }
     }
@@ -788,7 +807,7 @@ mod tests {
 
     fn parse(source: &str) -> Result<Program> {
         let tokens = Lexer::new(source).tokenize()?;
-        Parser::new(&tokens).parse()
+        Parser::new(source, &tokens).parse()
     }
 
     #[test]

@@ -53,8 +53,6 @@ pub struct SymbolTable {
     pub scopes: Vec<Scope>,
     /// Currently active scope index.
     pub current_scope: usize,
-    /// Map from (scope_id, name) to symbol index.
-    scope_map: Vec<HashMap<String, SymId>>,
 }
 
 impl SymbolTable {
@@ -64,7 +62,6 @@ impl SymbolTable {
             symbols: Vec::new(),
             scopes: vec![global],
             current_scope: 0,
-            scope_map: vec![HashMap::new()],
         }
     }
 
@@ -72,7 +69,6 @@ impl SymbolTable {
     pub fn enter_scope(&mut self) {
         let scope = Scope { symbols: HashMap::new(), parent: Some(self.current_scope) };
         self.scopes.push(scope);
-        self.scope_map.push(HashMap::new());
         self.current_scope = self.scopes.len() - 1;
     }
 
@@ -87,12 +83,11 @@ impl SymbolTable {
     /// Returns an error if the name is already defined in this scope.
     pub fn define(&mut self, name: &str, kind: SymKind) -> Result<SymId, String> {
         // Check for duplicates in current scope
-        if self.scope_map[self.current_scope].contains_key(name) {
+        if self.scopes[self.current_scope].symbols.contains_key(name) {
             return Err(format!("duplicate definition of '{}'", name));
         }
         let id = self.symbols.len();
         self.symbols.push((name.to_string(), kind.clone()));
-        self.scope_map[self.current_scope].insert(name.to_string(), id);
         self.scopes[self.current_scope].symbols.insert(
             name.to_string(),
             SymEntry { id, kind },
@@ -145,7 +140,6 @@ impl SymbolTable {
 
     /// Remove a symbol from the current scope. Returns the entry if it existed.
     pub fn remove_from_current_scope(&mut self, name: &str) -> Option<SymEntry> {
-        self.scope_map[self.current_scope].remove(name);
         self.scopes[self.current_scope].symbols.remove(name)
     }
 
@@ -154,7 +148,6 @@ impl SymbolTable {
         let id = self.symbols.len();
         self.symbols.push((name.to_string(), kind.clone()));
         let entry = SymEntry { id, kind };
-        self.scope_map[self.current_scope].insert(name.to_string(), id);
         self.scopes[self.current_scope].symbols.insert(name.to_string(), entry);
         id
     }

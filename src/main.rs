@@ -64,7 +64,7 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
 
     // Initial compile
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
-    let parser = zenlang::parser::Parser::new(&tokens);
+    let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
@@ -95,7 +95,7 @@ fn run_disasm(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
         .map_err(|e| Error::Io { source: e })?;
 
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
-    let parser = zenlang::parser::Parser::new(&tokens);
+    let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
@@ -113,7 +113,7 @@ fn run_check(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
         .map_err(|e| Error::Io { source: e })?;
 
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
-    let parser = zenlang::parser::Parser::new(&tokens);
+    let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
@@ -183,7 +183,7 @@ fn run_repl() -> zenlang::Result<()> {
                 continue;
             }
         };
-        let parser = zenlang::parser::Parser::new(&tokens);
+    let parser = zenlang::parser::Parser::new(&source, &tokens);
         let mut program = match parser.parse() {
             Ok(p) => p,
             Err(e) => {

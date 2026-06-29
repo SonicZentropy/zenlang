@@ -104,7 +104,7 @@ impl HotReloader {
 
         // Run the full compilation pipeline
         let tokens = Lexer::new(&source).tokenize()?;
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(&source, &tokens);
         let mut program = parser.parse()?;
 
         let native_names = stdlib::native_names();

@@ -28,8 +28,9 @@ impl TypeMap {
 }
 
 pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
-    let mut checker = TypeChecker { symbols, type_map: TypeMap::new(), errors: Vec::new() };
+    let mut checker = TypeChecker { symbols, type_map: TypeMap::new(), errors: Vec::new(), current_span: Span::new(0, 0) };
     for stmt in &program.stmts {
+        checker.set_span(stmt.span);
         checker.check_stmt(&stmt.node, None);
     }
     if checker.errors.is_empty() {
@@ -43,12 +44,17 @@ struct TypeChecker<'a> {
     symbols: &'a mut SymbolTable,
     type_map: TypeMap,
     errors: Vec<Error>,
+    current_span: Span,
 }
 
 impl<'a> TypeChecker<'a> {
+    fn set_span(&mut self, span: Span) {
+        self.current_span = span;
+    }
+
     fn error(&mut self, msg: impl Into<String>) {
         self.errors.push(Error::TypeError {
-            location: SourceLocation::new(None, Span::new(0, 0), 0, 0),
+            location: SourceLocation::new(None, self.current_span, 0, 0),
             msg: msg.into(),
         });
     }
@@ -138,7 +144,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_expr(&mut self, expr: &Expr) -> Type {
         let ty = match expr {
-            Expr::Int(_) => Type::I32,
+            Expr::Int(_) => Type::I64,
             Expr::Float(_) => Type::F64,
             Expr::Str(_) => Type::Str,
             Expr::Bool(_) => Type::Bool,
@@ -212,7 +218,7 @@ impl<'a> TypeChecker<'a> {
                 let it = self.check_expr(inner);
                 match op {
                     UnOp::Neg => {
-                        if !matches!(it, Type::I32 | Type::F64) {
+                        if !matches!(it, Type::I64 | Type::F32 | Type::F64) {
                             self.error("negation requires numeric type");
                         }
                         it
@@ -301,12 +307,15 @@ impl<'a> TypeChecker<'a> {
                 Type::Unit
             }
             Expr::For { var, iter, body } => {
-                self.check_expr(iter);
+                let iter_ty = self.check_expr(iter);
                 self.symbols.enter_scope();
-                // Infer loop variable type from the range start expression
                 let loop_ty = match iter.as_ref() {
                     Expr::Range { start, .. } => self.check_expr(start),
-                    _ => Type::I32,
+                    _ => match &iter_ty {
+                        Type::Array(inner) => *inner.clone(),
+                        Type::Str => Type::Str,
+                        _ => Type::I64,
+                    },
                 };
                 // Remove any existing binding (from resolver) and re-insert
                 self.symbols.remove_from_current_scope(var);
@@ -404,9 +413,12 @@ impl<'a> TypeChecker<'a> {
         match (&a, &b) {
             // Unit (from foreign field access, unknown at compile time) is compatible with everything
             (Type::Unit, _) | (_, Type::Unit) => true,
-            (Type::I32, Type::I32) => true,
+            (Type::I64, Type::I64) => true,
+            (Type::F32, Type::F32) => true,
             (Type::F64, Type::F64) => true,
-            (Type::F64, Type::I32) | (Type::I32, Type::F64) => true, // implicit coercion
+            (Type::F64, Type::I64) | (Type::I64, Type::F64) => true, // implicit i64↔f64
+            (Type::F32, Type::I64) | (Type::I64, Type::F32) => true, // implicit i64↔f32
+            (Type::F32, Type::F64) | (Type::F64, Type::F32) => true, // implicit f32↔f64
             (Type::Bool, Type::Bool) => true,
             (Type::Str, Type::Str) => true,
             (Type::Named(a), Type::Named(b)) => a == b,
@@ -417,7 +429,9 @@ impl<'a> TypeChecker<'a> {
 
     fn resolve_named(&self, ty: &Type) -> Type {
         match ty {
-            Type::Named(s) if s == "int" => Type::I32,
+            Type::Named(s) if s == "int" => Type::I64,
+            Type::Named(s) if s == "i32" => Type::I64,
+            Type::Named(s) if s == "f32" => Type::F32,
             Type::Named(s) if s == "float" => Type::F64,
             Type::Named(s) if s == "bool" => Type::Bool,
             Type::Named(s) if s == "str" => Type::Str,
@@ -427,7 +441,8 @@ impl<'a> TypeChecker<'a> {
 
     fn type_display(&self, ty: &Type) -> String {
         match ty {
-            Type::I32 => "i32".into(),
+            Type::I64 => "i64".into(),
+            Type::F32 => "f32".into(),
             Type::F64 => "f64".into(),
             Type::Bool => "bool".into(),
             Type::Str => "str".into(),
@@ -451,7 +466,7 @@ mod tests {
 
     fn type_check(source: &str) -> Result<TypeMap> {
         let tokens = Lexer::new(source).tokenize()?;
-        let mut program = Parser::new(&tokens).parse()?;
+        let mut program = Parser::new(source, &tokens).parse()?;
         let mut symbols = resolver::resolve(&mut program)?;
         check(&program, &mut symbols)
     }

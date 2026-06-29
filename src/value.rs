@@ -125,10 +125,10 @@ impl PartialEq for Value {
             (Value::Int(a), Value::Int(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => a.as_ref() == b.as_ref(),
-            (Value::Array(a), Value::Array(b)) => Rc::ptr_eq(a, b),
-            (Value::Struct(a), Value::Struct(b)) => Rc::ptr_eq(a, b),
+            (Value::Array(a), Value::Array(b)) => *a.borrow() == *b.borrow(),
+            (Value::Struct(a), Value::Struct(b)) => *a.borrow() == *b.borrow(),
             (Value::Enum { tag: ta, data: da }, Value::Enum { tag: tb, data: db }) => {
-                ta == tb && Rc::ptr_eq(da, db)
+                ta == tb && *da.borrow() == *db.borrow()
             }
             (Value::Function(a), Value::Function(b)) => a == b,
             (Value::Foreign(a), Value::Foreign(b)) => *a.borrow() == *b.borrow(),

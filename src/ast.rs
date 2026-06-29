@@ -6,7 +6,8 @@ use crate::token::TokenKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    I32,
+    I64,
+    F32,
     F64,
     Bool,
     Str,

@@ -18,7 +18,7 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
         let sig = FnSignature {
             name: name.clone(),
             params: vec![],
-            return_type: Some(Type::I32),
+            return_type: Some(Type::I64),
         };
         let _ = resolver.symbols.define(name, SymKind::Function(sig));
     }
@@ -29,16 +29,21 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
 struct Resolver {
     symbols: SymbolTable,
     errors: Vec<Error>,
+    current_span: crate::span::Span,
 }
 
 impl Resolver {
     fn new() -> Self {
-        Self { symbols: SymbolTable::new(), errors: Vec::new() }
+        Self { symbols: SymbolTable::new(), errors: Vec::new(), current_span: crate::span::Span::new(0, 0) }
+    }
+
+    fn set_span(&mut self, span: crate::span::Span) {
+        self.current_span = span;
     }
 
     fn error(&mut self, msg: String) {
         self.errors.push(Error::Resolve {
-            location: SourceLocation::new(None, crate::span::Span::new(0, 0), 0, 0),
+            location: SourceLocation::new(None, self.current_span, 0, 0),
             msg,
         });
     }
@@ -46,11 +51,13 @@ impl Resolver {
     fn resolve_program(&mut self, program: &mut Program) -> Result<()> {
         // First pass: register all top-level declarations (fn, struct, enum, impl)
         for stmt in &program.stmts {
+            self.set_span(stmt.span);
             self.register_top_level(&stmt.node);
         }
 
         // Second pass: resolve function bodies
         for stmt in &program.stmts {
+            self.set_span(stmt.span);
             self.resolve_decl(&stmt.node);
         }
 
@@ -289,7 +296,7 @@ mod tests {
 
     fn resolve_program(source: &str) -> std::result::Result<SymbolTable, Vec<Error>> {
         let tokens = Lexer::new(source).tokenize().map_err(|e| vec![e])?;
-        let mut program = Parser::new(&tokens).parse().map_err(|e| vec![e])?;
+        let mut program = Parser::new(source, &tokens).parse().map_err(|e| vec![e])?;
         match resolve(&mut program) {
             Ok(t) => Ok(t),
             Err(Error::ParseMultiple { errors }) => Err(errors),

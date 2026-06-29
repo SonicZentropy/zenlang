@@ -33,7 +33,7 @@ fn main() {
     // Initial compile (exactly like the embedding pipeline)
     let source = std::fs::read_to_string(&script_path).unwrap();
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
-    let mut program = zenlang::parser::Parser::new(&tokens).parse()?;
+    let mut program = zenlang::parser::Parser::new(&source, &tokens).parse()?;
     let names = native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;

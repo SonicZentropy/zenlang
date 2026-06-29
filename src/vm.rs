@@ -342,6 +342,11 @@ impl VM {
                         (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af + bf)),
                         (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 + bf)),
                         (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af + *bi as f64)),
+                        (Value::Str(as_), Value::Str(bs)) => {
+                            let mut result = as_.to_string();
+                            result.push_str(bs);
+                            self.stack.push(Value::Str(result.into()));
+                        }
                         _ => {
                             return Err(self.runtime_error(format!("cannot add {} and {}", a.type_name(), b.type_name())));
                         }
@@ -699,6 +704,11 @@ impl VM {
                             let val = arr.borrow()[idx].clone();
                             self.stack.push(val);
                         }
+                        (Value::Str(s), Value::Int(i)) => {
+                            let idx = *i as usize;
+                            let c = s.chars().nth(idx).map(|c| c.to_string()).unwrap_or_default();
+                            self.stack.push(Value::Str(c.into()));
+                        }
                         _ => {
                             return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
                         }
@@ -718,6 +728,15 @@ impl VM {
                         _ => {
                             return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
                         }
+                    }
+                }
+
+                Opcode::Len => {
+                    let val = self.stack.pop().unwrap();
+                    match val {
+                        Value::Str(s) => self.stack.push(Value::Int(s.len() as i64)),
+                        Value::Array(arr) => self.stack.push(Value::Int(arr.borrow().len() as i64)),
+                        _ => return Err(self.runtime_error(format!("cannot get length of {}", val.type_name()))),
                     }
                 }
 
@@ -747,7 +766,7 @@ mod tests {
 
     fn run(source: &str) -> Value {
         let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let native_names = crate::stdlib::native_names();
         let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
@@ -1087,7 +1106,7 @@ mod tests {
 
         // Initial compilation
         let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
@@ -1100,7 +1119,7 @@ mod tests {
 
         // Simulate a hot reload with the same source (no changes)
         let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
@@ -1116,7 +1135,7 @@ mod tests {
         // Initial: let x = 5; x
         let source1 = "let x = 5; x";
         let tokens = Lexer::new(source1).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source1, &tokens);
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
@@ -1130,7 +1149,7 @@ mod tests {
         // Simulate changing x = 5 to x = 42 in the source and hot reload
         let source2 = "let x = 42; x";
         let tokens = Lexer::new(source2).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source2, &tokens);
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
@@ -1151,7 +1170,7 @@ mod tests {
 
         // Initial compilation
         let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
@@ -1164,7 +1183,7 @@ mod tests {
 
         // Reload with same source (function indices should be stable)
         let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(&tokens);
+        let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();

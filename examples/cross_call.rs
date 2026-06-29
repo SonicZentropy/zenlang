@@ -60,7 +60,7 @@ dmg
 ";
 
     let tokens = Lexer::new(source).tokenize()?;
-    let mut program = Parser::new(&tokens).parse()?;
+    let mut program = Parser::new(source, &tokens).parse()?;
     let mut symbols = resolve_with_natives(&mut program, &names)?;
     let types = check(&program, &mut symbols)?;
     let (fns, global_names) = compile(&program, &types, &symbols, &names, source)?;

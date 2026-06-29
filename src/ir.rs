@@ -39,6 +39,7 @@ pub enum Opcode {
     LoadIndex,
     StoreIndex,
     NewClosure(u16, u16),
+    Len,
     Halt,
 }
 
@@ -82,7 +83,8 @@ impl Opcode {
             LoadIndex => 33,
             StoreIndex => 34,
             NewClosure(_, _) => 35,
-            Halt => 36,
+            Len => 36,
+            Halt => 37,
         }
     }
 
@@ -125,7 +127,8 @@ impl Opcode {
             33 => LoadIndex,
             34 => StoreIndex,
             35 => NewClosure(0, 0),
-            36 => Halt,
+            36 => Len,
+            37 => Halt,
             _ => return None,
         })
     }
@@ -322,6 +325,7 @@ impl Chunk {
                 Opcode::Not => println!("Not"),
                 Opcode::LoadIndex => println!("LoadIndex"),
                 Opcode::StoreIndex => println!("StoreIndex"),
+                Opcode::Len => println!("Len"),
                 Opcode::Halt => println!("Halt"),
             }
             offset = next;

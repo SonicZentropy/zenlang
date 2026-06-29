@@ -105,7 +105,7 @@ goblin
         }
 
         let tokens = Lexer::new(source).tokenize().unwrap();
-        let mut program = Parser::new(&tokens).parse().unwrap();
+        let mut program = Parser::new(source, &tokens).parse().unwrap();
         let mut symbols = resolve_with_natives(&mut program, &names).unwrap();
         let types = check(&program, &mut symbols).unwrap();
         let (fns, global_names) = compile(&program, &types, &symbols, &names, source).unwrap();

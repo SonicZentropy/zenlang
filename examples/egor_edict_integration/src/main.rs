@@ -411,7 +411,7 @@ fn setup() -> Game {
     }
 
     let tokens = Lexer::new(SCRIPT).tokenize().unwrap();
-    let mut program = Parser::new(&tokens).parse().unwrap();
+    let mut program = Parser::new(SCRIPT, &tokens).parse().unwrap();
     let mut symbols = resolve_with_natives(&mut program, &names).unwrap();
     let types = check(&program, &mut symbols).unwrap();
     let (fns, global_names) = compile(&program, &types, &symbols, &names, SCRIPT).unwrap();
