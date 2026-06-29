@@ -8,7 +8,7 @@ Provides [Zenlang](https://github.com/your-org/zenlang) support for Zed:
 
 ## Prerequisites
 
-- The `zenlang` binary must be on your `PATH`:
+- The `zenc` binary must be on your `PATH`:
   ```
   cargo install --path /path/to/zenlang
   ```

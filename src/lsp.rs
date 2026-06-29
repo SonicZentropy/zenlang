@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use lsp_types::notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification};
+use lsp_types::notification::{
+    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
+    Notification,
+};
 use lsp_types::request::{Formatting, HoverRequest, Request};
 use lsp_types::*;
 use tracing::{debug, info, trace, warn};
@@ -15,11 +18,12 @@ use crate::parser::Parser;
 use crate::resolver;
 use crate::span::{Span, Spanned};
 use crate::symbol::{SymKind, SymbolTable};
-use crate::typeck::{self, TypeMap};
 use crate::token::TokenKind;
+use crate::typeck::{self, TypeMap};
 
 type DocUri = lsp_types::Uri;
 
+#[allow(dead_code)]
 struct DocumentState {
     source: String,
     program: Program,
@@ -41,7 +45,10 @@ fn offset_to_position(source: &str, offset: usize) -> Position {
             col += 1;
         }
     }
-    Position { line, character: col }
+    Position {
+        line,
+        character: col,
+    }
 }
 
 fn position_to_offset(source: &str, pos: Position) -> Option<usize> {
@@ -80,7 +87,16 @@ fn error_to_diagnostics(source: &str, err: &Error) -> Vec<Diagnostic> {
         Error::Compile { location, msg } => (location, msg),
         Error::Runtime { msg, .. } => {
             return vec![Diagnostic {
-                range: Range { start: Position { line: 0, character: 0 }, end: Position { line: 0, character: 0 } },
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message: msg.clone(),
                 ..Default::default()
@@ -89,14 +105,26 @@ fn error_to_diagnostics(source: &str, err: &Error) -> Vec<Diagnostic> {
         Error::Io { .. } => return Vec::new(),
         Error::Script { msg } => {
             return vec![Diagnostic {
-                range: Range { start: Position { line: 0, character: 0 }, end: Position { line: 0, character: 0 } },
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message: msg.clone(),
                 ..Default::default()
             }];
         }
         Error::ParseMultiple { errors } | Error::CompileMultiple { errors } => {
-            return errors.iter().flat_map(|e| error_to_diagnostics(source, e)).collect();
+            return errors
+                .iter()
+                .flat_map(|e| error_to_diagnostics(source, e))
+                .collect();
         }
     };
     let range = span_to_range(source, location.span);
@@ -150,7 +178,12 @@ fn compile_source(source: &str) -> Result<DocumentState, Vec<Diagnostic>> {
         return Err(error_to_diagnostics(source, &e));
     }
     trace!("compilation: success");
-    Ok(DocumentState { source: source.to_string(), program, symbols, types })
+    Ok(DocumentState {
+        source: source.to_string(),
+        program,
+        symbols,
+        types,
+    })
 }
 
 /// Resolve the path for the persistent log file.
@@ -165,7 +198,12 @@ fn resolve_log_path() -> std::path::PathBuf {
     }
     let cwd = std::env::current_dir().unwrap_or_default();
     let candidate = cwd.join("zenlang-lsp.log");
-    if std::fs::OpenOptions::new().create(true).append(true).open(&candidate).is_ok() {
+    if std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&candidate)
+        .is_ok()
+    {
         return candidate;
     }
     std::env::temp_dir().join("zenlang-lsp.log")
@@ -182,27 +220,37 @@ fn init_lsp_tracing() -> tracing_appender::non_blocking::WorkerGuard {
     eprintln!("[zenlang lsp] starting, log: {}", log_path.display());
 
     // File writer (non‑blocking so the LSP is never stalled by I/O)
-    let log_dir  = log_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
-    let log_name = log_path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "zenlang-lsp.log".into());
+    let log_dir = log_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default();
+    let log_name = log_path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "zenlang-lsp.log".into());
     let file_appender = tracing_appender::rolling::never(&log_dir, &log_name);
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // Two layers: one for stderr, one for the file.
+    use tracing_subscriber::Layer;
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::Layer;
 
     let stderr_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
         .with_ansi(false)
-        .with_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "zenlang=info".into()));
+        .with_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "zenlang=info".into()),
+        );
 
     let file_layer = tracing_subscriber::fmt::layer()
         .with_writer(non_blocking)
         .with_ansi(false)
-        .with_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "zenlang=debug".into()));
+        .with_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "zenlang=debug".into()),
+        );
 
     tracing_subscriber::registry()
         .with(stderr_layer)
@@ -231,8 +279,8 @@ pub fn run_server() {
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         definition_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
-        semantic_tokens_provider: Some(
-            SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
                 legend: SemanticTokensLegend {
                     token_types: vec![
                         SemanticTokenType::KEYWORD,
@@ -247,8 +295,8 @@ pub fn run_server() {
                 },
                 full: Some(SemanticTokensFullOptions::Bool(true)),
                 ..Default::default()
-            }),
-        ),
+            },
+        )),
         document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
@@ -297,7 +345,12 @@ fn handle_request(
     docs: &HashMap<DocUri, DocumentState>,
     req: lsp_server::Request,
 ) {
-    let uri_hint: String = match req.params.get("textDocument").and_then(|td| td.get("uri")).and_then(|u| u.as_str()) {
+    let uri_hint: String = match req
+        .params
+        .get("textDocument")
+        .and_then(|td| td.get("uri"))
+        .and_then(|u| u.as_str())
+    {
         Some(u) => u.to_string(),
         None => "<unknown>".into(),
     };
@@ -325,10 +378,12 @@ fn handle_request(
             let r = state.and_then(|s| completion(s, &pos));
             debug!(
                 "completion: {} items for {uri:?}",
-                r.as_ref().map(|c| match c {
-                    CompletionResponse::Array(items) => items.len(),
-                    _ => 0,
-                }).unwrap_or(0)
+                r.as_ref()
+                    .map(|c| match c {
+                        CompletionResponse::Array(items) => items.len(),
+                        _ => 0,
+                    })
+                    .unwrap_or(0)
             );
             serde_json::to_value(r).ok()
         }
@@ -368,7 +423,10 @@ fn handle_request(
         result,
         error: None,
     };
-    connection.sender.send(lsp_server::Message::Response(response)).unwrap();
+    connection
+        .sender
+        .send(lsp_server::Message::Response(response))
+        .unwrap();
 }
 
 fn handle_notification(
@@ -382,7 +440,11 @@ fn handle_notification(
             let uri_clone = params.text_document.uri.clone();
             let source = params.text_document.text;
             info!("didOpen: {uri_clone:?}");
-            trace!("didOpen source ({} chars):\n{}", source.len(), &source[..source.len().min(512)]);
+            trace!(
+                "didOpen source ({} chars):\n{}",
+                source.len(),
+                &source[..source.len().min(512)]
+            );
 
             match compile_source(&source) {
                 Ok(state) => {
@@ -390,18 +452,32 @@ fn handle_notification(
                     send_diagnostics(connection, uri_clone, Vec::new());
                 }
                 Err(diags) => {
-                    warn!("didOpen: compilation produced {} diagnostic(s) for {uri_clone:?}", diags.len());
+                    warn!(
+                        "didOpen: compilation produced {} diagnostic(s) for {uri_clone:?}",
+                        diags.len()
+                    );
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
+                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse()
+                    {
                         let mut p = parser;
                         let native_names = crate::stdlib::native_names();
-                        let mut s = resolver::resolve_with_natives(&mut p, &native_names).ok().unwrap_or_else(SymbolTable::new);
+                        let mut s = resolver::resolve_with_natives(&mut p, &native_names)
+                            .ok()
+                            .unwrap_or_else(SymbolTable::new);
                         let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
                         (p, s, t)
                     } else {
                         (Program::new(), SymbolTable::new(), TypeMap::new())
                     };
-                    docs.insert(uri_clone.clone(), DocumentState { source, program, symbols, types });
+                    docs.insert(
+                        uri_clone.clone(),
+                        DocumentState {
+                            source,
+                            program,
+                            symbols,
+                            types,
+                        },
+                    );
                     send_diagnostics(connection, uri_clone, diags);
                 }
             }
@@ -438,12 +514,20 @@ fn handle_notification(
                     }
                 }
                 if changed {
-                    trace!("source after incremental changes:\n{}", &state.source[..state.source.len().min(512)]);
+                    trace!(
+                        "source after incremental changes:\n{}",
+                        &state.source[..state.source.len().min(512)]
+                    );
                 }
                 state.source.clone()
             } else {
                 warn!("didChange: no prior state for {uri_clone:?}, treating as open");
-                params.content_changes.into_iter().last().map(|c| c.text).unwrap_or_default()
+                params
+                    .content_changes
+                    .into_iter()
+                    .last()
+                    .map(|c| c.text)
+                    .unwrap_or_default()
             };
 
             match compile_source(&source) {
@@ -452,19 +536,33 @@ fn handle_notification(
                     send_diagnostics(connection, uri_clone, Vec::new());
                 }
                 Err(diags) => {
-                    debug!("didChange: compilation produced {} diagnostic(s) for {uri_clone:?}", diags.len());
+                    debug!(
+                        "didChange: compilation produced {} diagnostic(s) for {uri_clone:?}",
+                        diags.len()
+                    );
                     // If we can parse, salvage partial state for semantic tokens etc.
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
+                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse()
+                    {
                         let mut p = parser;
                         let native_names = crate::stdlib::native_names();
-                        let mut s = resolver::resolve_with_natives(&mut p, &native_names).ok().unwrap_or_else(SymbolTable::new);
+                        let mut s = resolver::resolve_with_natives(&mut p, &native_names)
+                            .ok()
+                            .unwrap_or_else(SymbolTable::new);
                         let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
                         (p, s, t)
                     } else {
                         (Program::new(), SymbolTable::new(), TypeMap::new())
                     };
-                    docs.insert(uri_clone.clone(), DocumentState { source, program, symbols, types });
+                    docs.insert(
+                        uri_clone.clone(),
+                        DocumentState {
+                            source,
+                            program,
+                            symbols,
+                            types,
+                        },
+                    );
                     send_diagnostics(connection, uri_clone, diags);
                 }
             }
@@ -481,18 +579,32 @@ fn handle_notification(
                         send_diagnostics(connection, uri.clone(), Vec::new());
                     }
                     Err(diags) => {
-                        debug!("didSave: compilation produced {} diagnostic(s) for {uri:?}", diags.len());
+                        debug!(
+                            "didSave: compilation produced {} diagnostic(s) for {uri:?}",
+                            diags.len()
+                        );
                         let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                        let (program, symbols, types) = if let Ok(parser) = Parser::new(&tokens).parse() {
-                            let mut p = parser;
-                            let native_names = crate::stdlib::native_names();
-                            let mut s = resolver::resolve_with_natives(&mut p, &native_names).ok().unwrap_or_else(SymbolTable::new);
-                            let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
-                            (p, s, t)
-                        } else {
-                            (Program::new(), SymbolTable::new(), TypeMap::new())
-                        };
-                        docs.insert(uri.clone(), DocumentState { source, program, symbols, types });
+                        let (program, symbols, types) =
+                            if let Ok(parser) = Parser::new(&tokens).parse() {
+                                let mut p = parser;
+                                let native_names = crate::stdlib::native_names();
+                                let mut s = resolver::resolve_with_natives(&mut p, &native_names)
+                                    .ok()
+                                    .unwrap_or_else(SymbolTable::new);
+                                let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
+                                (p, s, t)
+                            } else {
+                                (Program::new(), SymbolTable::new(), TypeMap::new())
+                            };
+                        docs.insert(
+                            uri.clone(),
+                            DocumentState {
+                                source,
+                                program,
+                                symbols,
+                                types,
+                            },
+                        );
                         send_diagnostics(connection, uri.clone(), diags);
                     }
                 }
@@ -510,13 +622,14 @@ fn handle_notification(
 }
 
 fn send_diagnostics(connection: &mut lsp_server::Connection, uri: DocUri, diags: Vec<Diagnostic>) {
-    debug!("send_diagnostics: {} diagnostic(s) for {uri:?}", diags.len());
+    debug!(
+        "send_diagnostics: {} diagnostic(s) for {uri:?}",
+        diags.len()
+    );
     for d in &diags {
         trace!(
             "  diag: line {}:{} - {}",
-            d.range.start.line,
-            d.range.start.character,
-            d.message,
+            d.range.start.line, d.range.start.character, d.message,
         );
     }
     let params = PublishDiagnosticsParams {
@@ -528,7 +641,10 @@ fn send_diagnostics(connection: &mut lsp_server::Connection, uri: DocUri, diags:
         "textDocument/publishDiagnostics".to_string(),
         serde_json::to_value(params).unwrap(),
     );
-    connection.sender.send(lsp_server::Message::Notification(notif)).unwrap();
+    connection
+        .sender
+        .send(lsp_server::Message::Notification(notif))
+        .unwrap();
 }
 
 fn hover(state: &DocumentState, pos: &Position) -> Option<Hover> {
@@ -541,22 +657,38 @@ fn hover(state: &DocumentState, pos: &Position) -> Option<Hover> {
     if !source[offset].is_ascii_alphanumeric() && source[offset] != b'_' {
         return None;
     }
-    let start = (0..offset).rev()
+    let start = (0..offset)
+        .rev()
         .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
         .last()
         .unwrap_or(offset);
-    let end = offset + 1 + (offset + 1..source.len())
-        .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
-        .count();
+    let end = offset
+        + 1
+        + (offset + 1..source.len())
+            .take_while(|&i| source[i].is_ascii_alphanumeric() || source[i] == b'_')
+            .count();
     let name = &state.source[start..end];
 
-    let kind = state.symbols.symbols.iter().rev().find(|(n, _)| n == name).map(|(_, k)| k)?;
+    let kind = state
+        .symbols
+        .symbols
+        .iter()
+        .rev()
+        .find(|(n, _)| n == name)
+        .map(|(_, k)| k)?;
     // Find the definition's top-level statement for its comment
-    let def_span = state.program.stmts.iter().find(|s| match &s.node {
-        Stmt::Fn { name: n, .. } | Stmt::Struct { name: n, .. } | Stmt::Enum { name: n, .. } => n == name,
-        Stmt::Impl { type_name, .. } => type_name == name,
-        _ => false,
-    }).map(|s| s.span);
+    let def_span = state
+        .program
+        .stmts
+        .iter()
+        .find(|s| match &s.node {
+            Stmt::Fn { name: n, .. }
+            | Stmt::Struct { name: n, .. }
+            | Stmt::Enum { name: n, .. } => n == name,
+            Stmt::Impl { type_name, .. } => type_name == name,
+            _ => false,
+        })
+        .map(|s| s.span);
 
     let mut text = String::new();
     if let Some(span) = def_span {
@@ -595,9 +727,8 @@ fn comment_before(source: &str, offset: usize) -> Option<String> {
 fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionResponse> {
     let mut items = Vec::new();
     for kw in &[
-        "fn", "let", "mut", "if", "else", "while", "for", "loop",
-        "break", "continue", "return", "match", "in", "struct", "enum",
-        "impl", "true", "false",
+        "fn", "let", "mut", "if", "else", "while", "for", "loop", "break", "continue", "return",
+        "match", "in", "struct", "enum", "impl", "true", "false",
     ] {
         items.push(CompletionItem {
             label: kw.to_string(),
@@ -619,7 +750,11 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
             ..Default::default()
         });
     }
-    if items.is_empty() { None } else { Some(CompletionResponse::Array(items)) }
+    if items.is_empty() {
+        None
+    } else {
+        Some(CompletionResponse::Array(items))
+    }
 }
 
 fn goto_definition(
@@ -636,14 +771,25 @@ fn document_symbols(state: &DocumentState) -> Option<Vec<DocumentSymbol>> {
             symbols.push(sym);
         }
     }
-    if symbols.is_empty() { None } else { Some(symbols) }
+    if symbols.is_empty() {
+        None
+    } else {
+        Some(symbols)
+    }
 }
 
 fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<DocumentSymbol> {
     let range = span_to_range(source, stmt.span);
     match &stmt.node {
         Stmt::Fn { name, params, .. } => {
-            let detail = Some(format!("fn({})", params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")));
+            let detail = Some(format!(
+                "fn({})",
+                params
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
             Some(DocumentSymbol {
                 name: name.clone(),
                 detail,
@@ -656,16 +802,19 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
             })
         }
         Stmt::Struct { name, fields } => {
-            let children = fields.iter().map(|f| DocumentSymbol {
-                name: f.name.clone(),
-                detail: Some(format!("{}", type_display(&f.type_ann))),
-                kind: SymbolKind::FIELD,
-                range,
-                selection_range: range,
-                children: None,
-                deprecated: None,
-                tags: None,
-            }).collect();
+            let children = fields
+                .iter()
+                .map(|f| DocumentSymbol {
+                    name: f.name.clone(),
+                    detail: Some(format!("{}", type_display(&f.type_ann))),
+                    kind: SymbolKind::FIELD,
+                    range,
+                    selection_range: range,
+                    children: None,
+                    deprecated: None,
+                    tags: None,
+                })
+                .collect();
             Some(DocumentSymbol {
                 name: name.clone(),
                 detail: None,
@@ -678,16 +827,19 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
             })
         }
         Stmt::Enum { name, variants } => {
-            let children = variants.iter().map(|v| DocumentSymbol {
-                name: v.name.clone(),
-                detail: None,
-                kind: SymbolKind::ENUM_MEMBER,
-                range,
-                selection_range: range,
-                children: None,
-                deprecated: None,
-                tags: None,
-            }).collect();
+            let children = variants
+                .iter()
+                .map(|v| DocumentSymbol {
+                    name: v.name.clone(),
+                    detail: None,
+                    kind: SymbolKind::ENUM_MEMBER,
+                    range,
+                    selection_range: range,
+                    children: None,
+                    deprecated: None,
+                    tags: None,
+                })
+                .collect();
             Some(DocumentSymbol {
                 name: name.clone(),
                 detail: None,
@@ -699,18 +851,16 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 tags: None,
             })
         }
-        Stmt::Let { name, .. } => {
-            Some(DocumentSymbol {
-                name: name.clone(),
-                detail: None,
-                kind: SymbolKind::VARIABLE,
-                range,
-                selection_range: range,
-                children: None,
-                deprecated: None,
-                tags: None,
-            })
-        }
+        Stmt::Let { name, .. } => Some(DocumentSymbol {
+            name: name.clone(),
+            detail: None,
+            kind: SymbolKind::VARIABLE,
+            range,
+            selection_range: range,
+            children: None,
+            deprecated: None,
+            tags: None,
+        }),
         _ => None,
     }
 }
@@ -730,14 +880,29 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
 
         let tok = &spanned.node;
         let token_type = match &tok.kind {
-            TokenKind::Fn | TokenKind::Let | TokenKind::Mut
-            | TokenKind::If | TokenKind::Else | TokenKind::While
-            | TokenKind::For | TokenKind::Loop | TokenKind::Break
-            | TokenKind::Continue | TokenKind::Return | TokenKind::Match
-            | TokenKind::In | TokenKind::Struct | TokenKind::Enum
-            | TokenKind::Impl | TokenKind::Self_ | TokenKind::Pub
-            | TokenKind::Use | TokenKind::Mod | TokenKind::Const
-            | TokenKind::Type | TokenKind::Underscore => SemanticTokenType::KEYWORD,
+            TokenKind::Fn
+            | TokenKind::Let
+            | TokenKind::Mut
+            | TokenKind::If
+            | TokenKind::Else
+            | TokenKind::While
+            | TokenKind::For
+            | TokenKind::Loop
+            | TokenKind::Break
+            | TokenKind::Continue
+            | TokenKind::Return
+            | TokenKind::Match
+            | TokenKind::In
+            | TokenKind::Struct
+            | TokenKind::Enum
+            | TokenKind::Impl
+            | TokenKind::Self_
+            | TokenKind::Pub
+            | TokenKind::Use
+            | TokenKind::Mod
+            | TokenKind::Const
+            | TokenKind::Type
+            | TokenKind::Underscore => SemanticTokenType::KEYWORD,
             TokenKind::Str(_) => SemanticTokenType::STRING,
             TokenKind::Int(_) | TokenKind::Float(_) => SemanticTokenType::NUMBER,
             TokenKind::Bool(_) => SemanticTokenType::KEYWORD,
@@ -753,15 +918,32 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     SemanticTokenType::VARIABLE
                 }
             }
-            TokenKind::Plus | TokenKind::Minus | TokenKind::Star
-            | TokenKind::Slash | TokenKind::Percent | TokenKind::Eq
-            | TokenKind::EqEq | TokenKind::Ne | TokenKind::Lt
-            | TokenKind::Gt | TokenKind::Le | TokenKind::Ge
-            | TokenKind::And | TokenKind::AndAnd | TokenKind::Or
-            | TokenKind::OrOr | TokenKind::Bang | TokenKind::Dot
-            | TokenKind::DotDot | TokenKind::DotDotEq | TokenKind::Comma
-            | TokenKind::Semi | TokenKind::Colon | TokenKind::ColonColon
-            | TokenKind::Arrow | TokenKind::FatArrow => SemanticTokenType::OPERATOR,
+            TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::Percent
+            | TokenKind::Eq
+            | TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::Lt
+            | TokenKind::Gt
+            | TokenKind::Le
+            | TokenKind::Ge
+            | TokenKind::And
+            | TokenKind::AndAnd
+            | TokenKind::Or
+            | TokenKind::OrOr
+            | TokenKind::Bang
+            | TokenKind::Dot
+            | TokenKind::DotDot
+            | TokenKind::DotDotEq
+            | TokenKind::Comma
+            | TokenKind::Semi
+            | TokenKind::Colon
+            | TokenKind::ColonColon
+            | TokenKind::Arrow
+            | TokenKind::FatArrow => SemanticTokenType::OPERATOR,
             _ => continue,
         };
 
@@ -803,10 +985,16 @@ fn format_document(state: &DocumentState, _uri: &DocUri, tab_size: usize) -> Opt
         return Some(Vec::new());
     }
     let range = Range {
-        start: Position { line: 0, character: 0 },
+        start: Position {
+            line: 0,
+            character: 0,
+        },
         end: offset_to_position(&state.source, state.source.len()),
     };
-    Some(vec![TextEdit { range, new_text: formatted }])
+    Some(vec![TextEdit {
+        range,
+        new_text: formatted,
+    }])
 }
 
 fn token_type_index(ty: SemanticTokenType) -> u32 {
@@ -826,11 +1014,36 @@ fn symkind_display(kind: &SymKind) -> String {
     match kind {
         SymKind::Variable(ty) => type_display(ty),
         SymKind::Function(sig) => {
-            let params: Vec<String> = sig.params.iter().map(|(n, t)| format!("{}: {}", n, type_display(t))).collect();
-            format!("fn({}) -> {}", params.join(", "), sig.return_type.as_ref().map(|t| type_display(t)).unwrap_or_else(|| "?".to_string()))
+            let params: Vec<String> = sig
+                .params
+                .iter()
+                .map(|(n, t)| format!("{}: {}", n, type_display(t)))
+                .collect();
+            format!(
+                "fn({}) -> {}",
+                params.join(", "),
+                sig.return_type
+                    .as_ref()
+                    .map(|t| type_display(t))
+                    .unwrap_or_else(|| "?".to_string())
+            )
         }
-        SymKind::Struct(def) => format!("struct {{ {} }}", def.fields.iter().map(|f| format!("{}: {}", f.name, type_display(&f.type_ann))).collect::<Vec<_>>().join(", ")),
-        SymKind::Enum(def) => format!("enum {{ {} }}", def.variants.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", ")),
+        SymKind::Struct(def) => format!(
+            "struct {{ {} }}",
+            def.fields
+                .iter()
+                .map(|f| format!("{}: {}", f.name, type_display(&f.type_ann)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        SymKind::Enum(def) => format!(
+            "enum {{ {} }}",
+            def.variants
+                .iter()
+                .map(|(n, _)| n.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
     }
 }
 

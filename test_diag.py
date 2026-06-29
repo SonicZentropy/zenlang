@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import subprocess, json, sys, time
 
+exe = "target/debug/zenc.exe" if sys.platform == "win32" else "target/debug/zenc"
 proc = subprocess.Popen(
-    [r"target/debug/zenlang.exe", "lsp"],
+    [exe, "lsp"],
     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
 )
 

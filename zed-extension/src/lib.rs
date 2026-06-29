@@ -1,4 +1,4 @@
-use zed_extension_api as zed;
+use zed_extension_api::{self as zed, Os};
 
 struct ZenlangExtension;
 
@@ -23,11 +23,9 @@ impl zed::Extension for ZenlangExtension {
 
 impl ZenlangExtension {
     fn lsp_path(&self, worktree: &zed::Worktree) -> String {
-        // Hardcode to the local cargo build. worktree.which() is
-        // unreliable from WASM on Windows, and PATH copy/which
-        // introduced more problems than it solved during dev.
         let root = worktree.root_path();
-        format!("{root}/target/debug/zenlang.exe")
+        let exe = if zed::current_platform().0 == Os::Windows { "zenc.exe" } else { "zenc" };
+        format!("{root}/target/debug/{exe}")
     }
 }
 

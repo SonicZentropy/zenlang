@@ -11,16 +11,16 @@ use edict::entity::EntityId;
 use edict::world::World;
 
 use zenlang::compiler::compile;
-use zenlang::{Value, VM};
 use zenlang::error::Result;
 use zenlang::interop::{with_foreign, with_foreign_mut};
-use zenlang::value::ForeignObject;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
 use zenlang::resolver::resolve_with_natives;
 use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
+use zenlang::value::ForeignObject;
 use zenlang::vm::VMContext;
+use zenlang::{VM, Value};
 
 // ─── ECS Components ────────────────────────────────────────────
 
@@ -112,78 +112,96 @@ fn register_natives(vm: &mut VM, ecs: &Rc<RefCell<EcsState>>, state: &Rc<RefCell
     // spawn_entity(x, y, vx, vy, size, r, g, b) -> EntityHandle
     {
         let s = ecs.clone();
-        vm.register_native("spawn_entity", Rc::new(move |_: &mut VMContext, args: &[Value]| {
-            let x = args.get(0).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
-            let y = args.get(1).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
-            let vx = args.get(2).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
-            let vy = args.get(3).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
-            let size = args.get(4).and_then(|v| v.as_float()).unwrap_or(8.0) as f32;
-            let r = args.get(5).and_then(|v| v.as_float()).unwrap_or(255.0) as u8;
-            let g = args.get(6).and_then(|v| v.as_float()).unwrap_or(255.0) as u8;
-            let b = args.get(7).and_then(|v| v.as_float()).unwrap_or(255.0) as u8;
+        vm.register_native(
+            "spawn_entity",
+            Rc::new(move |_: &mut VMContext, args: &[Value]| {
+                let x = args.get(0).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
+                let y = args.get(1).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
+                let vx = args.get(2).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
+                let vy = args.get(3).and_then(|v| v.as_float()).unwrap_or(0.0) as f32;
+                let size = args.get(4).and_then(|v| v.as_float()).unwrap_or(8.0) as f32;
+                let r = args.get(5).and_then(|v| v.as_float()).unwrap_or(255.0) as u8;
+                let g = args.get(6).and_then(|v| v.as_float()).unwrap_or(255.0) as u8;
+                let b = args.get(7).and_then(|v| v.as_float()).unwrap_or(255.0) as u8;
 
-            let mut guard = s.borrow_mut();
-            let entity = guard.world.spawn((
-                Position(x, y),
-                Velocity(vx, vy),
-                Renderable { size, r, g, b },
-            ));
-            let id = entity.id();
-            let slot = guard.handles.len();
-            guard.handles.push(id);
+                let mut guard = s.borrow_mut();
+                let entity = guard.world.spawn((
+                    Position(x, y),
+                    Velocity(vx, vy),
+                    Renderable { size, r, g, b },
+                ));
+                let id = entity.id();
+                let slot = guard.handles.len();
+                guard.handles.push(id);
 
-            Ok(Value::Foreign(Rc::new(RefCell::new(
-                ForeignObject::new("EntityHandle", EntityHandle { slot }),
-            ))))
-        }));
+                Ok(Value::Foreign(Rc::new(RefCell::new(ForeignObject::new(
+                    "EntityHandle",
+                    EntityHandle { slot },
+                )))))
+            }),
+        );
     }
 
     // entity_count() -> int
     {
         let s = ecs.clone();
-        vm.register_native("entity_count", Rc::new(move |_: &mut VMContext, _: &[Value]| {
-            let guard = s.borrow();
-            Ok(Value::Int(guard.handles.len() as i64))
-        }));
+        vm.register_native(
+            "entity_count",
+            Rc::new(move |_: &mut VMContext, _: &[Value]| {
+                let guard = s.borrow();
+                Ok(Value::Int(guard.handles.len() as i64))
+            }),
+        );
     }
 
     // get_entity(idx) -> EntityHandle | nil
     {
         let s = ecs.clone();
-        vm.register_native("get_entity", Rc::new(move |_: &mut VMContext, args: &[Value]| {
-            let idx = args.first().and_then(|v| v.as_int()).unwrap_or(0) as usize;
-            let guard = s.borrow();
-            if idx < guard.handles.len() {
-                Ok(Value::Foreign(Rc::new(RefCell::new(
-                    ForeignObject::new("EntityHandle", EntityHandle { slot: idx }),
-                ))))
-            } else {
-                Ok(Value::Nil)
-            }
-        }));
+        vm.register_native(
+            "get_entity",
+            Rc::new(move |_: &mut VMContext, args: &[Value]| {
+                let idx = args.first().and_then(|v| v.as_int()).unwrap_or(0) as usize;
+                let guard = s.borrow();
+                if idx < guard.handles.len() {
+                    Ok(Value::Foreign(Rc::new(RefCell::new(ForeignObject::new(
+                        "EntityHandle",
+                        EntityHandle { slot: idx },
+                    )))))
+                } else {
+                    Ok(Value::Nil)
+                }
+            }),
+        );
     }
 
     // screen_width() -> float
     {
         let fs = state.clone();
-        vm.register_native("screen_width", Rc::new(move |_: &mut VMContext, _: &[Value]| {
-            Ok(Value::Float(fs.borrow().screen_w as f64))
-        }));
+        vm.register_native(
+            "screen_width",
+            Rc::new(move |_: &mut VMContext, _: &[Value]| {
+                Ok(Value::Float(fs.borrow().screen_w as f64))
+            }),
+        );
     }
 
     // screen_height() -> float
     {
         let fs = state.clone();
-        vm.register_native("screen_height", Rc::new(move |_: &mut VMContext, _: &[Value]| {
-            Ok(Value::Float(fs.borrow().screen_h as f64))
-        }));
+        vm.register_native(
+            "screen_height",
+            Rc::new(move |_: &mut VMContext, _: &[Value]| {
+                Ok(Value::Float(fs.borrow().screen_h as f64))
+            }),
+        );
     }
 
     // is_key_pressed(key) -> bool
     {
         let fs = state.clone();
-        vm.register_native("is_key_pressed", Rc::new(
-            move |_: &mut VMContext, args: &[Value]| {
+        vm.register_native(
+            "is_key_pressed",
+            Rc::new(move |_: &mut VMContext, args: &[Value]| {
                 let key = args.first().and_then(|v| v.as_str()).unwrap_or_default();
                 let guard = fs.borrow();
                 let pressed = match key.as_str() {
@@ -191,26 +209,28 @@ fn register_natives(vm: &mut VM, ecs: &Rc<RefCell<EcsState>>, state: &Rc<RefCell
                     _ => false,
                 };
                 Ok(Value::Bool(pressed))
-            },
-        ));
+            }),
+        );
     }
 
     // rand_range(min, max) -> float
-    vm.register_native("rand_range", Rc::new(
-        |_: &mut VMContext, args: &[Value]| {
+    vm.register_native(
+        "rand_range",
+        Rc::new(|_: &mut VMContext, args: &[Value]| {
             let min = args.get(0).and_then(|v| v.as_float()).unwrap_or(0.0);
             let max = args.get(1).and_then(|v| v.as_float()).unwrap_or(1.0);
-            use rand::Rng;
-            Ok(Value::Float(rand::thread_rng().gen_range(min..max)))
-        },
-    ));
+            use rand::RngExt;
+            Ok(Value::Float(rand::rng().random_range(min..max)))
+        }),
+    );
 
     // delta_time() -> float
     {
         let fs = state.clone();
-        vm.register_native("delta_time", Rc::new(move |_: &mut VMContext, _: &[Value]| {
-            Ok(Value::Float(fs.borrow().dt as f64))
-        }));
+        vm.register_native(
+            "delta_time",
+            Rc::new(move |_: &mut VMContext, _: &[Value]| Ok(Value::Float(fs.borrow().dt as f64))),
+        );
     }
 }
 
@@ -399,7 +419,11 @@ fn setup() -> Game {
     vm.load_bytecode(fns, global_names);
     let _ = vm.run_main();
 
-    Game { vm: RefCell::new(vm), ecs, frame_state }
+    Game {
+        vm: RefCell::new(vm),
+        ecs,
+        frame_state,
+    }
 }
 
 // ─── Entry point ───────────────────────────────────────────────
@@ -421,7 +445,8 @@ fn main() {
                 fs.dt = fc.timer.delta;
             }
 
-            fc.gfx.clear(Color::new([15.0 / 255.0, 15.0 / 255.0, 30.0 / 255.0, 1.0]));
+            fc.gfx
+                .clear(Color::new([15.0 / 255.0, 15.0 / 255.0, 30.0 / 255.0, 1.0]));
 
             // 1. Run the Zenlang script (AI / gameplay logic)
             if let Ok(mut vm) = game.vm.try_borrow_mut() {
@@ -464,8 +489,14 @@ fn main() {
             {
                 let ecs = game.ecs.borrow();
                 for (pos, rend) in ecs.world.view::<(&Position, &Renderable)>() {
-                    let c = Color::new([rend.r as f32 / 255.0, rend.g as f32 / 255.0, rend.b as f32 / 255.0, 1.0]);
-                    fc.gfx.polygon()
+                    let c = Color::new([
+                        rend.r as f32 / 255.0,
+                        rend.g as f32 / 255.0,
+                        rend.b as f32 / 255.0,
+                        1.0,
+                    ]);
+                    fc.gfx
+                        .polygon()
                         .at(Vec2::new(pos.0, pos.1))
                         .radius(rend.size)
                         .segments(32)
@@ -477,14 +508,21 @@ fn main() {
             {
                 let ecs = game.ecs.borrow();
                 let info = format!("Entities: {}  |  SPACE to spawn", ecs.handles.len());
-                fc.gfx.text(&info)
+                fc.gfx
+                    .text(&info)
                     .at((12.0, 24.0))
                     .size(20.0)
                     .color(Color::WHITE);
-                fc.gfx.text("Script-driven bouncing particles")
+                fc.gfx
+                    .text("Script-driven bouncing particles")
                     .at((12.0, 48.0))
                     .size(14.0)
-                    .color(Color::new([180.0 / 255.0, 180.0 / 255.0, 200.0 / 255.0, 1.0]));
+                    .color(Color::new([
+                        180.0 / 255.0,
+                        180.0 / 255.0,
+                        200.0 / 255.0,
+                        1.0,
+                    ]));
             }
         });
 }

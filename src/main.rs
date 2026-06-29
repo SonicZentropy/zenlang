@@ -6,7 +6,7 @@ use zenlang::hotreload::HotReloader;
 use zenlang::{Error, VM};
 
 #[derive(Parser)]
-#[command(name = "zenlang", version, about = "Zenlang scripting language")]
+#[command(name = "zenc", version, about = "Zenlang scripting language")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
