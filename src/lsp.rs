@@ -791,7 +791,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                     .join(", ")
             ));
             Some(DocumentSymbol {
-                name: name.clone(),
+                name: name.to_string(),
                 detail,
                 kind: SymbolKind::FUNCTION,
                 range,
@@ -805,7 +805,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
             let children = fields
                 .iter()
                 .map(|f| DocumentSymbol {
-                    name: f.name.clone(),
+                    name: f.name.to_string(),
                     detail: Some(format!("{}", type_display(&f.type_ann))),
                     kind: SymbolKind::FIELD,
                     range,
@@ -816,7 +816,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 })
                 .collect();
             Some(DocumentSymbol {
-                name: name.clone(),
+                name: name.to_string(),
                 detail: None,
                 kind: SymbolKind::STRUCT,
                 range,
@@ -830,7 +830,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
             let children = variants
                 .iter()
                 .map(|v| DocumentSymbol {
-                    name: v.name.clone(),
+                    name: v.name.to_string(),
                     detail: None,
                     kind: SymbolKind::ENUM_MEMBER,
                     range,
@@ -841,7 +841,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 })
                 .collect();
             Some(DocumentSymbol {
-                name: name.clone(),
+                name: name.to_string(),
                 detail: None,
                 kind: SymbolKind::ENUM,
                 range,
@@ -852,7 +852,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
             })
         }
         Stmt::Let { name, .. } => Some(DocumentSymbol {
-            name: name.clone(),
+            name: name.to_string(),
             detail: None,
             kind: SymbolKind::VARIABLE,
             range,
@@ -1055,7 +1055,7 @@ fn type_display(ty: &crate::ast::Type) -> String {
         crate::ast::Type::Bool => "bool".into(),
         crate::ast::Type::Str => "str".into(),
         crate::ast::Type::Unit => "()".into(),
-        crate::ast::Type::Named(n) => n.clone(),
+        crate::ast::Type::Named(n) => n.to_string(),
         crate::ast::Type::Array(inner) => format!("[{}]", type_display(inner)),
         crate::ast::Type::Fn { params, ret } => {
             let ps: Vec<String> = params.iter().map(type_display).collect();

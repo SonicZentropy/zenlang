@@ -91,20 +91,42 @@ impl<'a> Lexer<'a> {
             '#' => self.make_token(TokenKind::Hash),
             '@' => self.make_token(TokenKind::At),
             '?' => self.make_token(TokenKind::Question),
-            '%' => self.make_token(TokenKind::Percent),
+            '%' => {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::PercentEq)
+                } else {
+                    self.make_token(TokenKind::Percent)
+                }
+            }
 
-            // Operators that could be one or two chars
-            '+' => self.make_token(TokenKind::Plus),
+            // Operators that could be one, two, or three chars
+            '+' => {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::PlusEq)
+                } else {
+                    self.make_token(TokenKind::Plus)
+                }
+            }
             '-' => {
                 if self.r#match('>') {
                     self.make_token(TokenKind::Arrow)
+                } else if self.r#match('=') {
+                    self.make_token(TokenKind::MinusEq)
                 } else {
                     self.make_token(TokenKind::Minus)
                 }
             }
-            '*' => self.make_token(TokenKind::Star),
+            '*' => {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::StarEq)
+                } else {
+                    self.make_token(TokenKind::Star)
+                }
+            }
             '/' => {
-                if self.r#match('/') {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::SlashEq)
+                } else if self.r#match('/') {
                     self.skip_to_eol();
                     self.make_token(TokenKind::Comment)
                 } else if self.r#match('*') {
@@ -131,32 +153,58 @@ impl<'a> Lexer<'a> {
                 }
             }
             '<' => {
-                if self.r#match('=') {
+                if self.r#match('<') {
+                    if self.r#match('=') {
+                        self.make_token(TokenKind::ShlEq)
+                    } else {
+                        self.make_token(TokenKind::Shl)
+                    }
+                } else if self.r#match('=') {
                     self.make_token(TokenKind::Le)
                 } else {
                     self.make_token(TokenKind::Lt)
                 }
             }
             '>' => {
-                if self.r#match('=') {
+                if self.r#match('>') {
+                    if self.r#match('=') {
+                        self.make_token(TokenKind::ShrEq)
+                    } else {
+                        self.make_token(TokenKind::Shr)
+                    }
+                } else if self.r#match('=') {
                     self.make_token(TokenKind::Ge)
                 } else {
                     self.make_token(TokenKind::Gt)
                 }
             }
             '&' => {
-                if self.r#match('&') {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::AndEq)
+                } else if self.r#match('&') {
                     self.make_token(TokenKind::AndAnd)
                 } else {
                     self.make_token(TokenKind::And)
                 }
             }
             '|' => {
-                if self.r#match('|') {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::OrEq)
+                } else if self.r#match('|') {
                     self.make_token(TokenKind::OrOr)
                 } else {
                     self.make_token(TokenKind::Or)
                 }
+            }
+            '^' => {
+                if self.r#match('=') {
+                    self.make_token(TokenKind::CaretEq)
+                } else {
+                    self.make_token(TokenKind::Caret)
+                }
+            }
+            '~' => {
+                self.make_token(TokenKind::Tilde)
             }
             '.' => {
                 if self.r#match('.') {
@@ -318,14 +366,14 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        while self.peek().is_ascii_digit() {
+        while self.peek().is_ascii_digit() || self.peek() == '_' {
             self.advance();
         }
 
         // Check for float: a decimal point followed by at least one digit
         let is_float = if self.peek() == '.' && self.peek_next().is_ascii_digit() {
             self.advance();
-            while self.peek().is_ascii_digit() {
+            while self.peek().is_ascii_digit() || self.peek() == '_' {
                 self.advance();
             }
             true
@@ -333,12 +381,13 @@ impl<'a> Lexer<'a> {
             false
         };
 
-        let text = &self.source[self.start..self.current];
+        let raw = &self.source[self.start..self.current];
+        let text: String = raw.chars().filter(|&c| c != '_').collect();
         if is_float {
             let val: f64 = text.parse().unwrap_or_else(|_| {
                 self.errors.push(Error::Parse {
                     location: self.current_location(),
-                    msg: format!("invalid float literal '{}'", text),
+                    msg: format!("invalid float literal '{}'", raw),
                 });
                 0.0
             });
@@ -347,7 +396,7 @@ impl<'a> Lexer<'a> {
             let val: i64 = text.parse().unwrap_or_else(|_| {
                 self.errors.push(Error::Parse {
                     location: self.current_location(),
-                    msg: format!("invalid integer literal '{}'", text),
+                    msg: format!("invalid integer literal '{}'", raw),
                 });
                 0
             });
@@ -358,7 +407,7 @@ impl<'a> Lexer<'a> {
     fn hex_number(&mut self) -> Spanned<Token> {
         self.advance(); // consume 'x' or 'X' (the '0' was already consumed)
         let start = self.current;
-        while self.peek().is_ascii_hexdigit() {
+        while self.peek().is_ascii_hexdigit() || self.peek() == '_' {
             self.advance();
         }
         if self.current == start {
@@ -367,11 +416,12 @@ impl<'a> Lexer<'a> {
                 msg: "invalid hex literal: no hexadecimal digits".into(),
             });
         }
-        let text = &self.source[start..self.current];
-        let val = i64::from_str_radix(text, 16).unwrap_or_else(|_| {
+        let raw = &self.source[start..self.current];
+        let text: String = raw.chars().filter(|&c| c != '_').collect();
+        let val = i64::from_str_radix(&text, 16).unwrap_or_else(|_| {
             self.errors.push(Error::Parse {
                 location: self.current_location(),
-                msg: format!("invalid hex literal '{}'", text),
+                msg: format!("invalid hex literal '{}'", raw),
             });
             0
         });
@@ -381,7 +431,7 @@ impl<'a> Lexer<'a> {
     fn octal_number(&mut self) -> Spanned<Token> {
         self.advance(); // consume 'o' or 'O' (the '0' was already consumed)
         let start = self.current;
-        while matches!(self.peek(), '0'..='7') {
+        while matches!(self.peek(), '0'..='7' | '_') {
             self.advance();
         }
         if self.current == start {
@@ -390,11 +440,12 @@ impl<'a> Lexer<'a> {
                 msg: "invalid octal literal: no octal digits".into(),
             });
         }
-        let text = &self.source[start..self.current];
-        let val = i64::from_str_radix(text, 8).unwrap_or_else(|_| {
+        let raw = &self.source[start..self.current];
+        let text: String = raw.chars().filter(|&c| c != '_').collect();
+        let val = i64::from_str_radix(&text, 8).unwrap_or_else(|_| {
             self.errors.push(Error::Parse {
                 location: self.current_location(),
-                msg: format!("invalid octal literal '{}'", text),
+                msg: format!("invalid octal literal '{}'", raw),
             });
             0
         });
@@ -404,7 +455,7 @@ impl<'a> Lexer<'a> {
     fn binary_number(&mut self) -> Spanned<Token> {
         self.advance(); // consume 'b' or 'B' (the '0' was already consumed)
         let start = self.current;
-        while matches!(self.peek(), '0' | '1') {
+        while matches!(self.peek(), '0' | '1' | '_') {
             self.advance();
         }
         if self.current == start {
@@ -413,11 +464,12 @@ impl<'a> Lexer<'a> {
                 msg: "invalid binary literal: no binary digits".into(),
             });
         }
-        let text = &self.source[start..self.current];
-        let val = i64::from_str_radix(text, 2).unwrap_or_else(|_| {
+        let raw = &self.source[start..self.current];
+        let text: String = raw.chars().filter(|&c| c != '_').collect();
+        let val = i64::from_str_radix(&text, 2).unwrap_or_else(|_| {
             self.errors.push(Error::Parse {
                 location: self.current_location(),
-                msg: format!("invalid binary literal '{}'", text),
+                msg: format!("invalid binary literal '{}'", raw),
             });
             0
         });
@@ -467,7 +519,7 @@ impl<'a> Lexer<'a> {
 }
 
 fn is_ident_start(c: char) -> bool {
-    c == '_' || c.is_ascii_alphabetic()
+    c == '_' || c.is_alphabetic()
 }
 
 fn is_ident_continue(c: char) -> bool {
@@ -525,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_operators() {
-        let tokens = Lexer::new("+ - * / % == != < > <= >= && || ! & | .. ..= -> => :: ; : , . # @ ?").tokenize().unwrap();
+        let tokens = Lexer::new("+ - * / % == != < > <= >= && || ! & | .. ..= -> => :: ; : , . # @ ? ^ ~ << >>").tokenize().unwrap();
         let expected: Vec<TokenKind> = vec![
             TokenKind::Plus, TokenKind::Minus, TokenKind::Star, TokenKind::Slash,
             TokenKind::Percent, TokenKind::EqEq, TokenKind::Ne, TokenKind::Lt,
@@ -534,6 +586,7 @@ mod tests {
             TokenKind::Arrow, TokenKind::FatArrow, TokenKind::ColonColon,
             TokenKind::Semi, TokenKind::Colon, TokenKind::Comma, TokenKind::Dot,
             TokenKind::Hash, TokenKind::At, TokenKind::Question,
+            TokenKind::Caret, TokenKind::Tilde, TokenKind::Shl, TokenKind::Shr,
         ];
         let kinds: Vec<TokenKind> = tokens.iter().filter_map(|t| match &t.node.kind {
             TokenKind::Eof => None,

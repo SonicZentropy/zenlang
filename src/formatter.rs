@@ -90,7 +90,13 @@ impl FmtState {
                 out.push(' ');
                 false
             }
-            k if is_bin_op(k) || is_compare_op(k) || matches!(k, TokenKind::And | TokenKind::Or) => {
+            k if is_bin_op(k) || is_compare_op(k)
+                || matches!(k, TokenKind::And | TokenKind::Or | TokenKind::Caret
+                    | TokenKind::Shl | TokenKind::Shr
+                    | TokenKind::PlusEq | TokenKind::MinusEq | TokenKind::StarEq
+                    | TokenKind::SlashEq | TokenKind::PercentEq
+                    | TokenKind::AndEq | TokenKind::OrEq
+                    | TokenKind::CaretEq | TokenKind::ShlEq | TokenKind::ShrEq) => {
                 out.push(' ');
                 false
             }
@@ -173,9 +179,14 @@ fn needs_space_before(kind: &TokenKind, prev: &Option<TokenKind>) -> bool {
         TokenKind::OpenBrace => true,
         // Binary / comparison operators
         k if is_bin_op(k) || is_compare_op(k) => true,
-        TokenKind::And | TokenKind::Or => true,
+        TokenKind::And | TokenKind::Or | TokenKind::Caret | TokenKind::Shl | TokenKind::Shr => true,
         // Assignment
         TokenKind::Eq => true,
+        // Compound assignment
+        TokenKind::PlusEq | TokenKind::MinusEq | TokenKind::StarEq
+        | TokenKind::SlashEq | TokenKind::PercentEq
+        | TokenKind::AndEq | TokenKind::OrEq
+        | TokenKind::CaretEq | TokenKind::ShlEq | TokenKind::ShrEq => true,
         // Arrows
         TokenKind::Arrow | TokenKind::FatArrow => true,
         // Colon (type annotation)
@@ -201,7 +212,8 @@ fn is_keyword_that_needs_space(k: &TokenKind) -> bool {
 fn is_bin_op(k: &TokenKind) -> bool {
     matches!(k,
         TokenKind::Plus | TokenKind::Minus | TokenKind::Star |
-        TokenKind::Slash | TokenKind::Percent
+        TokenKind::Slash | TokenKind::Percent |
+        TokenKind::Shl | TokenKind::Shr | TokenKind::Caret
     )
 }
 

@@ -74,10 +74,10 @@ impl Resolver {
         match stmt {
             Stmt::Fn { name, params, return_type, body: _ } => {
                 let sig = FnSignature {
-                    name: name.clone(),
+                    name: name.to_string(),
                     params: params.iter().map(|p| {
                         let ty = p.type_ann.clone().unwrap_or(Type::Unit);
-                        (p.name.clone(), ty)
+                        (p.name.to_string(), ty)
                     }).collect(),
                     return_type: return_type.clone(),
                 };
@@ -86,16 +86,16 @@ impl Resolver {
                 }
             }
             Stmt::Struct { name, fields } => {
-                let def = StructDef { name: name.clone(), fields: fields.clone() };
+                let def = StructDef { name: name.to_string(), fields: fields.clone() };
                 if let Err(e) = self.symbols.define(name, SymKind::Struct(def)) {
                     self.error(e);
                 }
             }
             Stmt::Enum { name, variants } => {
                 let v = variants.iter()
-                    .map(|v| (v.name.clone(), v.fields.clone()))
+                    .map(|v| (v.name.to_string(), v.fields.clone()))
                     .collect();
-                let def = EnumDef { name: name.clone(), variants: v };
+                let def = EnumDef { name: name.to_string(), variants: v };
                 if let Err(e) = self.symbols.define(name, SymKind::Enum(def)) {
                     self.error(e);
                 }
@@ -107,7 +107,7 @@ impl Resolver {
                             name: format!("{}::{}", type_name, name),
                             params: params.iter().map(|p| {
                                 let ty = p.type_ann.clone().unwrap_or(Type::Unit);
-                                (p.name.clone(), ty)
+                                (p.name.to_string(), ty)
                             }).collect(),
                             return_type: return_type.clone(),
                         };

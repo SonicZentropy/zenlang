@@ -40,6 +40,12 @@ pub enum Opcode {
     StoreIndex,
     NewClosure(u16, u16),
     Len,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    BitNot,
     Halt,
 }
 
@@ -84,7 +90,13 @@ impl Opcode {
             StoreIndex => 34,
             NewClosure(_, _) => 35,
             Len => 36,
-            Halt => 37,
+            BitAnd => 37,
+            BitOr => 38,
+            BitXor => 39,
+            Shl => 40,
+            Shr => 41,
+            BitNot => 42,
+            Halt => 43,
         }
     }
 
@@ -128,7 +140,13 @@ impl Opcode {
             34 => StoreIndex,
             35 => NewClosure(0, 0),
             36 => Len,
-            37 => Halt,
+            37 => BitAnd,
+            38 => BitOr,
+            39 => BitXor,
+            40 => Shl,
+            41 => Shr,
+            42 => BitNot,
+            43 => Halt,
             _ => return None,
         })
     }
@@ -211,7 +229,8 @@ impl Chunk {
             | Opcode::Jump(v) | Opcode::JumpIfFalse(v) | Opcode::Loop(v)
             | Opcode::Call(v) | Opcode::MakeStruct(v) | Opcode::MakeArray(v)
             | Opcode::LoadField(v) | Opcode::StoreField(v) => self.emit_u16(v, line),
-            Opcode::And | Opcode::Or => {}
+            Opcode::And | Opcode::Or | Opcode::BitAnd | Opcode::BitOr | Opcode::BitXor
+            | Opcode::Shl | Opcode::Shr | Opcode::BitNot => {}
             Opcode::MakeEnum(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
             Opcode::CallMethod(m, a) => { self.emit_u16(m, line); self.emit_u16(a, line); }
             Opcode::NewClosure(f, n) => { self.emit_u16(f, line); self.emit_u16(n, line); }
@@ -326,6 +345,12 @@ impl Chunk {
                 Opcode::LoadIndex => println!("LoadIndex"),
                 Opcode::StoreIndex => println!("StoreIndex"),
                 Opcode::Len => println!("Len"),
+                Opcode::BitAnd => println!("BitAnd"),
+                Opcode::BitOr => println!("BitOr"),
+                Opcode::BitXor => println!("BitXor"),
+                Opcode::Shl => println!("Shl"),
+                Opcode::Shr => println!("Shr"),
+                Opcode::BitNot => println!("BitNot"),
                 Opcode::Halt => println!("Halt"),
             }
             offset = next;

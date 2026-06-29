@@ -1,3 +1,13 @@
+# Changelog
+
+## [0.2.0] -
+- Compound assignment operators (`+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`)
+- Bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`) + compound assigns
+- Numeric separator support (`1_000_000`)
+- `run_script` graceful exit via Ctrl+C
+- Unicode identifier support (`is_alphabetic()` instead of `is_ascii_alphabetic()`)
+
+## [0.1.0]
 
 ### 🔴 Critical Bugs
 

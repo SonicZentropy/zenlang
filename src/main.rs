@@ -1,4 +1,6 @@
 use std::io::BufRead;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 
@@ -80,8 +82,13 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
 
     // Enter hot reload loop
     let mut reloader = HotReloader::new([path.as_std_path().to_path_buf()], vm);
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    }).ok();
 
-    loop {
+    while running.load(Ordering::SeqCst) {
         if reloader.tick()? {
             let result = reloader.vm_mut().run_main()?;
             tracing::info!("reload result: {:?}", result);

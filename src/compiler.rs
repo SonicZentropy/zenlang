@@ -55,7 +55,7 @@ pub fn compile(
         register_global_stmt(&stmt.node, &mut globals, &mut global_order);
         if let Stmt::Fn { name, .. } = &stmt.node {
             let idx = function_names.len() + 1; // +1 because main is index 0
-            function_names.insert(name.clone(), idx);
+            function_names.insert(name.to_string(), idx);
         }
     }
 
@@ -86,7 +86,7 @@ pub fn compile(
     for stmt in &program.stmts {
         if let Stmt::Fn { name, params, return_type: _, body } = &stmt.node {
             let arity = params.len() as u32;
-            let mut fc = FunctionCompiler::new(name.clone(), arity, &mut globals, &function_names, &mut errors, &line_offsets);
+            let mut fc = FunctionCompiler::new(name.to_string(), arity, &mut globals, &function_names, &mut errors, &line_offsets);
 
             fc.enter_scope();
             for param in params {
@@ -126,19 +126,19 @@ pub fn compile(
 fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_order: &mut Vec<String>) {
     match stmt {
         Stmt::Fn { name, .. } | Stmt::Let { name, .. } => {
-            if !globals.contains_key(name) {
+            if !globals.contains_key(name.as_str()) {
                 let idx = globals.len() as u16;
-                globals.insert(name.clone(), idx);
-                global_order.push(name.clone());
+                globals.insert(name.to_string(), idx);
+                global_order.push(name.to_string());
             }
         }
         Stmt::Impl { methods, .. } => {
             for m in methods {
                 if let Stmt::Fn { name, .. } = &m.node {
-                    if !globals.contains_key(name) {
+                    if !globals.contains_key(name.as_str()) {
                         let idx = globals.len() as u16;
-                        globals.insert(name.clone(), idx);
-                        global_order.push(name.clone());
+                        globals.insert(name.to_string(), idx);
+                        global_order.push(name.to_string());
                     }
                 }
             }
@@ -306,7 +306,7 @@ impl<'a> FunctionCompiler<'a> {
                         self.emit_op(Opcode::StoreGlobal(idx));
                     } else {
                         let idx = self.globals.len() as u16;
-                        self.globals.insert(name.clone(), idx);
+                        self.globals.insert(name.to_string(), idx);
                         self.emit_op(Opcode::StoreGlobal(idx));
                     }
                 } else {
@@ -356,14 +356,14 @@ impl<'a> FunctionCompiler<'a> {
             Expr::Ident(name) => {
                 if let Some(idx) = self.resolve_local(name) {
                     self.emit_op(Opcode::LoadLocal(idx));
-                } else if let Some(&fn_idx) = self.function_names.get(name) {
+                } else if let Some(&fn_idx) = self.function_names.get(name.as_str()) {
                     // Function reference — push function constant
                     self.load_const(Value::Function(fn_idx));
                 } else if let Some(idx) = self.resolve_global(name) {
                     self.emit_op(Opcode::LoadGlobal(idx));
                 } else {
                     let idx = self.globals.len() as u16;
-                    self.globals.insert(name.clone(), idx);
+                    self.globals.insert(name.to_string(), idx);
                     self.emit_op(Opcode::LoadGlobal(idx));
                 }
             }
@@ -383,6 +383,7 @@ impl<'a> FunctionCompiler<'a> {
                 match op {
                     UnOp::Neg => self.emit_op(Opcode::Neg),
                     UnOp::Not => self.emit_op(Opcode::Not),
+                    UnOp::BitNot => self.emit_op(Opcode::BitNot),
                 }
             }
 
@@ -768,6 +769,11 @@ impl<'a> FunctionCompiler<'a> {
             BinOp::Ge => self.emit_op(Opcode::Ge),
             BinOp::And => self.emit_op(Opcode::And),
             BinOp::Or => self.emit_op(Opcode::Or),
+            BinOp::BitAnd => self.emit_op(Opcode::BitAnd),
+            BinOp::BitOr => self.emit_op(Opcode::BitOr),
+            BinOp::BitXor => self.emit_op(Opcode::BitXor),
+            BinOp::Shl => self.emit_op(Opcode::Shl),
+            BinOp::Shr => self.emit_op(Opcode::Shr),
             BinOp::Assign => unreachable!(),
         }
     }

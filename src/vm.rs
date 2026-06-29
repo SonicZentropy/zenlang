@@ -746,6 +746,71 @@ impl VM {
                     self.stack.push(Value::Function(_fn_idx));
                 }
 
+                Opcode::BitAnd => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (&a, &b) {
+                        (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai & bi)),
+                        _ => {
+                            return Err(self.runtime_error(format!("cannot bitwise-and {} and {}", a.type_name(), b.type_name())));
+                        }
+                    }
+                }
+
+                Opcode::BitOr => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (&a, &b) {
+                        (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai | bi)),
+                        _ => {
+                            return Err(self.runtime_error(format!("cannot bitwise-or {} and {}", a.type_name(), b.type_name())));
+                        }
+                    }
+                }
+
+                Opcode::BitXor => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (&a, &b) {
+                        (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai ^ bi)),
+                        _ => {
+                            return Err(self.runtime_error(format!("cannot bitwise-xor {} and {}", a.type_name(), b.type_name())));
+                        }
+                    }
+                }
+
+                Opcode::Shl => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (&a, &b) {
+                        (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai << bi)),
+                        _ => {
+                            return Err(self.runtime_error(format!("cannot shift left {} and {}", a.type_name(), b.type_name())));
+                        }
+                    }
+                }
+
+                Opcode::Shr => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    match (&a, &b) {
+                        (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai >> bi)),
+                        _ => {
+                            return Err(self.runtime_error(format!("cannot shift right {} and {}", a.type_name(), b.type_name())));
+                        }
+                    }
+                }
+
+                Opcode::BitNot => {
+                    let a = self.stack.pop().unwrap();
+                    match a {
+                        Value::Int(n) => self.stack.push(Value::Int(!n)),
+                        _ => {
+                            return Err(self.runtime_error(format!("cannot bitwise-not {}", a.type_name())));
+                        }
+                    }
+                }
+
                 Opcode::Halt => {
                     break;
                 }

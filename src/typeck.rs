@@ -186,7 +186,8 @@ impl<'a> TypeChecker<'a> {
                         }
                         lt
                     }
-                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
+                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod
+                    | BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr => {
                         if !self.types_compatible(&lt, &rt) {
                             self.error(format!(
                                 "type mismatch in arithmetic: '{}' vs '{}'",
@@ -228,6 +229,12 @@ impl<'a> TypeChecker<'a> {
                             self.error("logical not requires bool");
                         }
                         Type::Bool
+                    }
+                    UnOp::BitNot => {
+                        if !matches!(it, Type::I64 | Type::F32 | Type::F64) {
+                            self.error("bitwise not requires numeric type");
+                        }
+                        it
                     }
                 }
             }
@@ -447,7 +454,7 @@ impl<'a> TypeChecker<'a> {
             Type::Bool => "bool".into(),
             Type::Str => "str".into(),
             Type::Unit => "()".into(),
-            Type::Named(s) => s.clone(),
+            Type::Named(s) => s.to_string(),
             Type::Array(inner) => format!("[{}]", self.type_display(inner)),
             Type::Fn { params, ret } => {
                 let p: Vec<String> = params.iter().map(|t| self.type_display(t)).collect();

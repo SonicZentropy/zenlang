@@ -43,7 +43,9 @@ impl Precedence {
             TokenKind::EqEq | TokenKind::Ne | TokenKind::Lt | TokenKind::Le
                 | TokenKind::Gt | TokenKind::Ge => Precedence::Compare,
             TokenKind::Plus | TokenKind::Minus => Precedence::Term,
-            TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Precedence::Factor,
+            TokenKind::Star | TokenKind::Slash | TokenKind::Percent
+                | TokenKind::Shl | TokenKind::Shr => Precedence::Factor,
+            TokenKind::And | TokenKind::Or | TokenKind::Caret => Precedence::Term,
             TokenKind::OpenParen | TokenKind::Dot | TokenKind::OpenBracket => Precedence::Call,
             _ => Precedence::Lowest,
         }
@@ -183,7 +185,7 @@ impl<'a> Parser<'a> {
 
         self.expect(TokenKind::Semi)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Let { mutable, name, type_ann, init }, span))
+        Ok(Spanned::new(Stmt::Let { mutable, name: name.into(), type_ann, init }, span))
     }
 
     fn expr_stmt(&mut self) -> Result<Spanned<Stmt>> {
@@ -225,7 +227,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block_stmts()?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Fn { name, params, return_type, body }, span))
+        Ok(Spanned::new(Stmt::Fn { name: name.into(), params, return_type, body }, span))
     }
 
     fn param_list(&mut self) -> Result<Vec<Param>> {
@@ -248,7 +250,7 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-            params.push(Param { name, type_ann });
+            params.push(Param { name: name.into(), type_ann });
             if !self.r#match(TokenKind::Comma) {
                 break;
             }
@@ -268,12 +270,12 @@ impl<'a> Parser<'a> {
             let fname = self.expect_ident()?;
             self.expect(TokenKind::Colon)?;
             let ftype = self.parse_type()?;
-            fields.push(StructField { name: fname, type_ann: ftype });
+            fields.push(StructField { name: fname.into(), type_ann: ftype });
             self.r#match(TokenKind::Comma); // optional trailing comma
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Struct { name, fields }, span))
+        Ok(Spanned::new(Stmt::Struct { name: name.into(), fields }, span))
     }
 
     // ---------- Enum declarations ----------
@@ -297,12 +299,12 @@ impl<'a> Parser<'a> {
             } else {
                 Vec::new()
             };
-            variants.push(EnumVariant { name: vname, fields });
+            variants.push(EnumVariant { name: vname.into(), fields });
             self.r#match(TokenKind::Comma);
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Enum { name, variants }, span))
+        Ok(Spanned::new(Stmt::Enum { name: name.into(), variants }, span))
     }
 
     // ---------- Impl blocks ----------
@@ -323,7 +325,7 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Impl { type_name, methods }, span))
+        Ok(Spanned::new(Stmt::Impl { type_name: type_name.into(), methods }, span))
     }
 
     // ---------- Expressions (Pratt parser) ----------
@@ -340,12 +342,32 @@ impl<'a> Parser<'a> {
             if matches!(tok, TokenKind::Eq | TokenKind::OrOr | TokenKind::AndAnd
                 | TokenKind::EqEq | TokenKind::Ne | TokenKind::Lt | TokenKind::Le
                 | TokenKind::Gt | TokenKind::Ge | TokenKind::Plus | TokenKind::Minus
-                | TokenKind::Star | TokenKind::Slash | TokenKind::Percent)
+                | TokenKind::Star | TokenKind::Slash | TokenKind::Percent
+                | TokenKind::And | TokenKind::Or | TokenKind::Caret
+                | TokenKind::Shl | TokenKind::Shr)
             {
                 self.advance();
                 let op = BinOp::from_token(&tok).unwrap();
                 let rhs = self.expression(Precedence::of(&tok).next());
                 expr = Expr::Binary { op, lhs: Box::new(expr), rhs: Box::new(rhs?) };
+            } else if matches!(tok, TokenKind::PlusEq | TokenKind::MinusEq
+                | TokenKind::StarEq | TokenKind::SlashEq | TokenKind::PercentEq
+                | TokenKind::AndEq | TokenKind::OrEq
+                | TokenKind::CaretEq | TokenKind::ShlEq | TokenKind::ShrEq)
+            {
+                self.advance();
+                let compound_op = compound_to_binop(&tok);
+                let rhs = self.expression(Precedence::of(&tok).next());
+                // Desugar x += y  →  x = x + y
+                expr = Expr::Binary {
+                    op: BinOp::Assign,
+                    lhs: Box::new(expr.clone()),
+                    rhs: Box::new(Expr::Binary {
+                        op: compound_op,
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs?),
+                    }),
+                };
             } else if matches!(tok, TokenKind::OpenParen) {
                 self.advance();
                 let args = self.arg_list()?;
@@ -362,9 +384,9 @@ impl<'a> Parser<'a> {
                 if self.r#match(TokenKind::OpenParen) {
                     let args = self.arg_list()?;
                     self.expect(TokenKind::CloseParen)?;
-                    expr = Expr::MethodCall { obj: Box::new(expr), method: field, args };
+                    expr = Expr::MethodCall { obj: Box::new(expr), method: field.into(), args };
                 } else {
-                    expr = Expr::Field { obj: Box::new(expr), field };
+                    expr = Expr::Field { obj: Box::new(expr), field: field.into() };
                 }
             } else if matches!(tok, TokenKind::OpenBracket) {
                 self.advance();
@@ -385,12 +407,12 @@ impl<'a> Parser<'a> {
             // Literals
             TokenKind::Int(n) => { self.advance(); Ok(Expr::Int(n)) }
             TokenKind::Float(n) => { self.advance(); Ok(Expr::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); Ok(Expr::Str(s.to_string())) }
+            TokenKind::Str(s) => { self.advance(); Ok(Expr::Str(s)) }
             TokenKind::Bool(b) => { self.advance(); Ok(Expr::Bool(b)) }
             TokenKind::Underscore => { self.advance(); Ok(Expr::Unit) }
 
             // Unary operators
-            TokenKind::Minus | TokenKind::Bang => {
+            TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde => {
                 self.advance();
                 let op = UnOp::from_token(&tok).unwrap();
                 let expr = self.expression(Precedence::Unary)?;
@@ -425,13 +447,13 @@ impl<'a> Parser<'a> {
                         let fname = self.expect_ident()?;
                         self.expect(TokenKind::Colon)?;
                         let val = self.expression(Precedence::Lowest)?;
-                        fields.push((fname, val));
+                        fields.push((fname.into(), val));
                         self.r#match(TokenKind::Comma);
                     }
                     self.expect(TokenKind::CloseBrace)?;
-                    Ok(Expr::StructLit { name, fields })
+                    Ok(Expr::StructLit { name: name.into(), fields })
                 } else {
-                    Ok(Expr::Ident(name))
+                    Ok(Expr::Ident(name.into()))
                 }
             }
 
@@ -467,12 +489,12 @@ impl<'a> Parser<'a> {
         match tok {
             TokenKind::Int(n) => { self.advance(); Ok(Expr::Int(n)) }
             TokenKind::Float(n) => { self.advance(); Ok(Expr::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); Ok(Expr::Str(s.to_string())) }
+            TokenKind::Str(s) => { self.advance(); Ok(Expr::Str(s)) }
             TokenKind::Bool(b) => { self.advance(); Ok(Expr::Bool(b)) }
             TokenKind::Underscore => { self.advance(); Ok(Expr::Unit) }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
-                Ok(Expr::Ident(name))
+                Ok(Expr::Ident(name.into()))
             }
             TokenKind::OpenParen => {
                 self.advance();
@@ -515,7 +537,7 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::In)?; // "for var in iter"
         let iter = self.expression(Precedence::Lowest)?;
         let body = self.block()?;
-        Ok(Expr::For { var, iter: Box::new(iter), body: Box::new(body) })
+        Ok(Expr::For { var: var.into(), iter: Box::new(iter), body: Box::new(body) })
     }
 
     fn loop_stmt(&mut self) -> Result<Expr> {
@@ -557,11 +579,11 @@ impl<'a> Parser<'a> {
             Ok(expr)
         } else if matches!(self.peek().node.kind, TokenKind::Ident(_)) {
             let name = self.expect_ident()?;
-            let mut expr = Expr::Ident(name);
+            let mut expr = Expr::Ident(name.into());
             // Allow continued field access: match x.y { ... }
             while self.r#match(TokenKind::Dot) {
                 let field = self.expect_ident()?;
-                expr = Expr::Field { obj: Box::new(expr), field };
+                expr = Expr::Field { obj: Box::new(expr), field: field.into() };
             }
             Ok(expr)
         } else {
@@ -600,11 +622,11 @@ impl<'a> Parser<'a> {
             TokenKind::Underscore => { self.advance(); Ok(Pattern::Wildcard) }
             TokenKind::Int(n) => { self.advance(); Ok(Pattern::Int(n)) }
             TokenKind::Float(n) => { self.advance(); Ok(Pattern::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); Ok(Pattern::Str(s.to_string())) }
+            TokenKind::Str(s) => { self.advance(); Ok(Pattern::Str(s)) }
             TokenKind::Bool(b) => { self.advance(); Ok(Pattern::Bool(b)) }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
-                Ok(Pattern::Ident(name))
+                Ok(Pattern::Ident(name.into()))
             }
             _ => Err(self.error("expected pattern"))
         }
@@ -626,14 +648,14 @@ impl<'a> Parser<'a> {
                 // Check for array type: [Type] or [Type; N]
                 if self.r#match(TokenKind::OpenBracket) {
                     if self.r#match(TokenKind::CloseBracket) {
-                        return Ok(Type::Array(Box::new(Type::Named(name))));
+                        return Ok(Type::Array(Box::new(Type::Named(name.into()))));
                     }
                     // For now, just handle [Type]
                     let inner = self.parse_type()?;
                     self.expect(TokenKind::CloseBracket)?;
                     Ok(Type::Array(Box::new(inner)))
                 } else {
-                    Ok(Type::Named(name))
+                    Ok(Type::Named(name.into()))
                 }
             }
             TokenKind::OpenParen => {
@@ -798,6 +820,22 @@ impl<'a> Parser<'a> {
         }
     }
 
+}
+
+fn compound_to_binop(tok: &TokenKind) -> BinOp {
+    match tok {
+        TokenKind::PlusEq => BinOp::Add,
+        TokenKind::MinusEq => BinOp::Sub,
+        TokenKind::StarEq => BinOp::Mul,
+        TokenKind::SlashEq => BinOp::Div,
+        TokenKind::PercentEq => BinOp::Mod,
+        TokenKind::AndEq => BinOp::And,
+        TokenKind::OrEq => BinOp::Or,
+        TokenKind::CaretEq => BinOp::BitXor,
+        TokenKind::ShlEq => BinOp::Shl,
+        TokenKind::ShrEq => BinOp::Shr,
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]

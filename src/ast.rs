@@ -1,4 +1,6 @@
 
+use compact_str::CompactString;
+
 use crate::span::Spanned;
 use crate::token::TokenKind;
 
@@ -12,7 +14,7 @@ pub enum Type {
     Bool,
     Str,
     Unit,
-    Named(String),
+    Named(CompactString),
     Array(Box<Type>),
     Fn { params: Vec<Type>, ret: Box<Type> },
 }
@@ -34,6 +36,11 @@ pub enum BinOp {
     Ge,
     And,
     Or,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
     Assign,
 }
 
@@ -41,6 +48,7 @@ pub enum BinOp {
 pub enum UnOp {
     Neg,
     Not,
+    BitNot,
 }
 
 // ---------- Patterns (simplified match) ----------
@@ -48,10 +56,10 @@ pub enum UnOp {
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Wildcard,
-    Ident(String),
+    Ident(CompactString),
     Int(i64),
     Float(f64),
-    Str(String),
+    Str(CompactString),
     Bool(bool),
 }
 
@@ -61,19 +69,19 @@ pub type NodeId = usize;
 
 #[derive(Debug, Clone)]
 pub struct Param {
-    pub name: String,
+    pub name: CompactString,
     pub type_ann: Option<Type>,
 }
 
 #[derive(Debug, Clone)]
 pub struct StructField {
-    pub name: String,
+    pub name: CompactString,
     pub type_ann: Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct EnumVariant {
-    pub name: String,
+    pub name: CompactString,
     pub fields: Vec<Type>,
 }
 
@@ -88,28 +96,28 @@ pub struct MatchArm {
 pub enum Stmt {
     Let {
         mutable: bool,
-        name: String,
+        name: CompactString,
         type_ann: Option<Type>,
         init: Option<Expr>,
     },
     Expr(Expr),
     Return(Option<Expr>),
     Fn {
-        name: String,
+        name: CompactString,
         params: Vec<Param>,
         return_type: Option<Type>,
         body: Vec<Spanned<Stmt>>,
     },
     Struct {
-        name: String,
+        name: CompactString,
         fields: Vec<StructField>,
     },
     Enum {
-        name: String,
+        name: CompactString,
         variants: Vec<EnumVariant>,
     },
     Impl {
-        type_name: String,
+        type_name: CompactString,
         methods: Vec<Spanned<Stmt>>,
     },
 }
@@ -121,12 +129,12 @@ pub enum Expr {
     // Literals
     Int(i64),
     Float(f64),
-    Str(String),
+    Str(CompactString),
     Bool(bool),
     Unit,
 
     // References
-    Ident(String),
+    Ident(CompactString),
 
     // Operators
     Binary {
@@ -146,12 +154,12 @@ pub enum Expr {
     },
     MethodCall {
         obj: Box<Expr>,
-        method: String,
+        method: CompactString,
         args: Vec<Expr>,
     },
     Field {
         obj: Box<Expr>,
-        field: String,
+        field: CompactString,
     },
     Index {
         obj: Box<Expr>,
@@ -170,7 +178,7 @@ pub enum Expr {
         body: Box<Expr>,
     },
     For {
-        var: String,
+        var: CompactString,
         iter: Box<Expr>,
         body: Box<Expr>,
     },
@@ -189,8 +197,8 @@ pub enum Expr {
 
     // Data literals
     StructLit {
-        name: String,
-        fields: Vec<(String, Expr)>,
+        name: CompactString,
+        fields: Vec<(CompactString, Expr)>,
     },
     Array(Vec<Expr>),
     Range {
@@ -238,6 +246,11 @@ impl BinOp {
             TokenKind::Ge => Some(BinOp::Ge),
             TokenKind::AndAnd => Some(BinOp::And),
             TokenKind::OrOr => Some(BinOp::Or),
+            TokenKind::And => Some(BinOp::BitAnd),
+            TokenKind::Or => Some(BinOp::BitOr),
+            TokenKind::Caret => Some(BinOp::BitXor),
+            TokenKind::Shl => Some(BinOp::Shl),
+            TokenKind::Shr => Some(BinOp::Shr),
             TokenKind::Eq => Some(BinOp::Assign),
             _ => None,
         }
@@ -249,6 +262,7 @@ impl UnOp {
         match kind {
             TokenKind::Minus => Some(UnOp::Neg),
             TokenKind::Bang => Some(UnOp::Not),
+            TokenKind::Tilde => Some(UnOp::BitNot),
             _ => None,
         }
     }
