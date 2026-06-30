@@ -486,7 +486,14 @@ impl<'a> Parser<'a> {
                 if self.is_struct_lit_start() {
                     self.advance();
                     let mut fields = Vec::new();
+                    let mut spread = None;
                     while !self.check(&TokenKind::CloseBrace) && !self.is_at_end() {
+                        if self.check(&TokenKind::DotDot) {
+                            self.advance();
+                            spread = Some(Box::new(self.expression(Precedence::Lowest)?));
+                            self.r#match(TokenKind::Comma);
+                            break;
+                        }
                         let fname = self.expect_ident()?;
                         self.expect(TokenKind::Colon)?;
                         let val = self.expression(Precedence::Lowest)?;
@@ -494,7 +501,7 @@ impl<'a> Parser<'a> {
                         self.r#match(TokenKind::Comma);
                     }
                     self.expect(TokenKind::CloseBrace)?;
-                    Ok(Expr::StructLit { name: name.into(), fields })
+                    Ok(Expr::StructLit { name: name.into(), fields, spread })
                 } else {
                     Ok(Expr::Ident(name.into()))
                 }
@@ -931,6 +938,10 @@ impl<'a> Parser<'a> {
                 return matches!(&self.tokens[i + 2].node.kind, TokenKind::Colon);
             }
         }
+        // Spread struct: Foo { ..expr }
+        if matches!(after_brace, TokenKind::DotDot) {
+            return true;
+        }
         false
     }
 
@@ -1294,7 +1305,7 @@ update();
     fn test_struct_literal() {
         let prog = parse("let v = Vec2 { x: 1.0, y: 2.0 };").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::StructLit { name, fields }), .. } => {
+            Stmt::Let { init: Some(Expr::StructLit { name, fields, .. }), .. } => {
                 assert_eq!(name, "Vec2");
                 assert_eq!(fields.len(), 2);
             }

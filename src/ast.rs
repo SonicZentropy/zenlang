@@ -209,6 +209,7 @@ pub enum Expr {
     StructLit {
         name: CompactString,
         fields: Vec<(CompactString, Expr)>,
+        spread: Option<Box<Expr>>,
     },
     Array(Vec<Expr>),
     Range {

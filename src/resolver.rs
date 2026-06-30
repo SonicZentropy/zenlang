@@ -375,9 +375,12 @@ impl Resolver {
             Expr::Return(Some(inner)) => {
                 self.resolve_expr(inner);
             }
-            Expr::StructLit { fields, .. } => {
+            Expr::StructLit { fields, spread, .. } => {
                 for (_, val) in fields {
                     self.resolve_expr(val);
+                }
+                if let Some(spread_expr) = spread {
+                    self.resolve_expr(spread_expr);
                 }
             }
             Expr::Array(elems) => {

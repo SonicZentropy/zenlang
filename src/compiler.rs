@@ -1027,13 +1027,23 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Return);
             }
 
-            Expr::StructLit { name: _, fields } => {
-                // Push field names then values; MakeStruct pops in reverse order
-                for (field_name, val) in fields {
-                    self.load_const(Value::Str(field_name.clone().into()));
-                    self.compile_expr(val);
+            Expr::StructLit { name: _, fields, spread } => {
+                if let Some(spread_expr) = spread {
+                    // Compile spread base, then override with explicit fields via StoreField
+                    self.compile_expr(spread_expr);
+                    for (field_name, val) in fields {
+                        self.compile_expr(val);
+                        let idx = self.chunk.add_field_name(field_name);
+                        self.emit_op(Opcode::StoreField(idx));
+                    }
+                } else {
+                    // Push field names then values; MakeStruct pops in reverse order
+                    for (field_name, val) in fields {
+                        self.load_const(Value::Str(field_name.clone().into()));
+                        self.compile_expr(val);
+                    }
+                    self.emit_op(Opcode::MakeStruct(fields.len() as u16));
                 }
-                self.emit_op(Opcode::MakeStruct(fields.len() as u16));
             }
 
             Expr::Array(elems) => {

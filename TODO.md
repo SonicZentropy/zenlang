@@ -163,6 +163,24 @@ Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... 
 
 ---
 
+## Phase 9 — `..` spread operator in struct literals (COMPLETE)
+
+`Point { x: 10, ..base }` creates a struct with `x` overridden, all other fields copied from `base`. Implemented by compiling the spread expression and then using `StoreField` to override explicit fields.
+
+| File | Change |
+|---|---|
+| `src/ast.rs` | Add `spread: Option<Box<Expr>>` field to `StructLit` |
+| `src/parser.rs` | Parse `..expr` inside struct literal braces; update `is_struct_lit_start` to return true for `Foo { ..expr }` |
+| `src/resolver.rs` | Resolve the spread expression |
+| `src/typeck.rs` | Validate spread expression type matches the struct type |
+| `src/compiler.rs` | Compile spread by emitting `StoreField` for each explicit field on top of the spread value |
+| `src/lsp.rs` | Search spread expression for go-to-definition |
+| `tests/spread_test.zen` | Tests basic spread, all-fields-explicit + spread, copy-only, chained spread |
+
+**Dependencies**: None.
+
+---
+
 ## Summary of work by file
 
 | File | Phases affected |
@@ -178,6 +196,7 @@ Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... 
 | `src/stdlib/mod.rs` | 0 (`assert`), 2b (Option/Result helpers) |
 | `src/main.rs` | 0 (`test` subcommand) |
 | `src/formatter.rs` | 2a (new type variants) |
+| `src/lsp.rs` | 9 (spread in find_definition) |
 | `tests/*.zen` | 3 (all) |
 
 ---

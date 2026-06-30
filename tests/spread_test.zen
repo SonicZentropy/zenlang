@@ -1,0 +1,32 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+struct Rect {
+    w: i64,
+    h: i64,
+}
+
+fn main() {
+    // basic spread: override one field
+    let p = Point { x: 1, y: 2 };
+    let q = Point { x: 10, ..p };
+    assert(q.x == 10);
+    assert(q.y == 2);
+
+    // spread with all fields explicit (wasteful but valid)
+    let r = Point { x: 3, y: 4, ..p };
+    assert(r.x == 3);
+    assert(r.y == 4);
+
+    // spread without explicit fields (copy)
+    let s = Point { ..r };
+    assert(s.x == 3);
+    assert(s.y == 4);
+
+    // chained spread
+    let t = Point { x: 99, ..s };
+    assert(t.x == 99);
+    assert(t.y == 4);
+}

@@ -932,9 +932,14 @@ fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span
         Expr::Field { obj, .. } => find_definition_in_expr(obj, source, name),
         Expr::Index { obj, index } => find_definition_in_expr(obj, source, name)
             .or_else(|| find_definition_in_expr(index, source, name)),
-        Expr::StructLit { fields, .. } => {
+        Expr::StructLit { fields, spread, .. } => {
             for (_, val) in fields {
                 if let Some(span) = find_definition_in_expr(val, source, name) {
+                    return Some(span);
+                }
+            }
+            if let Some(spread_expr) = spread {
+                if let Some(span) = find_definition_in_expr(spread_expr, source, name) {
                     return Some(span);
                 }
             }

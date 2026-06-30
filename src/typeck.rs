@@ -516,7 +516,7 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::Return(None) => Type::Unit,
             Expr::Break | Expr::Continue => Type::Unit,
-            Expr::StructLit { name, fields } => {
+            Expr::StructLit { name, fields, spread } => {
                 let entry = self.symbols.lookup(name).cloned();
                 match entry {
                     Some(SymEntry { kind: SymKind::Struct(def), .. }) => {
@@ -530,6 +530,16 @@ impl<'a> TypeChecker<'a> {
                             }
                             self.check_expr(fval);
                         }
+                        if let Some(spread_expr) = spread {
+                            let spread_ty = self.check_expr(spread_expr);
+                            let expected = Type::Named(name.clone());
+                            if spread_ty != expected {
+                                self.error(format!(
+                                    "spread expression has type '{}' but expected struct '{}'",
+                                    self.type_display(&spread_ty), name
+                                ));
+                            }
+                        }
                     }
                     Some(_) => {
                         self.error(format!("'{}' is not a struct", name));
@@ -537,7 +547,7 @@ impl<'a> TypeChecker<'a> {
                     None => {
                         self.error(format!("undefined struct '{}'", name));
                     }
-                }
+                };
                 Type::Named(name.clone())
             }
             Expr::Array(elems) => {
