@@ -6,7 +6,8 @@ and a tight bytecode VM.
 
 ## Features
 
-- **Rust-like syntax**: `let`, `fn`, `if`/`else`, `while`, `for`, `match`, `struct`, `enum`, `impl`.
+- **Rust-like syntax**: `let`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls.
+- **Struct sugar**: named field shorthand (`Point { x, y }`), spread operator (`Point { x: 1, ..base }`).
 - **Expression-oriented**: blocks (`{ ... }`) return values; `if`/`match` are expressions.
 - **Bytecode VM**: register-based stack VM with ~50 opcodes. No IR, single-pass codegen.
 - **Rust interop**: register foreign types with fields and methods, call Rust from scripts
@@ -122,8 +123,18 @@ print(c()); // 1
 ```rust
 let x = if cond { 1 } else { 2 };
 
+if let Some(v) = opt {
+    print(v);
+} else {
+    print("none");
+}
+
 while i < 10 {
     i = i + 1;
+}
+
+while let Some(v) = iter {
+    print(v);
 }
 
 for i in 0..5 {
@@ -144,16 +155,26 @@ let val = match x {
 ### Structs, Enums, Impl
 
 ```rust
-struct Point { x, y }
+struct Point { x: i64, y: i64 }
 
+// Named field shorthand: expands to Point { x: x, y: y }
 let p = Point { x: 1, y: 2 };
+let q = Point { x, y };  // shorthand if variable names match
+
+// Spread operator: copy with overrides
+let r = Point { x: 10, ..p };
+
 p.x = 10;
 
 enum Option { None, Some(val) }
 
 impl Point {
-    fn magnitude(self) -> (self.x * self.x + self.y * self.y).sqrt()
+    fn area(&self) -> i64 {
+        self.x * self.y
+    }
 }
+
+let a = p.area();  // method call dispatch
 ```
 
 ### Arrays & Strings
