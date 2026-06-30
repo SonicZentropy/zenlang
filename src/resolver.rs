@@ -22,6 +22,42 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
         };
         let _ = resolver.symbols.define(name, SymKind::Function(sig));
     }
+    // Pre-register built-in Option type
+    let option_def = EnumDef {
+        name: "Option".into(),
+        variants: vec![
+            ("Some".into(), vec![Type::Unit]), // Unit acts as generic placeholder (compatible with everything)
+            ("None".into(), vec![]),
+        ],
+    };
+    let _ = resolver.symbols.define("Option", SymKind::Enum(option_def.clone()));
+    for (tag, (vname, fields)) in option_def.variants.iter().enumerate() {
+        let cons = SymKind::EnumConstructor {
+            enum_name: "Option".into(),
+            variant_name: vname.clone(),
+            tag: tag as u16,
+            fields: fields.clone(),
+        };
+        let _ = resolver.symbols.define(vname, cons);
+    }
+    // Pre-register built-in Result type
+    let result_def = EnumDef {
+        name: "Result".into(),
+        variants: vec![
+            ("Ok".into(), vec![Type::Unit]), // Unit acts as generic placeholder
+            ("Err".into(), vec![Type::Unit]), // Unit acts as generic placeholder
+        ],
+    };
+    let _ = resolver.symbols.define("Result", SymKind::Enum(result_def.clone()));
+    for (tag, (vname, fields)) in result_def.variants.iter().enumerate() {
+        let cons = SymKind::EnumConstructor {
+            enum_name: "Result".into(),
+            variant_name: vname.clone(),
+            tag: tag as u16,
+            fields: fields.clone(),
+        };
+        let _ = resolver.symbols.define(vname, cons);
+    }
     resolver.resolve_program(program)?;
     Ok(resolver.symbols)
 }
@@ -323,6 +359,7 @@ impl Resolver {
                         }
                         Pattern::EnumVariant { variant_name: _, bindings } => {
                             for binding in bindings {
+                                if binding.is_empty() { continue; } // wildcard _
                                 if let Err(e) = self.symbols.define(binding, SymKind::Variable(Type::Unit)) {
                                     self.error(e);
                                 }
@@ -394,7 +431,9 @@ mod tests {
     #[test]
     fn test_empty() {
         let table = resolve_program("").unwrap();
-        assert!(table.globals().is_empty());
+        // Option/Result types and their constructors are pre-registered
+        assert!(table.lookup("Option").is_some());
+        assert!(table.lookup("Result").is_some());
     }
 
     #[test]

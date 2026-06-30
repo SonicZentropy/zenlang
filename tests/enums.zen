@@ -1,19 +1,34 @@
-enum Option {
-    Some(int),
-    None,
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+enum Shape {
+    Circle(int),
+    Rect(int, int),
 }
 
 fn main() {
-    let x = Some(42);
-    let y = None;
+    let r = Red;
+    let g = Green;
+    let b = Blue;
 
-    match x {
-        Some(v) => assert(v == 42),
-        None => assert(false),
+    match r {
+        Red => assert(true),
+        Green => assert(false),
+        Blue => assert(false),
     }
 
-    match y {
-        Some(_v) => assert(false),
-        None => assert(true),
+    let c = Circle(10);
+    match c {
+        Circle(radius) => assert(radius == 10),
+        Rect(_w, _h) => assert(false),
+    }
+
+    let sq = Rect(5, 3);
+    match sq {
+        Circle(_) => assert(false),
+        Rect(w, h) => assert(w == 5 && h == 3),
     }
 }

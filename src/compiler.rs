@@ -53,6 +53,16 @@ pub fn compile(
         }
     }
 
+    // Pre-register built-in enum constructor names as globals
+    for name in &["Some", "None", "Ok", "Err"] {
+        let mut g = globals.borrow_mut();
+        if !g.contains_key(*name) {
+            let idx = g.len() as u16;
+            g.insert(name.to_string(), idx);
+            global_order.push(name.to_string());
+        }
+    }
+
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
         register_global_stmt(&stmt.node, &mut *globals.borrow_mut(), &mut global_order);
@@ -968,8 +978,12 @@ impl<'a> FunctionCompiler<'a> {
                             for (i, binding) in bindings.iter().enumerate() {
                                 self.emit_op(Opcode::Dup);
                                 self.emit_op(Opcode::LoadEnumField(i as u16));
-                                let slot = self.add_local(binding);
-                                self.emit_op(Opcode::StoreLocal(slot));
+                                if binding.is_empty() {
+                                    self.emit_op(Opcode::Pop); // wildcard _: discard value
+                                } else {
+                                    let slot = self.add_local(binding);
+                                    self.emit_op(Opcode::StoreLocal(slot));
+                                }
                             }
                             self.emit_op(Opcode::Pop);
                             self.compile_expr(&arm.body);

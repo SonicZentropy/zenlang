@@ -422,6 +422,7 @@ impl<'a> TypeChecker<'a> {
                                         ));
                                     }
                                     for (i, binding) in bindings.iter().enumerate() {
+                                        if binding.is_empty() { continue; } // wildcard _
                                         let ty = field_types.get(i).cloned().unwrap_or(Type::Unit);
                                         // Remove Unit placeholder from resolver, insert proper type
                                         self.symbols.remove_from_current_scope(binding);
@@ -533,6 +534,11 @@ impl<'a> TypeChecker<'a> {
             (Type::Array(a), Type::Array(b)) => self.types_compatible(a, b),
             (Type::Option(a), Type::Option(b)) => self.types_compatible(a, b),
             (Type::Result(oka, erra), Type::Result(okb, errb)) => self.types_compatible(oka, okb) && self.types_compatible(erra, errb),
+            // Named("Option") / Named("Result") from enum constructors are compatible with generic Option/Result
+            (Type::Named(a), Type::Option(_)) if a == "Option" => true,
+            (Type::Option(_), Type::Named(a)) if a == "Option" => true,
+            (Type::Named(a), Type::Result(_, _)) if a == "Result" => true,
+            (Type::Result(_, _), Type::Named(a)) if a == "Result" => true,
             _ => false,
         }
     }

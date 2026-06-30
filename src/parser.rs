@@ -711,7 +711,12 @@ impl<'a> Parser<'a> {
                 if self.r#match(TokenKind::OpenParen) {
                     let mut bindings = Vec::new();
                     while !self.check(&TokenKind::CloseParen) && !self.is_at_end() {
-                        let binding = self.expect_ident()?;
+                        let binding = if self.check(&TokenKind::Underscore) {
+                            self.advance();
+                            String::new() // empty = wildcard, skipped by resolver/typeck
+                        } else {
+                            self.expect_ident()?
+                        };
                         bindings.push(binding.into());
                         self.r#match(TokenKind::Comma);
                     }

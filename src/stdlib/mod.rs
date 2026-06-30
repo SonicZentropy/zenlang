@@ -36,6 +36,15 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("to_int", Rc::new(to_int_impl));
     vm.register_native("to_float", Rc::new(to_float_impl));
     vm.register_native("to_str", Rc::new(to_str_impl));
+
+    // Option/Result helpers
+    vm.register_native("is_some", Rc::new(is_some_impl));
+    vm.register_native("is_none", Rc::new(is_none_impl));
+    vm.register_native("is_ok", Rc::new(is_ok_impl));
+    vm.register_native("is_err", Rc::new(is_err_impl));
+    vm.register_native("unwrap", Rc::new(unwrap_impl));
+    vm.register_native("unwrap_or", Rc::new(unwrap_or_impl));
+    vm.register_native("expect", Rc::new(expect_impl));
 }
 
 /// Return the list of all built-in native function names.
@@ -62,6 +71,13 @@ pub fn native_names() -> Vec<String> {
         "to_int".into(),
         "to_float".into(),
         "to_str".into(),
+        "is_some".into(),
+        "is_none".into(),
+        "is_ok".into(),
+        "is_err".into(),
+        "unwrap".into(),
+        "unwrap_or".into(),
+        "expect".into(),
     ]
 }
 
@@ -276,5 +292,62 @@ fn to_str_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
         Some(val) => Ok(Value::Str(format!("{val:?}").into())),
         None => Ok(Value::Str("nil".into())),
+    }
+}
+
+// --- Option/Result helpers ---
+
+fn enum_tag(val: &Value) -> Option<u16> {
+    match val {
+        Value::Enum { tag, data: _ } => Some(*tag),
+        _ => None,
+    }
+}
+
+fn is_some_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(0))))
+}
+
+fn is_none_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(1))))
+}
+
+fn is_ok_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(0))))
+}
+
+fn is_err_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(1))))
+}
+
+fn unwrap_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    match args.first() {
+        Some(Value::Enum { tag, data }) if *tag == 0 => {
+            Ok(data.borrow().first().cloned().unwrap_or(Value::Nil))
+        }
+        Some(Value::Enum { tag: _, data: _ }) => {
+            Err(crate::error::Error::Script { msg: "unwrap failed: got None/Err".into() })
+        }
+        _ => Err(crate::error::Error::Script { msg: "unwrap called on non-enum value".into() }),
+    }
+}
+
+fn unwrap_or_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    match (args.first(), args.get(1)) {
+        (Some(Value::Enum { tag, data }), Some(default)) if *tag == 0 => {
+            Ok(data.borrow().first().cloned().unwrap_or_else(|| default.clone()))
+        }
+        (_, Some(default)) => Ok(default.clone()),
+        _ => Ok(Value::Nil),
+    }
+}
+
+fn expect_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let msg = args.get(1).and_then(|v| v.as_str()).unwrap_or_else(|| "expect failed".into());
+    match args.first() {
+        Some(Value::Enum { tag, data }) if *tag == 0 => {
+            Ok(data.borrow().first().cloned().unwrap_or(Value::Nil))
+        }
+        _ => Err(crate::error::Error::Script { msg: format!("expect failed: {msg}") }),
     }
 }
