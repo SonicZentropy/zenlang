@@ -1,0 +1,12 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+fn main() {
+    let x = 10;
+    let y = 20;
+    let p = Point { x, y };
+    assert(p.x == 10);
+    assert(p.y == 20);
+}

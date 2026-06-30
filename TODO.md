@@ -181,12 +181,25 @@ Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... 
 
 ---
 
+## Phase 10 — Named field shorthand in struct literals (COMPLETE)
+
+`Point { x, y }` is sugar for `Point { x: x, y: y }`. The parser recognizes identifiers followed by `,` or `}` as shorthand and desugars to `Expr::Ident(field_name)`.
+
+| File | Change |
+|---|---|
+| `src/parser.rs` | In struct field parsing, check for `,` or `}` after field name instead of requiring `:`. Update `is_struct_lit_start` to return true for `Foo { x }`. |
+| `tests/shorthand_test.zen` | Tests basic shorthand field syntax. |
+
+**Dependencies**: None.
+
+---
+
 ## Summary of work by file
 
 | File | Phases affected |
 |---|---|
 | `src/ast.rs` | 1b (`Pattern::EnumVariant`), 2a (`Type::Option/Result`) |
-| `src/parser.rs` | 1b (pattern parsing), 2a (generic type syntax) |
+| `src/parser.rs` | 1b (pattern parsing), 2a (generic type syntax), 10 (shorthand fields) |
 | `src/symbol.rs` | 1a (`SymKind::EnumConstructor`) |
 | `src/resolver.rs` | 1a (register constructors), 1b (resolve patterns), 2b (auto-register Option/Result) |
 | `src/typeck.rs` | 1a (validate constructor call), 1b (match arm with bindings), 2a (type compatibility) |

@@ -495,9 +495,14 @@ impl<'a> Parser<'a> {
                             break;
                         }
                         let fname = self.expect_ident()?;
-                        self.expect(TokenKind::Colon)?;
-                        let val = self.expression(Precedence::Lowest)?;
-                        fields.push((fname.into(), val));
+                        if self.check(&TokenKind::Comma) || self.check(&TokenKind::CloseBrace) {
+                            // Shorthand: Foo { x } means Foo { x: x }
+                            fields.push((fname.clone().into(), Expr::Ident(fname.into())));
+                        } else {
+                            self.expect(TokenKind::Colon)?;
+                            let val = self.expression(Precedence::Lowest)?;
+                            fields.push((fname.into(), val));
+                        }
                         self.r#match(TokenKind::Comma);
                     }
                     self.expect(TokenKind::CloseBrace)?;
@@ -932,10 +937,11 @@ impl<'a> Parser<'a> {
         if matches!(after_brace, TokenKind::CloseBrace) {
             return true;
         }
-        // Struct with fields: Foo { field: value, ... }
+        // Struct with fields: Foo { field: value, ... } or Foo { field, ... }
         if matches!(after_brace, TokenKind::Ident(_)) {
             if i + 2 < self.tokens.len() {
-                return matches!(&self.tokens[i + 2].node.kind, TokenKind::Colon);
+                let after_ident = &self.tokens[i + 2].node.kind;
+                return matches!(after_ident, TokenKind::Colon | TokenKind::Comma | TokenKind::CloseBrace);
             }
         }
         // Spread struct: Foo { ..expr }
