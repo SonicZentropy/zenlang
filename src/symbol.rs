@@ -29,6 +29,7 @@ pub enum SymKind {
     Function(FnSignature),
     Struct(StructDef),
     Enum(EnumDef),
+    EnumConstructor { enum_name: String, variant_name: String, tag: u16, fields: Vec<Type> },
     Module(usize),
 }
 

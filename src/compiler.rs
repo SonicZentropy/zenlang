@@ -32,7 +32,7 @@ pub fn offset_to_line(offsets: &[usize], byte_offset: usize) -> usize {
 pub fn compile(
     program: &Program,
     _types: &TypeMap,
-    _symbols: &SymbolTable,
+    symbols: &SymbolTable,
     native_names: &[String],
     source: &str,
 ) -> Result<(Vec<BytecodeFn>, Vec<String>)> {
@@ -85,7 +85,7 @@ pub fn compile(
     {
         let mut fc = FunctionCompiler::new(
             "__main__".into(), 0, globals.clone(), &function_names,
-            &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(),
+            &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(), symbols,
         );
         let stmt_count = program.stmts.len();
         for (i, stmt) in program.stmts.iter().enumerate() {
@@ -109,7 +109,7 @@ pub fn compile(
 
     // Third pass: compile user-defined functions
     compile_functions(&program.stmts, &mut functions, &globals, &function_names,
-        &mut errors, &line_offsets, &lambda_counter, &lambda_fns);
+        &mut errors, &line_offsets, &lambda_counter, &lambda_fns, symbols);
 
     // Helper to compile function declarations from a list of stmts (handles Mod recursion)
     fn compile_functions(stmts: &[Spanned<Stmt>], functions: &mut Vec<BytecodeFn>,
@@ -118,13 +118,14 @@ pub fn compile(
         mut errors: &mut Vec<Error>,
         line_offsets: &[usize],
         lambda_counter: &Rc<RefCell<usize>>,
-        lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>) {
+        lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>,
+        symbols: &SymbolTable) {
         for stmt in stmts {
             if let Stmt::Fn { name, params, return_type: _, body } = &stmt.node {
                 let arity = params.len() as u32;
             let mut fc = FunctionCompiler::new(
                 name.to_string(), arity, globals.clone(), &function_names,
-                &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(),
+                &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(), symbols,
             );
 
             fc.enter_scope();
@@ -154,7 +155,7 @@ pub fn compile(
             functions.push(fc.finalize());
             } else if let Stmt::Mod { body, .. } = &stmt.node {
                 compile_functions(body, functions, globals, function_names,
-                    errors, line_offsets, lambda_counter, lambda_fns);
+                    errors, line_offsets, lambda_counter, lambda_fns, symbols);
             }
         }
     }
@@ -385,6 +386,15 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 global_order.push(name.to_string());
             }
         }
+        Stmt::Enum { variants, .. } => {
+            for v in variants {
+                if !globals.contains_key(v.name.as_str()) {
+                    let idx = globals.len() as u16;
+                    globals.insert(v.name.to_string(), idx);
+                    global_order.push(v.name.to_string());
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -406,6 +416,7 @@ struct FunctionCompiler<'a> {
     const_map: HashMap<u64, u16>,
     lambda_counter: Rc<RefCell<usize>>,
     lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
+    symbols: &'a SymbolTable,
 }
 
 struct Local {
@@ -424,6 +435,7 @@ impl<'a> FunctionCompiler<'a> {
         line_offsets: &'a [usize],
         lambda_counter: Rc<RefCell<usize>>,
         lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
+        symbols: &'a SymbolTable,
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.locals = 0;
@@ -444,6 +456,7 @@ impl<'a> FunctionCompiler<'a> {
             line_offsets,
             lambda_counter,
             lambda_fns,
+            symbols,
         }
     }
 
@@ -617,10 +630,16 @@ impl<'a> FunctionCompiler<'a> {
                     self.load_const(Value::Function(fn_idx));
                 } else if let Some(idx) = self.resolve_global(name) {
                     self.emit_op(Opcode::LoadGlobal(idx));
+                } else if let Some(entry) = self.symbols.lookup(name) {
+                    if let SymKind::EnumConstructor { enum_name: _, variant_name: _, tag, fields } = &entry.kind {
+                        if fields.is_empty() {
+                            self.emit_op(Opcode::MakeEnum(*tag, 0));
+                            return;
+                        }
+                    }
+                    self.error(format!("undefined name '{}'", name));
                 } else {
-                    let idx = self.globals.borrow().len() as u16;
-                    self.globals.borrow_mut().insert(name.to_string(), idx);
-                    self.emit_op(Opcode::LoadGlobal(idx));
+                    self.error(format!("undefined name '{}'", name));
                 }
             }
 
@@ -644,6 +663,18 @@ impl<'a> FunctionCompiler<'a> {
             }
 
             Expr::Call { func, args } => {
+                // Check if this is an enum constructor call
+                if let Expr::Ident(name) = func.as_ref() {
+                    if let Some(entry) = self.symbols.lookup(name) {
+                        if let SymKind::EnumConstructor { enum_name: _, variant_name: _, tag, fields: _ } = &entry.kind {
+                            for arg in args {
+                                self.compile_expr(arg);
+                            }
+                            self.emit_op(Opcode::MakeEnum(*tag, args.len() as u16));
+                            return;
+                        }
+                    }
+                }
                 self.compile_expr(func);
                 for arg in args {
                     self.compile_expr(arg);
@@ -1014,6 +1045,7 @@ impl<'a> FunctionCompiler<'a> {
             self.line_offsets,
             self.lambda_counter.clone(),
             self.lambda_fns.clone(),
+            self.symbols,
         );
 
         // Enter scope, add upvalues as locals first, then params

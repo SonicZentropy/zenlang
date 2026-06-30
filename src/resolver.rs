@@ -92,12 +92,24 @@ impl Resolver {
                 }
             }
             Stmt::Enum { name, variants } => {
-                let v = variants.iter()
+                let v: Vec<(String, Vec<Type>)> = variants.iter()
                     .map(|v| (v.name.to_string(), v.fields.clone()))
                     .collect();
-                let def = EnumDef { name: name.to_string(), variants: v };
+                let def = EnumDef { name: name.to_string(), variants: v.clone() };
                 if let Err(e) = self.symbols.define(name, SymKind::Enum(def)) {
                     self.error(e);
+                }
+                // Register each variant as a constructor in the current scope
+                for (tag, variant) in variants.iter().enumerate() {
+                    let cons = SymKind::EnumConstructor {
+                        enum_name: name.to_string(),
+                        variant_name: variant.name.to_string(),
+                        tag: tag as u16,
+                        fields: variant.fields.clone(),
+                    };
+                    if let Err(e) = self.symbols.define(&variant.name, cons) {
+                        self.error(e);
+                    }
                 }
             }
             Stmt::Impl { type_name, methods } => {

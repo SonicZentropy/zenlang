@@ -185,6 +185,9 @@ impl<'a> TypeChecker<'a> {
                                 ret: Box::new(ret),
                             }
                         }
+                        SymKind::EnumConstructor { enum_name, variant_name: _, tag: _, fields } if fields.is_empty() => {
+                            Type::Named(enum_name.clone().into())
+                        }
                         _ => {
                             self.error(format!("'{}' is not a variable", name));
                             Type::Unit
@@ -264,6 +267,30 @@ impl<'a> TypeChecker<'a> {
                 }
             }
             Expr::Call { func, args } => {
+                // Check if this is an enum constructor call
+                let constructor_info: Option<(String, String, Vec<Type>)> = if let Expr::Ident(name) = func.as_ref() {
+                    if let Some(entry) = self.symbols.lookup(name) {
+                        if let SymKind::EnumConstructor { enum_name, variant_name, tag: _, fields } = &entry.kind {
+                            Some((enum_name.clone(), variant_name.clone(), fields.clone()))
+                        } else { None }
+                    } else { None }
+                } else { None };
+                if let Some((enum_name, variant_name, fields)) = constructor_info {
+                    if args.len() != fields.len() {
+                        self.error(format!("'{}' expects {} arguments, got {}", variant_name, fields.len(), args.len()));
+                        return Type::Unit;
+                    }
+                    for (arg, field_ty) in args.iter().zip(fields.iter()) {
+                        let arg_ty = self.check_expr(arg);
+                        if !self.types_compatible(&arg_ty, field_ty) {
+                            self.error(format!(
+                                "argument type mismatch for '{}': expected '{}', got '{}'",
+                                variant_name, self.type_display(field_ty), self.type_display(&arg_ty),
+                            ));
+                        }
+                    }
+                    return Type::Named(enum_name.into());
+                }
                 let ft = self.check_expr(func);
                 for arg in args {
                     self.check_expr(arg);

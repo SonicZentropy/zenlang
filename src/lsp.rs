@@ -742,6 +742,7 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
             SymKind::Function(_) => CompletionItemKind::FUNCTION,
             SymKind::Struct(_) => CompletionItemKind::STRUCT,
             SymKind::Enum(_) => CompletionItemKind::ENUM,
+            SymKind::EnumConstructor { .. } => CompletionItemKind::ENUM,
             SymKind::Module(_) => CompletionItemKind::MODULE,
         };
         items.push(CompletionItem {
@@ -1136,7 +1137,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     match &entry.kind {
                         SymKind::Function(_) => SemanticTokenType::FUNCTION,
                         SymKind::Variable(_) => SemanticTokenType::VARIABLE,
-                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::Module(_) => SemanticTokenType::TYPE,
+                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::Module(_) => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1269,6 +1270,17 @@ fn symkind_display(kind: &SymKind) -> String {
                 .join(", ")
         ),
         SymKind::Module(_) => "module".to_string(),
+        SymKind::EnumConstructor { enum_name, variant_name, tag: _, fields } => {
+            let fields_str = if fields.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "({})",
+                    fields.iter().map(|t| type_display(t)).collect::<Vec<_>>().join(", ")
+                )
+            };
+            format!("{}{} (enum {})", variant_name, fields_str, enum_name)
+        }
     }
 }
 

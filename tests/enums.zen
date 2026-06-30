@@ -1,0 +1,10 @@
+enum Option {
+    Some(int),
+    None,
+}
+
+fn main() {
+    let x = Some(42);
+    let y = None;
+    assert(true);
+}
