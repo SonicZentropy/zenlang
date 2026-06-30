@@ -29,6 +29,7 @@ pub enum SymKind {
     Function(FnSignature),
     Struct(StructDef),
     Enum(EnumDef),
+    Module(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +113,11 @@ impl SymbolTable {
     /// Look up a symbol in the global scope only.
     pub fn lookup_global(&self, name: &str) -> Option<&SymEntry> {
         self.scopes[0].symbols.get(name)
+    }
+
+    /// Look up a symbol in a specific scope (without walking parents).
+    pub fn lookup_in_scope(&self, scope_idx: usize, name: &str) -> Option<&SymEntry> {
+        self.scopes[scope_idx].symbols.get(name)
     }
 
     /// Get all global symbols.

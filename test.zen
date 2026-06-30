@@ -11,5 +11,5 @@ fn testai() -> void {
 // This should return an error
 fn an_error() -> int {
     let x = "test";
-    return 5;
+    return x;
 }

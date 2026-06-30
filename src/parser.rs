@@ -108,6 +108,10 @@ impl<'a> Parser<'a> {
             self.enum_decl()
         } else if self.r#match(TokenKind::Impl) {
             self.impl_decl()
+        } else if self.r#match(TokenKind::Use) {
+            self.use_decl()
+        } else if self.r#match(TokenKind::Mod) {
+            self.mod_decl()
         } else if self.r#match(TokenKind::Pub) {
             // TODO: visibility tracking not yet implemented - parse the declaration but ignore `pub`
             self.declaration()
@@ -116,10 +120,45 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // ---------- Use and Mod declarations ----------
+
+    fn use_decl(&mut self) -> Result<Spanned<Stmt>> {
+        let start = self.prev_span();
+        let mut path = vec![self.expect_ident()?.into()];
+        while self.r#match(TokenKind::ColonColon) {
+            path.push(self.expect_ident()?.into());
+        }
+        self.expect(TokenKind::Semi)?;
+        let span = start.merge(&self.prev_span());
+        Ok(Spanned::new(Stmt::Use { path }, span))
+    }
+
+    fn mod_decl(&mut self) -> Result<Spanned<Stmt>> {
+        let start = self.prev_span();
+        let name = self.expect_ident()?.into();
+        let body = self.block_stmts()?;
+        let span = start.merge(&self.prev_span());
+        Ok(Spanned::new(Stmt::Mod { name, body }, span))
+    }
+
     // ---------- Statements (inside blocks) ----------
 
     fn statement(&mut self) -> Result<Spanned<Stmt>> {
-        if self.r#match(TokenKind::Let) {
+        if self.r#match(TokenKind::Pub) {
+            self.statement()
+        } else if self.r#match(TokenKind::Fn) {
+            self.function_decl()
+        } else if self.r#match(TokenKind::Struct) {
+            self.struct_decl()
+        } else if self.r#match(TokenKind::Enum) {
+            self.enum_decl()
+        } else if self.r#match(TokenKind::Impl) {
+            self.impl_decl()
+        } else if self.r#match(TokenKind::Use) {
+            self.use_decl()
+        } else if self.r#match(TokenKind::Mod) {
+            self.mod_decl()
+        } else if self.r#match(TokenKind::Let) {
             self.let_stmt()
         } else if self.check(&TokenKind::If) {
             let start = self.peek().span.start();
@@ -419,12 +458,16 @@ impl<'a> Parser<'a> {
                 Ok(Expr::Unary { op, expr: Box::new(expr) })
             }
 
-            // Grouping / Block
+            // Grouping / Block / Unit
             TokenKind::OpenParen => {
                 self.advance();
-                let expr = self.expression(Precedence::Lowest)?;
-                self.expect(TokenKind::CloseParen)?;
-                Ok(expr)
+                if self.r#match(TokenKind::CloseParen) {
+                    Ok(Expr::Unit)
+                } else {
+                    let expr = self.expression(Precedence::Lowest)?;
+                    self.expect(TokenKind::CloseParen)?;
+                    Ok(expr)
+                }
             }
             TokenKind::OpenBrace => {
                 let block = self.block()?;
@@ -479,8 +522,46 @@ impl<'a> Parser<'a> {
                 Ok(Expr::Range { start, end, inclusive })
             }
 
+            // Lambda: || expr (no params)
+            TokenKind::OrOr => {
+                self.advance();
+                let body = self.expression(Precedence::Lowest)?;
+                Ok(Expr::Lambda { params: vec![], return_type: None, body: Box::new(body) })
+            }
+
+            // Lambda: |params| expr
+            TokenKind::Or => {
+                self.advance();
+                let params = self.lambda_param_list()?;
+                self.expect(TokenKind::Or)?;
+                let body = self.expression(Precedence::Lowest)?;
+                Ok(Expr::Lambda { params, return_type: None, body: Box::new(body) })
+            }
+
             _ => Err(self.error(&format!("unexpected token '{}'", self.peek().node.lexeme)))
         }
+    }
+
+    fn lambda_param_list(&mut self) -> Result<Vec<Param>> {
+        let mut params = Vec::new();
+        loop {
+            if self.check(&TokenKind::Or) || self.check(&TokenKind::CloseParen) {
+                break;
+            }
+            self.r#match(TokenKind::And); // allow &mut
+            self.r#match(TokenKind::Mut);
+            let name = self.expect_ident()?;
+            let type_ann = if self.r#match(TokenKind::Colon) {
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
+            params.push(Param { name: name.into(), type_ann });
+            if !self.r#match(TokenKind::Comma) {
+                break;
+            }
+        }
+        Ok(params)
     }
 
     /// Parse a primary expression (without struct literal interpretation for ident {).  

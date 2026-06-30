@@ -742,6 +742,7 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
             SymKind::Function(_) => CompletionItemKind::FUNCTION,
             SymKind::Struct(_) => CompletionItemKind::STRUCT,
             SymKind::Enum(_) => CompletionItemKind::ENUM,
+            SymKind::Module(_) => CompletionItemKind::MODULE,
         };
         items.push(CompletionItem {
             label: name.clone(),
@@ -855,6 +856,8 @@ fn find_definition_in_stmt(
         Stmt::Expr(expr) => find_definition_in_expr(expr, source, name),
         Stmt::Return(Some(expr)) => find_definition_in_expr(expr, source, name),
         Stmt::Return(None) => None,
+        Stmt::Use { .. } => None,
+        Stmt::Mod { body, .. } => find_definition_in_stmts(body, source, name),
     }
 }
 
@@ -1133,7 +1136,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     match &entry.kind {
                         SymKind::Function(_) => SemanticTokenType::FUNCTION,
                         SymKind::Variable(_) => SemanticTokenType::VARIABLE,
-                        SymKind::Struct(_) | SymKind::Enum(_) => SemanticTokenType::TYPE,
+                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::Module(_) => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1265,6 +1268,7 @@ fn symkind_display(kind: &SymKind) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        SymKind::Module(_) => "module".to_string(),
     }
 }
 

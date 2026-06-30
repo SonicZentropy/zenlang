@@ -120,6 +120,13 @@ pub enum Stmt {
         type_name: CompactString,
         methods: Vec<Spanned<Stmt>>,
     },
+    Use {
+        path: Vec<CompactString>,
+    },
+    Mod {
+        name: CompactString,
+        body: Vec<Spanned<Stmt>>,
+    },
 }
 
 // ---------- Expressions ----------

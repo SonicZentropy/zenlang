@@ -1545,3 +1545,85 @@ mod closure_tests {
         assert_eq!(result, Value::Int(15));
     }
 }
+
+#[cfg(test)]
+mod module_tests {
+    use super::*;
+    use crate::compiler;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn run(source: &str) -> Value {
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let mut program = Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(
+            &program, &types, &symbols, &native_names, source
+        ).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.run_main().unwrap()
+    }
+
+    #[test]
+    fn test_mod_defines_module() {
+        let result = run("mod math { fn add(x, y) { x + y } } ()");
+        assert_eq!(result, Value::Nil);
+    }
+
+    #[test]
+    fn test_use_imports_function() {
+        let result = run("mod math { fn add(x, y) { x + y } } use math::add; add(1, 2)");
+        assert_eq!(result, Value::Int(3));
+    }
+
+    #[test]
+    fn test_use_multiple_items() {
+        let result = run("
+            mod math {
+                fn add(x, y) { x + y }
+                fn mul(x, y) { x * y }
+            }
+            use math::add;
+            use math::mul;
+            add(mul(2, 3), 1)
+        ");
+        assert_eq!(result, Value::Int(7));
+    }
+
+    #[test]
+    fn test_mod_with_let() {
+        let result = run("
+            mod config {
+                let pi = 314;
+            }
+            use config::pi;
+            pi
+        ");
+        assert_eq!(result, Value::Int(314));
+    }
+
+    #[test]
+    fn test_use_imports_from_first_module() {
+        let result = run("
+            mod math { fn add(x, y) { x + y } }
+            use math::add;
+            add(2, 3)
+        ");
+        assert_eq!(result, Value::Int(5));
+    }
+
+    #[test]
+    fn test_use_imports_from_second_module() {
+        let result = run("
+            mod a { fn double(x) { x * 2 } }
+            mod b { fn triple(x) { x * 3 } }
+            use b::triple;
+            triple(4)
+        ");
+        assert_eq!(result, Value::Int(12));
+    }
+}

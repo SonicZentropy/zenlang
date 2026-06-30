@@ -120,6 +120,28 @@ impl Resolver {
                     }
                 }
             }
+            Stmt::Mod { name, body } => {
+                // Enter scope for the module
+                self.symbols.enter_scope();
+                let module_scope = self.symbols.current_scope;
+                let parent = self.symbols.scopes[module_scope].parent.unwrap();
+                // Register module name in the parent scope
+                if self.symbols.scopes[parent].symbols.contains_key(name.as_str()) {
+                    self.error(format!("duplicate definition of '{}'", name));
+                } else {
+                    let id = self.symbols.symbols.len();
+                    self.symbols.symbols.push((name.to_string(), SymKind::Module(module_scope)));
+                    self.symbols.scopes[parent].symbols.insert(
+                        name.to_string(),
+                        SymEntry { id, kind: SymKind::Module(module_scope) },
+                    );
+                }
+                // Register top-level declarations within the module
+                for stmt in body {
+                    self.register_top_level(&stmt.node);
+                }
+                self.symbols.exit_scope();
+            }
             _ => {} // let, expr stmts are handled in second pass
         }
     }
@@ -163,6 +185,46 @@ impl Resolver {
             Stmt::Return(None) => {}
             Stmt::Struct { .. } | Stmt::Enum { .. } => {
                 // Already registered, nothing to resolve
+            }
+            Stmt::Use { path } => {
+                if path.len() == 1 {
+                    // Single-name import: verify it exists
+                    if self.symbols.lookup(&path[0]).is_none() {
+                        self.error(format!("cannot resolve '{}'", path[0]));
+                    }
+                } else {
+                    // Path-based import: look up module, then import last segment
+                    let module_name = &path[0];
+                    let item_name = &path[path.len() - 1];
+                    let entry = self.symbols.lookup(module_name).cloned();
+                    match entry {
+                        Some(SymEntry { kind: SymKind::Module(scope_idx), .. }) => {
+                            if let Some(item) = self.symbols.lookup_in_scope(scope_idx, item_name) {
+                                let _ = self.symbols.define(item_name, item.kind.clone());
+                            } else {
+                                self.error(format!("cannot find '{}' in module '{}'", item_name, module_name));
+                            }
+                        }
+                        Some(_) => {
+                            self.error(format!("'{}' is not a module", module_name));
+                        }
+                        None => {
+                            self.error(format!("cannot find module '{}'", module_name));
+                        }
+                    }
+                }
+            }
+            Stmt::Mod { name, body } => {
+                // Find the module's scope
+                let entry = self.symbols.lookup(name).cloned();
+                if let Some(SymEntry { kind: SymKind::Module(scope_idx), .. }) = entry {
+                    let prev_scope = self.symbols.current_scope;
+                    self.symbols.current_scope = scope_idx;
+                    for stmt in body {
+                        self.resolve_decl(&stmt.node);
+                    }
+                    self.symbols.current_scope = prev_scope;
+                }
             }
         }
     }
@@ -345,5 +407,43 @@ mod tests {
     fn test_if_else() {
         let table = resolve_program("let x = if true { 1 } else { 2 };").unwrap();
         assert!(table.lookup("x").is_some());
+    }
+
+    #[test]
+    fn test_mod_decl() {
+        let table = resolve_program("mod math { fn add(x, y) { x + y } }").unwrap();
+        assert!(table.lookup("math").is_some());
+        assert!(matches!(table.lookup("math").unwrap().kind, SymKind::Module(_)));
+    }
+
+    #[test]
+    fn test_use_import() {
+        let table = resolve_program("
+            mod math { fn add(x, y) { x + y } }
+            use math::add;
+        ").unwrap();
+        assert!(table.lookup("add").is_some());
+        assert!(matches!(table.lookup("add").unwrap().kind, SymKind::Function(_)));
+    }
+
+    #[test]
+    fn test_use_imports_variable() {
+        let table = resolve_program("
+            mod config { let pi = 314; }
+            use config::pi;
+        ").unwrap();
+        assert!(table.lookup("pi").is_some());
+    }
+
+    #[test]
+    fn test_use_nonexistent_module_fails() {
+        let result = resolve_program("use foo::bar;");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_duplicate_mod_fails() {
+        let result = resolve_program("mod a { } mod a { }");
+        assert!(result.is_err());
     }
 }

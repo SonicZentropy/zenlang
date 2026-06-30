@@ -56,14 +56,26 @@ pub fn compile(
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
         register_global_stmt(&stmt.node, &mut *globals.borrow_mut(), &mut global_order);
-        if let Stmt::Fn { name, .. } = &stmt.node {
-            let idx = function_names.len() + 1;
-            function_names.insert(name.to_string(), idx);
+        register_function_names(&stmt.node, &mut function_names);
+    }
+
+    fn register_function_names(stmt: &Stmt, function_names: &mut HashMap<String, usize>) {
+        match stmt {
+            Stmt::Fn { name, .. } => {
+                let idx = function_names.len() + 1;
+                function_names.insert(name.to_string(), idx);
+            }
+            Stmt::Mod { body, .. } => {
+                for s in body {
+                    register_function_names(&s.node, function_names);
+                }
+            }
+            _ => {}
         }
     }
 
     // Count lambdas and compute function indices
-    let user_fn_count = program.stmts.iter().filter(|s| matches!(&s.node, Stmt::Fn {..})).count();
+    let user_fn_count = function_names.len();
     let _lambda_count = count_lambdas_in_stmts(&program.stmts);
     let lambda_base = 1 + user_fn_count; // main=0, user functions start at 1
     let lambda_counter = Rc::new(RefCell::new(lambda_base));
@@ -96,9 +108,20 @@ pub fn compile(
     }
 
     // Third pass: compile user-defined functions
-    for stmt in &program.stmts {
-        if let Stmt::Fn { name, params, return_type: _, body } = &stmt.node {
-            let arity = params.len() as u32;
+    compile_functions(&program.stmts, &mut functions, &globals, &function_names,
+        &mut errors, &line_offsets, &lambda_counter, &lambda_fns);
+
+    // Helper to compile function declarations from a list of stmts (handles Mod recursion)
+    fn compile_functions(stmts: &[Spanned<Stmt>], functions: &mut Vec<BytecodeFn>,
+        globals: &Rc<RefCell<HashMap<String, u16>>>,
+        function_names: &HashMap<String, usize>,
+        mut errors: &mut Vec<Error>,
+        line_offsets: &[usize],
+        lambda_counter: &Rc<RefCell<usize>>,
+        lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>) {
+        for stmt in stmts {
+            if let Stmt::Fn { name, params, return_type: _, body } = &stmt.node {
+                let arity = params.len() as u32;
             let mut fc = FunctionCompiler::new(
                 name.to_string(), arity, globals.clone(), &function_names,
                 &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(),
@@ -129,6 +152,10 @@ pub fn compile(
             fc.exit_scope();
 
             functions.push(fc.finalize());
+            } else if let Stmt::Mod { body, .. } = &stmt.node {
+                compile_functions(body, functions, globals, function_names,
+                    errors, line_offsets, lambda_counter, lambda_fns);
+            }
         }
     }
 
@@ -153,6 +180,7 @@ fn count_lambdas_in_stmt(stmt: &Stmt) -> usize {
         Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
         Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
         Stmt::Impl { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
+        Stmt::Mod { body, .. } => count_lambdas_in_stmts(body),
         _ => 0,
     }
 }
@@ -316,6 +344,9 @@ fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result:
                 }
             }
             Stmt::Return(None) => {}
+            Stmt::Mod { body, .. } => {
+                collect_free_in_stmts(body, &local_own, result);
+            }
             _ => {}
         }
     }
@@ -339,6 +370,19 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                         global_order.push(name.to_string());
                     }
                 }
+            }
+        }
+        Stmt::Mod { body, .. } => {
+            for stmt in body {
+                register_global_stmt(&stmt.node, globals, global_order);
+            }
+        }
+        Stmt::Use { path } => {
+            let name = &path[path.len() - 1];
+            if !globals.contains_key(name.as_str()) {
+                let idx = globals.len() as u16;
+                globals.insert(name.to_string(), idx);
+                global_order.push(name.to_string());
             }
         }
         _ => {}
@@ -539,12 +583,20 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Return);
             }
             Stmt::Fn { .. } | Stmt::Struct { .. } | Stmt::Enum { .. } => {}
-            Stmt::Impl { methods, .. } => {
-                for m in methods {
-                    self.compile_stmt(&m.node);
-                }
+        Stmt::Impl { methods, .. } => {
+            for m in methods {
+                self.compile_stmt(&m.node);
             }
         }
+        Stmt::Use { .. } => {
+            // Already resolved by the resolver; nothing to compile
+        }
+        Stmt::Mod { body, .. } => {
+            for stmt in body {
+                self.compile_stmt(&stmt.node);
+            }
+        }
+    }
     }
 
     // ---------- Expression compilation ----------
@@ -973,9 +1025,8 @@ impl<'a> FunctionCompiler<'a> {
             lambda_fc.add_local(&param.name);
         }
 
-        // Compile the lambda body
+        // Compile the lambda body (it produces a value on the stack)
         lambda_fc.compile_expr(body);
-        lambda_fc.none();
         lambda_fc.emit_op(Opcode::Return);
         lambda_fc.exit_scope();
 

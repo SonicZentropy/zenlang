@@ -138,7 +138,14 @@ impl<'a> TypeChecker<'a> {
                     self.check_stmt(&method.node, None);
                 }
             }
-            Stmt::Struct { .. } | Stmt::Enum { .. } => {}
+            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } => {}
+            Stmt::Mod { body, .. } => {
+                self.symbols.enter_scope();
+                for stmt in body {
+                    self.check_stmt(&stmt.node, _return_type);
+                }
+                self.symbols.exit_scope();
+            }
         }
     }
 
@@ -405,9 +412,19 @@ impl<'a> TypeChecker<'a> {
                 self.check_expr(end);
                 Type::Unit // TODO: proper range type
             }
-            Expr::Lambda { params: _, return_type: _, body } => {
+            Expr::Lambda { params, return_type: _, body } => {
+                self.symbols.enter_scope();
+                for param in params {
+                    let ty = param.type_ann.clone().unwrap_or(Type::Unit);
+                    if self.symbols.lookup(&param.name).is_none() {
+                        let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
+                    }
+                }
                 let ret = self.check_expr(body);
-                Type::Fn { params: Vec::new(), ret: Box::new(ret) }
+                self.symbols.exit_scope();
+                Type::Fn { params: params.iter().map(|p| {
+                    p.type_ann.clone().unwrap_or(Type::Unit)
+                }).collect(), ret: Box::new(ret) }
             }
         };
         self.type_map.set(expr, ty.clone());
