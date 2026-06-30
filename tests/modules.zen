@@ -1,0 +1,23 @@
+mod math {
+    fn add(a: i64, b: i64) -> i64 {
+        a + b
+    }
+
+    fn mul(a: i64, b: i64) -> i64 {
+        a * b
+    }
+
+    fn square(x: i64) -> i64 {
+        mul(x, x)
+    }
+}
+
+use math::add;
+use math::mul;
+use math::square;
+
+fn main() {
+    assert(add(2, 3) == 5);
+    assert(mul(4, 5) == 20);
+    assert(square(6) == 36);
+}

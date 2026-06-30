@@ -1,0 +1,35 @@
+fn add(a: i64, b: i64) -> i64 {
+    a + b
+}
+
+fn fact(n: i64) -> i64 {
+    if n <= 1 { 1 } else { n * fact(n - 1) }
+}
+
+fn returns_unit() {
+    let x = 1;
+    let _y = x + 1;
+}
+
+fn main() {
+    // basic function call
+    let sum = add(3, 4);
+    assert(sum == 7);
+
+    // recursion
+    assert(fact(0) == 1);
+    assert(fact(1) == 1);
+    assert(fact(5) == 120);
+
+    // function returning unit
+    returns_unit();
+
+    // early return
+    let x = 10;
+    if x > 5 {
+        // just return early — if we reach here the test passes
+        return;
+    }
+    // If we reach here, the early return didn't work
+    assert(false);
+}

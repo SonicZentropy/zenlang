@@ -1,0 +1,33 @@
+struct Vec2 {
+    x: f64,
+    y: f64,
+}
+
+fn main() {
+    // struct literal and field access
+    let v = Vec2 { x: 1.0, y: 2.0 };
+    assert(v.x == 1.0);
+    assert(v.y == 2.0);
+
+    // mutable struct field assignment
+    let mut v2 = Vec2 { x: 0.0, y: 0.0 };
+    v2.x = 3.0;
+    v2.y = 4.0;
+    assert(v2.x == 3.0);
+    assert(v2.y == 4.0);
+
+    // array literal and indexing
+    let arr = [10, 20, 30];
+    assert(arr[0] == 10);
+    assert(arr[1] == 20);
+    assert(arr[2] == 30);
+
+    // mutable array
+    let mut nums = [1, 2, 3];
+    nums[0] = 100;
+    assert(nums[0] == 100);
+
+    // string operations
+    let s = "hello";
+    assert(len(s) == 5);
+}

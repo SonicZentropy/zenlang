@@ -1,0 +1,79 @@
+fn main() {
+    // print: smoke test
+    print("hello from stdlib test");
+
+    // assert
+    assert(true);
+    assert(1 == 1);
+
+    // len (returns int)
+    assert(len("") == 0);
+    assert(len("abc") == 3);
+
+    // abs
+    assert(abs(-5) == 5);
+    assert(abs(5) == 5);
+
+    // min / max
+    assert(min(3, 7) == 3);
+    assert(max(3, 7) == 7);
+    assert(min(-1, -5) == -5);
+
+    // sqrt
+    let s = sqrt(9.0);
+    assert(s > 2.0);
+    assert(s < 4.0);
+
+    // Array operations
+    let mut arr = [1, 2, 3];
+    push(arr, 4);
+    assert(len(arr) == 4);
+
+    let popped = pop(arr);
+    assert(popped == 4);
+    assert(len(arr) == 3);
+
+    let mut arr2 = [10, 20, 30, 40];
+    insert(arr2, 1, 15);
+    assert(arr2[0] == 10);
+    assert(arr2[1] == 15);
+    assert(arr2[2] == 20);
+
+    let removed = remove(arr2, 1);
+    assert(removed == 15);
+    assert(arr2[1] == 20);
+
+    // to_int
+    assert(to_int(42) == 42);
+    assert(to_int(true) == 1);
+    assert(to_int(false) == 0);
+
+    // to_float
+    let f1 = to_float(3);
+    assert(f1 > 2.9);
+    assert(f1 < 3.1);
+
+    // trim
+    let t = trim(" hi ");
+    assert(len(t) == 2);
+
+    // to_upper
+    let u = to_upper("abc");
+    assert(len(u) == 3);
+
+    // to_lower
+    let l = to_lower("XYZ");
+    assert(len(l) == 3);
+
+    // substring
+    let sub = substring("hello", 0, 2);
+    assert(len(sub) == 2);
+
+    // to_str
+    let s2 = to_str(42);
+    assert(len(s2) > 0);
+
+    // type_of
+    let _ti = type_of(42);
+    let _ts = type_of("str");
+}
