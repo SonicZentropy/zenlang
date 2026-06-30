@@ -152,9 +152,40 @@ impl<'a> TypeChecker<'a> {
                 }
                 self.symbols.exit_scope();
             }
-            Stmt::Impl { methods, .. } => {
+            Stmt::Impl { type_name, methods } => {
                 for method in methods {
-                    self.check_stmt(&method.node, None);
+                    if let Stmt::Fn { name: _, params, return_type, body } = &method.node {
+                        self.symbols.enter_scope();
+                        for param in params {
+                            let ty = if param.type_ann.is_none() && param.name == "self" {
+                                Type::Named(type_name.clone())
+                            } else {
+                                param.type_ann.clone().unwrap_or(Type::Unit)
+                            };
+                            if self.symbols.lookup(&param.name).is_none() {
+                                let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
+                            }
+                        }
+                        let expected_ret = return_type.as_ref();
+                        for stmt in body {
+                            self.check_stmt(&stmt.node, expected_ret);
+                        }
+                        if let Some(last) = body.last() {
+                            if let Stmt::Expr(e) = &last.node {
+                                let ty = self.check_expr(e);
+                                if let Some(rt) = expected_ret {
+                                    if !self.types_compatible(&ty, rt) {
+                                        self.error_at(last.span, format!(
+                                            "function return type mismatch: expected '{}', got '{}'",
+                                            self.type_display(rt),
+                                            self.type_display(&ty),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        self.symbols.exit_scope();
+                    }
                 }
             }
             Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } => {}
@@ -326,16 +357,91 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Expr::MethodCall { obj, args, .. } => {
-                self.check_expr(obj);
-                for arg in args {
-                    self.check_expr(arg);
+            Expr::MethodCall { obj, method, args } => {
+                let obj_ty = self.check_expr(obj);
+                match &obj_ty {
+                    Type::Named(struct_name) => {
+                        let qualified = format!("{}::{}", struct_name, method);
+                        // Extract info from symbols before calling self methods (avoid borrow conflict)
+                        let method_info = self.symbols.lookup(&qualified).and_then(|entry| {
+                            if let SymKind::Function(sig) = &entry.kind {
+                                let has_self = sig.params.first().map(|(n, _)| n == "self").unwrap_or(false);
+                                let param_tys: Vec<Type> = if has_self {
+                                    sig.params[1..].iter().map(|(_, t)| t.clone()).collect()
+                                } else {
+                                    sig.params.iter().map(|(_, t)| t.clone()).collect()
+                                };
+                                Some((sig.return_type.clone().unwrap_or(Type::Unit), param_tys))
+                            } else {
+                                None
+                            }
+                        });
+                        match method_info {
+                            Some((ret_ty, param_tys)) => {
+                                if args.len() != param_tys.len() {
+                                    self.error(format!(
+                                        "method '{}::{}' expects {} argument(s), got {}",
+                                        struct_name, method, param_tys.len(), args.len(),
+                                    ));
+                                }
+                                for (i, arg) in args.iter().enumerate() {
+                                    let arg_ty = self.check_expr(arg);
+                                    if let Some(param_ty) = param_tys.get(i) {
+                                        if !self.types_compatible(&arg_ty, param_ty) {
+                                            self.error(format!(
+                                                "argument {} type mismatch for '{}::{}': expected '{}', got '{}'",
+                                                i, struct_name, method,
+                                                self.type_display(param_ty),
+                                                self.type_display(&arg_ty),
+                                            ));
+                                        }
+                                    }
+                                }
+                                ret_ty
+                            }
+                            None => {
+                                if self.symbols.lookup(&qualified).is_some() {
+                                    self.error(format!("'{}' is not a function", qualified));
+                                } else {
+                                    self.error(format!("no method named '{}' on struct '{}'", method, struct_name));
+                                }
+                                Type::Unit
+                            }
+                        }
+                    }
+                    _ => {
+                        for arg in args { self.check_expr(arg); }
+                        self.error(format!("cannot call method on type '{}'", self.type_display(&obj_ty)));
+                        Type::Unit
+                    }
                 }
-                Type::Unit // methods return unit by default
             }
-            Expr::Field { obj, field: _ } => {
-                self.check_expr(obj);
-                Type::Unit // fields typed by struct definition
+            Expr::Field { obj, field } => {
+                let obj_ty = self.check_expr(obj);
+                match &obj_ty {
+                    Type::Named(struct_name) => {
+                        if let Some(entry) = self.symbols.lookup(struct_name) {
+                            if let SymKind::Struct(def) = &entry.kind {
+                                if let Some(f) = def.fields.iter().find(|f| f.name == *field) {
+                                    f.type_ann.clone()
+                                } else {
+                                    self.error(format!("struct '{}' has no field '{}'", struct_name, field));
+                                    Type::Unit
+                                }
+                            } else {
+                                self.error(format!("'{}' is not a struct", struct_name));
+                                Type::Unit
+                            }
+                        } else {
+                            self.error(format!("undefined struct '{}'", struct_name));
+                            Type::Unit
+                        }
+                    }
+                    _ => {
+                        self.error(format!("cannot access field on type '{}'", self.type_display(&obj_ty)));
+                        Type::Unit
+                    }
+                }
             }
             Expr::Index { obj, index } => {
                 let ot = self.check_expr(obj);

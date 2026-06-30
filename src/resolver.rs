@@ -206,9 +206,23 @@ impl Resolver {
                 self.resolve_block(body);
                 self.symbols.exit_scope();
             }
-            Stmt::Impl { methods, .. } => {
+            Stmt::Impl { type_name, methods } => {
                 for method in methods {
-                    self.resolve_decl(&method.node);
+                    if let Stmt::Fn { name: _, params, body, .. } = &method.node {
+                        self.symbols.enter_scope();
+                        for param in params {
+                            let ty = if param.type_ann.is_none() && param.name == "self" {
+                                Type::Named(type_name.clone())
+                            } else {
+                                param.type_ann.clone().unwrap_or(Type::Unit)
+                            };
+                            if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty)) {
+                                self.error(e);
+                            }
+                        }
+                        self.resolve_block(body);
+                        self.symbols.exit_scope();
+                    }
                 }
             }
             Stmt::Let { name, type_ann, init, .. } => {
