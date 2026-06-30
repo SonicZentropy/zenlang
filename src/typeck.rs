@@ -520,9 +520,22 @@ impl<'a> TypeChecker<'a> {
                 let mt = self.check_expr(expr);
                 let mut arm_types = Vec::new();
                 // Look up enum definition from scrutinee type for enum variant validation
+                // Also extract type params from generic types (Result<T,E>, Option<T>)
                 let enum_def: Option<EnumDef> = match &mt {
                     Type::Named(n) => {
                         if let Some(entry) = self.symbols.lookup(n) {
+                            if let SymKind::Enum(def) = &entry.kind {
+                                Some(def.clone())
+                            } else { None }
+                        } else { None }
+                    }
+                    Type::Result(_, _) | Type::Option(_) => {
+                        let name = match &mt {
+                            Type::Result(_, _) => "Result",
+                            Type::Option(_) => "Option",
+                            _ => unreachable!(),
+                        };
+                        if let Some(entry) = self.symbols.lookup(name) {
                             if let SymKind::Enum(def) = &entry.kind {
                                 Some(def.clone())
                             } else { None }
@@ -552,7 +565,21 @@ impl<'a> TypeChecker<'a> {
                                     }
                                     for (i, binding) in bindings.iter().enumerate() {
                                         if binding.is_empty() { continue; } // wildcard _
-                                        let ty = field_types.get(i).cloned().unwrap_or(Type::Unit);
+                                        // Substitute generic placeholder types with actual types from Result/Option
+                                        let ty = if let Type::Result(ref ok_ty, ref err_ty) = mt {
+                                            match variant_name.as_str() {
+                                                "Ok" => *ok_ty.clone(),
+                                                "Err" => *err_ty.clone(),
+                                                _ => field_types.get(i).cloned().unwrap_or(Type::Unit),
+                                            }
+                                        } else if let Type::Option(ref some_ty) = mt {
+                                            match variant_name.as_str() {
+                                                "Some" => *some_ty.clone(),
+                                                _ => field_types.get(i).cloned().unwrap_or(Type::Unit),
+                                            }
+                                        } else {
+                                            field_types.get(i).cloned().unwrap_or(Type::Unit)
+                                        };
                                         // Remove Unit placeholder from resolver, insert proper type
                                         self.symbols.remove_from_current_scope(binding);
                                         let _ = self.symbols.define(binding, SymKind::Variable(ty));

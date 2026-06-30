@@ -1,0 +1,42 @@
+fn main() {
+    // Log level defaults to "info" — should see INFO, WARN, ERROR by default
+    log_info("this is an info message");
+    log_warn("this is a warning");
+    log_error("this is an error");
+
+    // Trace and debug should NOT appear at default "info" level
+    log_trace("you should NOT see this trace");
+    log_debug("you should NOT see this debug");
+
+    // Change level to DEBUG — now debug should appear
+    log_set_level("debug");
+    log_debug("you SHOULD see this debug message");
+    log_info("you SHOULD see this info message");
+
+    // Change level to WARN — now only warn and error appear
+    log_set_level("warn");
+    log_info("you should NOT see this info");
+    log_warn("you SHOULD see this warning");
+    log_error("you SHOULD see this error");
+
+    // Change level to TRACE — everything appears
+    log_set_level("trace");
+    log_trace("you SHOULD see this trace");
+
+    // Turn off all logging
+    log_set_level("off");
+    log_error("you should NOT see this error (logging off)");
+
+    // Reset to info for any subsequent tests
+    log_set_level("info");
+
+    // Verify functions don't crash with empty string
+    log_info("");
+    log_debug("");
+    log_set_level("");
+
+    // Verify level strings are case-insensitive
+    log_set_level("WARN");
+    log_set_level("WARNING");
+    log_set_level("INFO");
+}

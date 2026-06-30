@@ -6,6 +6,9 @@ use crate::value::Value;
 use crate::vm::{VM, VMContext};
 use crate::Result;
 
+mod fs;
+mod log;
+
 /// Register all built-in stdlib functions with the given VM.
 pub fn register_builtins(vm: &mut VM) {
     // Debug / I/O
@@ -13,6 +16,12 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("assert", Rc::new(assert_impl));
     vm.register_native("assert_eq", Rc::new(assert_eq_impl));
     vm.register_native("type_of", Rc::new(type_of_impl));
+
+    // File system, path, directory operations
+    fs::register(vm);
+
+    // Logging
+    log::register(vm);
 
     // String operations
     vm.register_native("len", Rc::new(len_impl));
@@ -57,7 +66,7 @@ pub fn native_names() -> Vec<String> {
 /// Return accurate type signatures for all native functions.
 pub fn native_fn_sigs() -> Vec<FnSignature> {
     // Unit param type = compatible with everything (acts as type variable)
-    vec![
+    let mut sigs = vec![
         FnSignature { name: "print".into(), params: vec![], return_type: Some(Type::Unit) },
         FnSignature { name: "assert".into(), params: vec![("cond".into(), Type::Unit)], return_type: Some(Type::Unit) },
         FnSignature { name: "assert_eq".into(), params: vec![("a".into(), Type::Unit), ("b".into(), Type::Unit)], return_type: Some(Type::Unit) },
@@ -86,7 +95,10 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
         FnSignature { name: "unwrap".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Unit) },
         FnSignature { name: "unwrap_or".into(), params: vec![("val".into(), Type::Unit), ("default".into(), Type::Unit)], return_type: Some(Type::Unit) },
         FnSignature { name: "expect".into(), params: vec![("val".into(), Type::Unit), ("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
-    ]
+    ];
+    sigs.extend(fs::signatures());
+    sigs.extend(log::signatures());
+    sigs
 }
 
 // --- Debug / I/O ---
