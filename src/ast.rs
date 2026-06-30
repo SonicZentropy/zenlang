@@ -61,6 +61,7 @@ pub enum Pattern {
     Float(f64),
     Str(CompactString),
     Bool(bool),
+    EnumVariant { variant_name: CompactString, bindings: Vec<CompactString> },
 }
 
 // ---------- Statements ----------

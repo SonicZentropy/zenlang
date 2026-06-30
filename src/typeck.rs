@@ -388,20 +388,59 @@ impl<'a> TypeChecker<'a> {
                 Type::Unit
             }
             Expr::Match { expr, arms } => {
-                let _mt = self.check_expr(expr);
+                let mt = self.check_expr(expr);
                 let mut arm_types = Vec::new();
+                // Look up enum definition from scrutinee type for enum variant validation
+                let enum_def: Option<EnumDef> = match &mt {
+                    Type::Named(n) => {
+                        if let Some(entry) = self.symbols.lookup(n) {
+                            if let SymKind::Enum(def) = &entry.kind {
+                                Some(def.clone())
+                            } else { None }
+                        } else { None }
+                    }
+                    _ => None,
+                };
                 for arm in arms {
-                    if let Pattern::Ident(name) = &arm.pattern {
+                    let enters_scope = matches!(arm.pattern, Pattern::Ident(_) | Pattern::EnumVariant { .. });
+                    if enters_scope {
                         self.symbols.enter_scope();
-                        if self.symbols.lookup(name).is_none() {
-                            let _ = self.symbols.define(name, SymKind::Variable(Type::Unit));
+                    }
+                    match &arm.pattern {
+                        Pattern::Ident(name) => {
+                            if self.symbols.lookup(name).is_none() {
+                                let _ = self.symbols.define(name, SymKind::Variable(Type::Unit));
+                            }
                         }
+                        Pattern::EnumVariant { variant_name, bindings } => {
+                            if let Some(ref def) = enum_def {
+                                if let Some((_, field_types)) = def.variants.iter().find(|(n, _)| n == variant_name.as_str()) {
+                                    if bindings.len() != field_types.len() {
+                                        self.error(format!(
+                                            "'{}' has {} fields, but pattern has {} bindings",
+                                            variant_name, field_types.len(), bindings.len(),
+                                        ));
+                                    }
+                                    for (i, binding) in bindings.iter().enumerate() {
+                                        let ty = field_types.get(i).cloned().unwrap_or(Type::Unit);
+                                        // Remove Unit placeholder from resolver, insert proper type
+                                        self.symbols.remove_from_current_scope(binding);
+                                        let _ = self.symbols.define(binding, SymKind::Variable(ty));
+                                    }
+                                } else {
+                                    self.error(format!("'{}' is not a variant of this enum", variant_name));
+                                }
+                            } else {
+                                self.error("cannot match enum variant on non-enum type");
+                            }
+                        }
+                        _ => {}
                     }
                     if let Some(guard) = &arm.guard {
                         self.check_expr(guard);
                     }
                     arm_types.push(self.check_expr(&arm.body));
-                    if matches!(arm.pattern, Pattern::Ident(_)) {
+                    if enters_scope {
                         self.symbols.exit_scope();
                     }
                 }

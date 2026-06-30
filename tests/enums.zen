@@ -6,5 +6,14 @@ enum Option {
 fn main() {
     let x = Some(42);
     let y = None;
-    assert(true);
+
+    match x {
+        Some(v) => assert(v == 42),
+        None => assert(false),
+    }
+
+    match y {
+        Some(_v) => assert(false),
+        None => assert(true),
+    }
 }

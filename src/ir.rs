@@ -46,6 +46,8 @@ pub enum Opcode {
     Shl,
     Shr,
     BitNot,
+    LoadEnumTag,
+    LoadEnumField(u16),
     Halt,
 }
 
@@ -96,7 +98,9 @@ impl Opcode {
             Shl => 40,
             Shr => 41,
             BitNot => 42,
-            Halt => 43,
+            LoadEnumTag => 43,
+            LoadEnumField(_) => 44,
+            Halt => 45,
         }
     }
 
@@ -146,7 +150,9 @@ impl Opcode {
             40 => Shl,
             41 => Shr,
             42 => BitNot,
-            43 => Halt,
+            43 => LoadEnumTag,
+            44 => LoadEnumField(0),
+            45 => Halt,
             _ => return None,
         })
     }
@@ -158,6 +164,7 @@ impl Opcode {
             | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
             | Opcode::Call(_) | Opcode::MakeStruct(_) | Opcode::MakeArray(_)
             | Opcode::LoadField(_) | Opcode::StoreField(_)
+            | Opcode::LoadEnumField(_)
             | Opcode::NewClosure(_, _) => 1,
             Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) => 2,
             _ => 0,
@@ -228,9 +235,10 @@ impl Chunk {
             | Opcode::LoadGlobal(v) | Opcode::StoreGlobal(v)
             | Opcode::Jump(v) | Opcode::JumpIfFalse(v) | Opcode::Loop(v)
             | Opcode::Call(v) | Opcode::MakeStruct(v) | Opcode::MakeArray(v)
-            | Opcode::LoadField(v) | Opcode::StoreField(v) => self.emit_u16(v, line),
+            | Opcode::LoadField(v) | Opcode::StoreField(v)
+            | Opcode::LoadEnumField(v) => self.emit_u16(v, line),
             Opcode::And | Opcode::Or | Opcode::BitAnd | Opcode::BitOr | Opcode::BitXor
-            | Opcode::Shl | Opcode::Shr | Opcode::BitNot => {}
+            | Opcode::Shl | Opcode::Shr | Opcode::BitNot | Opcode::LoadEnumTag => {}
             Opcode::MakeEnum(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
             Opcode::CallMethod(m, a) => { self.emit_u16(m, line); self.emit_u16(a, line); }
             Opcode::NewClosure(f, n) => { self.emit_u16(f, line); self.emit_u16(n, line); }
@@ -276,7 +284,8 @@ impl Chunk {
             | Opcode::LoadGlobal(_) | Opcode::StoreGlobal(_)
             | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
             | Opcode::Call(_) | Opcode::MakeStruct(_) | Opcode::MakeArray(_)
-            | Opcode::LoadField(_) | Opcode::StoreField(_) => {
+            | Opcode::LoadField(_) | Opcode::StoreField(_)
+            | Opcode::LoadEnumField(_) => {
                 off += 2;
             }
             _ => {}
@@ -351,6 +360,8 @@ impl Chunk {
                 Opcode::Shl => println!("Shl"),
                 Opcode::Shr => println!("Shr"),
                 Opcode::BitNot => println!("BitNot"),
+                Opcode::LoadEnumTag => println!("LoadEnumTag"),
+                Opcode::LoadEnumField(idx) => println!("LoadEnumField {:>4}", idx),
                 Opcode::Halt => println!("Halt"),
             }
             offset = next;

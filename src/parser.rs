@@ -707,7 +707,19 @@ impl<'a> Parser<'a> {
             TokenKind::Bool(b) => { self.advance(); Ok(Pattern::Bool(b)) }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
-                Ok(Pattern::Ident(name.into()))
+                // Check if this is an enum variant pattern: Ident ( args... )
+                if self.r#match(TokenKind::OpenParen) {
+                    let mut bindings = Vec::new();
+                    while !self.check(&TokenKind::CloseParen) && !self.is_at_end() {
+                        let binding = self.expect_ident()?;
+                        bindings.push(binding.into());
+                        self.r#match(TokenKind::Comma);
+                    }
+                    self.expect(TokenKind::CloseParen)?;
+                    Ok(Pattern::EnumVariant { variant_name: name.into(), bindings })
+                } else {
+                    Ok(Pattern::Ident(name.into()))
+                }
             }
             _ => Err(self.error("expected pattern"))
         }

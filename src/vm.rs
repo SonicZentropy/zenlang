@@ -843,6 +843,26 @@ impl VM {
                     }
                 }
 
+                Opcode::LoadEnumTag => {
+                    let val = self.stack.pop().unwrap();
+                    match val {
+                        Value::Enum { tag, data: _ } => self.stack.push(Value::Int(tag as i64)),
+                        _ => return Err(self.runtime_error(format!("LoadEnumTag on non-enum value"))),
+                    }
+                }
+
+                Opcode::LoadEnumField(_) => {
+                    let idx = self.read_u16() as usize;
+                    let val = self.stack.pop().unwrap();
+                    match val {
+                        Value::Enum { tag: _, data } => {
+                            let field = data.borrow().get(idx).cloned().unwrap_or(Value::Nil);
+                            self.stack.push(field);
+                        }
+                        _ => return Err(self.runtime_error(format!("LoadEnumField on non-enum value"))),
+                    }
+                }
+
                 Opcode::Halt => {
                     break;
                 }

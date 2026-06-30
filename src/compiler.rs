@@ -950,6 +950,35 @@ impl<'a> FunctionCompiler<'a> {
                             end_jumps.push(j);
                             self.patch_jump(next);
                         }
+                        Pattern::EnumVariant { variant_name, bindings } => {
+                            let tag: u16 = self.symbols.lookup(variant_name)
+                                .and_then(|entry| {
+                                    if let SymKind::EnumConstructor { enum_name: _, variant_name: _, tag, fields: _ } = &entry.kind {
+                                        Some(*tag)
+                                    } else { None }
+                                })
+                                .unwrap_or(0);
+                            self.emit_op(Opcode::LoadEnumTag);
+                            self.load_const(Value::Int(tag as i64));
+                            self.emit_op(Opcode::Eq);
+                            let next = self.current_offset();
+                            self.emit_op(Opcode::JumpIfFalse(0));
+                            self.emit_op(Opcode::Pop);
+                            self.enter_scope();
+                            for (i, binding) in bindings.iter().enumerate() {
+                                self.emit_op(Opcode::Dup);
+                                self.emit_op(Opcode::LoadEnumField(i as u16));
+                                let slot = self.add_local(binding);
+                                self.emit_op(Opcode::StoreLocal(slot));
+                            }
+                            self.emit_op(Opcode::Pop);
+                            self.compile_expr(&arm.body);
+                            self.exit_scope();
+                            let j = self.current_offset();
+                            self.emit_op(Opcode::Jump(0));
+                            end_jumps.push(j);
+                            self.patch_jump(next);
+                        }
                     }
                 }
                 self.emit_op(Opcode::Pop);

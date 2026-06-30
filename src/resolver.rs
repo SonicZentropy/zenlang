@@ -311,17 +311,30 @@ impl Resolver {
             Expr::Match { expr, arms } => {
                 self.resolve_expr(expr);
                 for arm in arms {
-                    if let Pattern::Ident(name) = &arm.pattern {
+                    let enters_scope = matches!(arm.pattern, Pattern::Ident(_) | Pattern::EnumVariant { .. });
+                    if enters_scope {
                         self.symbols.enter_scope();
-                        if let Err(e) = self.symbols.define(name, SymKind::Variable(Type::Unit)) {
-                            self.error(e);
+                    }
+                    match &arm.pattern {
+                        Pattern::Ident(name) => {
+                            if let Err(e) = self.symbols.define(name, SymKind::Variable(Type::Unit)) {
+                                self.error(e);
+                            }
                         }
+                        Pattern::EnumVariant { variant_name: _, bindings } => {
+                            for binding in bindings {
+                                if let Err(e) = self.symbols.define(binding, SymKind::Variable(Type::Unit)) {
+                                    self.error(e);
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                     if let Some(guard) = &arm.guard {
                         self.resolve_expr(guard);
                     }
                     self.resolve_expr(&arm.body);
-                    if matches!(arm.pattern, Pattern::Ident(_)) {
+                    if enters_scope {
                         self.symbols.exit_scope();
                     }
                 }
