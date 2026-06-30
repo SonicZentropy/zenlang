@@ -736,6 +736,22 @@ impl<'a> Parser<'a> {
             TokenKind::Ident(s) if s == "bool" => { self.advance(); Ok(Type::Bool) }
             TokenKind::Ident(s) if s == "str" => { self.advance(); Ok(Type::Str) }
             TokenKind::Ident(s) if s == "void" => { self.advance(); Ok(Type::Unit) }
+            TokenKind::Ident(s) if s == "Option" => {
+                self.advance();
+                self.expect(TokenKind::Lt)?;
+                let inner = self.parse_type()?;
+                self.expect(TokenKind::Gt)?;
+                Ok(Type::Option(Box::new(inner)))
+            }
+            TokenKind::Ident(s) if s == "Result" => {
+                self.advance();
+                self.expect(TokenKind::Lt)?;
+                let ok = self.parse_type()?;
+                self.expect(TokenKind::Comma)?;
+                let err = self.parse_type()?;
+                self.expect(TokenKind::Gt)?;
+                Ok(Type::Result(Box::new(ok), Box::new(err)))
+            }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
                 // Check for array type: [Type] or [Type; N]

@@ -531,6 +531,8 @@ impl<'a> TypeChecker<'a> {
             (Type::Str, Type::Str) => true,
             (Type::Named(a), Type::Named(b)) => a == b,
             (Type::Array(a), Type::Array(b)) => self.types_compatible(a, b),
+            (Type::Option(a), Type::Option(b)) => self.types_compatible(a, b),
+            (Type::Result(oka, erra), Type::Result(okb, errb)) => self.types_compatible(oka, okb) && self.types_compatible(erra, errb),
             _ => false,
         }
     }
@@ -561,6 +563,8 @@ impl<'a> TypeChecker<'a> {
                 let p: Vec<String> = params.iter().map(|t| self.type_display(t)).collect();
                 format!("({}) -> {}", p.join(", "), self.type_display(ret))
             }
+            Type::Option(inner) => format!("Option<{}>", self.type_display(inner)),
+            Type::Result(ok, err) => format!("Result<{}, {}>", self.type_display(ok), self.type_display(err)),
         }
     }
 }

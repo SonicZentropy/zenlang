@@ -1298,5 +1298,7 @@ fn type_display(ty: &crate::ast::Type) -> String {
             let ps: Vec<String> = params.iter().map(type_display).collect();
             format!("fn({}) -> {}", ps.join(", "), type_display(ret))
         }
+        crate::ast::Type::Option(inner) => format!("Option<{}>", type_display(inner)),
+        crate::ast::Type::Result(ok, err) => format!("Result<{}, {}>", type_display(ok), type_display(err)),
     }
 }

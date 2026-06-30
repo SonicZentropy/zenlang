@@ -17,6 +17,8 @@ pub enum Type {
     Named(CompactString),
     Array(Box<Type>),
     Fn { params: Vec<Type>, ret: Box<Type> },
+    Option(Box<Type>),
+    Result(Box<Type>, Box<Type>),
 }
 
 // ---------- Operators ----------
