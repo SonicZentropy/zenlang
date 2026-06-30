@@ -1,0 +1,22 @@
+fn main() {
+    // basic lambda
+    let f = |x, y| x + y;
+    let result = f(3, 4);
+    assert(result == 7);
+
+    // lambda with one param
+    let double = |x| x * 2;
+    assert(double(5) == 10);
+
+    // closure capturing upvalue
+    let base = 10;
+    let add_base = |x| x + base;
+    assert(add_base(5) == 15);
+
+    // closure with multiple captures
+    let a = 1;
+    let b = 2;
+    let c = 3;
+    let sum_captures = || a + b + c;
+    assert(sum_captures() == 6);
+}

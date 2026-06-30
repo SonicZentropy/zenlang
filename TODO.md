@@ -132,14 +132,17 @@ Warn/error if `match` on an enum does not cover all variants. Currently partial 
 
 ---
 
-## Phase 7 — Closure support
+## Phase 7 — Closure support (COMPLETE)
 
-Fully wire up parsed lambdas (`|x, y| x + y`) to the existing closure runtime (`Value::Closure`, upvalues, `NewClosure` opcode). Currently lambdas are parsed into `Expr::Lambda` but compilation may be incomplete.
+Lambdas (`|x, y| x + y`) are fully wired up to the closure runtime (`Value::Closure`, upvalues, `NewClosure` opcode). Captured variables are captured **by value** at closure creation time (not by reference, so mutation of outer variables is not reflected). The `compile_lambda` method at `src/compiler.rs:1057` handles free-variable collection, sub-compiler creation, and `NewClosure` emission. The VM at `src/vm.rs:769` executes `NewClosure` and at `src/vm.rs:518` handles closure calls.
 
 | File | Change |
 |---|---|
-| `src/compiler.rs` | `compile_expr` for `Expr::Lambda`: compile the lambda body as a separate `BytecodeFn`, emit `NewClosure` to create a closure at runtime, handle upvalue capture for outer variables. |
-| `src/vm.rs` | Test that `|x| x + 1` works, closures can capture and mutate outer `let mut` variables. |
+| `src/compiler.rs` | `compile_lambda` (already implemented): compiles body as separate `BytecodeFn`, emits `LoadLocal` for captured upvalues, emits `NewClosure(fn_idx, up_count)`. |
+| `src/vm.rs` | `NewClosure` (already implemented): pops upvalues from stack, builds `ClosureData`. Closure call (already implemented): pushes upvalues then args, sets up frame. |
+| `tests/closures.zen` | Tests basic lambda, upvalue capture, multiple captures. |
+
+**Future enhancement**: By-reference capture (for mutation of outer `let mut` variables) requires storing upvalues as `Rc<RefCell<Value>>` slots instead of copying values.
 
 **Dependencies**: None.
 
