@@ -94,7 +94,7 @@ When you write `match x { Some(v) => ..., None => ... }`, the parser recognizes 
 
 ---
 
-## Phase 4 — Native function return types
+## Phase 4 — Native function return types (COMPLETE)
 
 Give each native function an accurate type signature so the type checker reports correct types for stdlib calls. Currently all natives are typed as `() -> I64`, but many return `Bool`, `Str`, or `Float`.
 
@@ -108,13 +108,13 @@ Give each native function an accurate type signature so the type checker reports
 
 ---
 
-## Phase 5 — Exhaustive match checking
+## Phase 5 — Exhaustive match checking (COMPLETE)
 
 Warn/error if `match` on an enum does not cover all variants. Currently partial matches compile silently at runtime (no arm matches → fall-through to next).
 
 | File | Change |
 |---|---|
-| `src/typeck.rs` | In `check_expr` for `match`: when scrutinee type is an enum, collect all variant names covered and compare to all variant names in the enum def. Emit error if any variant is missing and no wildcard arm present. |
+| `src/typeck.rs` | In `check_expr` for `match`: when scrutinee type is an enum, collect all variant names covered and compare to all variant names in the enum def. Emit error if any variant is missing and no wildcard arm present. Also handles zero-field variants used as `Pattern::Ident` (e.g., `None`) and `Pattern::Wildcard`. |
 
 **Dependencies**: Phase 1b (enum pattern matching).
 

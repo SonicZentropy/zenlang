@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use compact_str::CompactString;
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::span::{SourceLocation, Span};
@@ -465,6 +466,39 @@ impl<'a> TypeChecker<'a> {
                     arm_types.push(self.check_expr(&arm.body));
                     if enters_scope {
                         self.symbols.exit_scope();
+                    }
+                }
+                // Exhaustiveness check: if matching on an enum, all variants must be covered
+                if let Some(ref def) = enum_def {
+                    let mut covered: Vec<CompactString> = Vec::new();
+                    let mut has_wildcard = false;
+                    for arm in arms {
+                        match &arm.pattern {
+                            Pattern::EnumVariant { variant_name, .. } => {
+                                if !covered.contains(variant_name) {
+                                    covered.push(variant_name.clone());
+                                }
+                            }
+                            Pattern::Ident(name) => {
+                                // Pattern::Ident could be a catch-all or a zero-field enum variant
+                                if def.variants.iter().any(|(vname, fields)| fields.is_empty() && vname == name.as_str()) {
+                                    if !covered.contains(name) {
+                                        covered.push(name.clone());
+                                    }
+                                } else {
+                                    has_wildcard = true;
+                                }
+                            }
+                            Pattern::Wildcard => has_wildcard = true,
+                            _ => {}
+                        }
+                    }
+                    if !has_wildcard {
+                        for (vname, _) in &def.variants {
+                            if !covered.iter().any(|c| c.as_str() == vname) {
+                                self.error(format!("non-exhaustive match: missing variant '{}'", vname));
+                            }
+                        }
                     }
                 }
                 // All arms should have compatible types
