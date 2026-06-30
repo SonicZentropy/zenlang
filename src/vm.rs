@@ -43,6 +43,7 @@ pub struct VM {
     globals: Vec<Value>,
     functions: Vec<BytecodeFn>,
     global_names: Vec<String>,
+    function_name_map: HashMap<String, usize>,
     natives: HashMap<String, usize>,
     native_fns: Vec<(String, NativeFn)>,
     pub foreign_registry: Rc<ForeignTypeRegistry>,
@@ -56,6 +57,7 @@ impl VM {
             globals: Vec::new(),
             functions: Vec::new(),
             global_names: Vec::new(),
+            function_name_map: HashMap::new(),
             natives: HashMap::new(),
             native_fns: Vec::new(),
             foreign_registry: Rc::new(ForeignTypeRegistry::new()),
@@ -69,6 +71,7 @@ impl VM {
             globals: Vec::new(),
             functions: Vec::new(),
             global_names: Vec::new(),
+            function_name_map: HashMap::new(),
             natives: HashMap::new(),
             native_fns: Vec::new(),
             foreign_registry: registry,
@@ -93,6 +96,7 @@ impl VM {
         let offset = self.functions.len();
         for (i, f) in fns.into_iter().enumerate() {
             let idx = offset + i;
+            self.function_name_map.insert(f.name.clone(), idx);
             self.functions.push(f);
             if i == 0 {
                 self.natives.insert("__main__".into(), idx);
@@ -589,6 +593,29 @@ impl VM {
                                 self.stack.push(Value::Nil);
                             }
                         }
+                        // Native script struct method dispatch
+                        Value::Struct(_, type_name) => {
+                            let method_name = self.chunk().method_names.get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let qualified = format!("{}::{}", type_name, method_name);
+                            match self.function_name_map.get(&qualified).copied() {
+                                Some(fn_idx) => {
+                                    let fn_def = &self.functions[fn_idx];
+                                    // bp = args_start - 1 so receiver (self) is at local 0
+                                    let bp = args_start - 1;
+                                    let frame = CallFrame::new(fn_idx, bp);
+                                    self.frames.push(frame);
+                                    let slot_count = fn_def.chunk.locals as usize;
+                                    while self.stack.len() < bp + slot_count {
+                                        self.stack.push(Value::Nil);
+                                    }
+                                }
+                                None => {
+                                    return Err(self.runtime_error(format!("type '{}' has no method '{}'", type_name, method_name)));
+                                }
+                            }
+                        }
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop();
@@ -623,8 +650,13 @@ impl VM {
                     self.stack.push(result);
                 }
 
-                Opcode::MakeStruct(_) => {
+                Opcode::MakeStruct(_, _) => {
+                    let type_name_idx = self.read_u16() as usize;
                     let field_count = self.read_u16() as usize;
+                    let type_name = match self.chunk().constants.get(type_name_idx) {
+                        Some(Value::Str(s)) => s.to_string(),
+                        _ => String::new(),
+                    };
                     let mut map = HashMap::new();
                     for _ in 0..field_count {
                         let val = self.stack.pop().unwrap();
@@ -633,7 +665,7 @@ impl VM {
                             map.insert(s.to_string(), val);
                         }
                     }
-                    self.stack.push(Value::Struct(Rc::new(RefCell::new(map))));
+                    self.stack.push(Value::Struct(Rc::new(RefCell::new(map)), type_name));
                 }
 
                 Opcode::MakeArray(_) => {
@@ -667,7 +699,7 @@ impl VM {
                         .unwrap_or_default();
                     let obj = self.stack.pop().unwrap();
                     match &obj {
-                        Value::Struct(map) => {
+                        Value::Struct(map, _) => {
                             let val = map.borrow().get(&field_name)
                                 .cloned()
                                 .unwrap_or(Value::Nil);
@@ -701,7 +733,7 @@ impl VM {
                         _ => None,
                     };
                     match &mut obj {
-                        Value::Struct(map) => {
+                        Value::Struct(map, _) => {
                             map.borrow_mut().insert(field_name, val);
                             self.stack.push(obj);
                         }
@@ -1501,7 +1533,7 @@ fn remap_function_value(
                 remap_function_value(v, old_name_to_idx, new_name_to_idx);
             }
         }
-        Value::Struct(map) => {
+        Value::Struct(map, _) => {
             for v in map.borrow_mut().values_mut() {
                 remap_function_value(v, old_name_to_idx, new_name_to_idx);
             }

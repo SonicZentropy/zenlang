@@ -18,8 +18,9 @@ fn self_test(self: i64) -> i64 {
 }
 
 fn main() {
-    // Phase 11: verify impl block methods compile as BytecodeFn entries
+    // Phase 12: method call type-checking and runtime dispatch
     let p = Point { x: 3, y: 4 };
+    assert(p.area() == 12);
     assert(square(p) == 12);
     assert(self_test(5) == 6);
 }

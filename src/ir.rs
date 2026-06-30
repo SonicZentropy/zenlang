@@ -31,7 +31,7 @@ pub enum Opcode {
     Call(u16),
     CallMethod(u16, u16),
     Return,
-    MakeStruct(u16),
+    MakeStruct(u16, u16), // (type_name_const_idx, field_count)
     MakeArray(u16),
     MakeEnum(u16, u16),
     LoadField(u16),
@@ -83,7 +83,7 @@ impl Opcode {
             Call(_) => 25,
             CallMethod(_, _) => 26,
             Return => 27,
-            MakeStruct(_) => 28,
+            MakeStruct(_, _) => 28,
             MakeArray(_) => 29,
             MakeEnum(_, _) => 30,
             LoadField(_) => 31,
@@ -135,7 +135,7 @@ impl Opcode {
             25 => Call(0),
             26 => CallMethod(0, 0),
             27 => Return,
-            28 => MakeStruct(0),
+            28 => MakeStruct(0, 0),
             29 => MakeArray(0),
             30 => MakeEnum(0, 0),
             31 => LoadField(0),
@@ -162,11 +162,11 @@ impl Opcode {
             Opcode::LoadConst(_) | Opcode::LoadLocal(_) | Opcode::StoreLocal(_)
             | Opcode::LoadGlobal(_) | Opcode::StoreGlobal(_)
             | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
-            | Opcode::Call(_) | Opcode::MakeStruct(_) | Opcode::MakeArray(_)
+            | Opcode::Call(_) | Opcode::MakeArray(_)
             | Opcode::LoadField(_) | Opcode::StoreField(_)
             | Opcode::LoadEnumField(_)
             | Opcode::NewClosure(_, _) => 1,
-            Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) => 2,
+            Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::MakeStruct(_, _) => 2,
             _ => 0,
         }
     }
@@ -234,12 +234,13 @@ impl Chunk {
             Opcode::LoadConst(v) | Opcode::LoadLocal(v) | Opcode::StoreLocal(v)
             | Opcode::LoadGlobal(v) | Opcode::StoreGlobal(v)
             | Opcode::Jump(v) | Opcode::JumpIfFalse(v) | Opcode::Loop(v)
-            | Opcode::Call(v) | Opcode::MakeStruct(v) | Opcode::MakeArray(v)
+            | Opcode::Call(v) | Opcode::MakeArray(v)
             | Opcode::LoadField(v) | Opcode::StoreField(v)
             | Opcode::LoadEnumField(v) => self.emit_u16(v, line),
             Opcode::And | Opcode::Or | Opcode::BitAnd | Opcode::BitOr | Opcode::BitXor
             | Opcode::Shl | Opcode::Shr | Opcode::BitNot | Opcode::LoadEnumTag => {}
             Opcode::MakeEnum(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
+            Opcode::MakeStruct(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
             Opcode::CallMethod(m, a) => { self.emit_u16(m, line); self.emit_u16(a, line); }
             Opcode::NewClosure(f, n) => { self.emit_u16(f, line); self.emit_u16(n, line); }
             _ => {}
@@ -277,13 +278,13 @@ impl Chunk {
         let op = Opcode::from_byte(byte)?;
         let mut off = offset + 1;
         match op {
-            Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::NewClosure(_, _) => {
+            Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::NewClosure(_, _) | Opcode::MakeStruct(_, _) => {
                 off += 4;
             }
             Opcode::LoadConst(_) | Opcode::LoadLocal(_) | Opcode::StoreLocal(_)
             | Opcode::LoadGlobal(_) | Opcode::StoreGlobal(_)
             | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
-            | Opcode::Call(_) | Opcode::MakeStruct(_) | Opcode::MakeArray(_)
+            | Opcode::Call(_) | Opcode::MakeArray(_)
             | Opcode::LoadField(_) | Opcode::StoreField(_)
             | Opcode::LoadEnumField(_) => {
                 off += 2;
@@ -331,7 +332,14 @@ impl Chunk {
                     let target = read_u16(offset + 1);
                     println!("Loop       {:>4} -> {:04x}", target, next.wrapping_sub(target as usize + 1));
                 }
-                Opcode::MakeStruct(_) => println!("MakeStruct {:>4}", read_u16(offset + 1)),
+                Opcode::MakeStruct(_, _) => {
+                    let type_idx = read_u16(offset + 1);
+                    let fields = read_u16(offset + 3);
+                    let type_name = self.constants.get(type_idx as usize).and_then(|v| {
+                        if let Value::Str(s) = v { Some(s.clone()) } else { None }
+                    }).unwrap_or_default();
+                    println!("MakeStruct {:>4} '{:?}' fields={}", type_idx, type_name, fields);
+                }
                 Opcode::MakeArray(_) => println!("MakeArray  {:>4}", read_u16(offset + 1)),
                 Opcode::MakeEnum(_, _) => {
                     let tag = read_u16(offset + 1);

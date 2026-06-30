@@ -81,7 +81,7 @@ pub enum Value {
     Float(f64),
     Str(Rc<str>),
     Array(Rc<RefCell<Vec<Value>>>),
-    Struct(Rc<RefCell<HashMap<String, Value>>>),
+    Struct(Rc<RefCell<HashMap<String, Value>>>, String), // type name for method dispatch
     Enum { tag: u16, data: Rc<RefCell<Vec<Value>>> },
     Function(usize),
     NativeFunction(NativeFn),
@@ -98,7 +98,7 @@ impl fmt::Debug for Value {
             Value::Float(n) => write!(f, "Float({})", n),
             Value::Str(s) => write!(f, "Str({:?})", s),
             Value::Array(_) => write!(f, "Array(...)"),
-            Value::Struct(_) => write!(f, "Struct(...)"),
+            Value::Struct(_, name) => write!(f, "Struct({})", name),
             Value::Enum { tag, .. } => write!(f, "Enum({})", tag),
             Value::Function(idx) => write!(f, "Function({})", idx),
             Value::NativeFunction(_) => write!(f, "NativeFunction(...)"),
@@ -117,7 +117,7 @@ impl Clone for Value {
             Value::Float(n) => Value::Float(*n),
             Value::Str(s) => Value::Str(s.clone()),
             Value::Array(a) => Value::Array(a.clone()),
-            Value::Struct(s) => Value::Struct(s.clone()),
+            Value::Struct(s, name) => Value::Struct(s.clone(), name.clone()),
             Value::Enum { tag, data } => Value::Enum { tag: *tag, data: data.clone() },
             Value::Function(idx) => Value::Function(*idx),
             Value::NativeFunction(f) => Value::NativeFunction(f.clone()),
@@ -136,7 +136,7 @@ impl PartialEq for Value {
             (Value::Float(a), Value::Float(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => a.as_ref() == b.as_ref(),
             (Value::Array(a), Value::Array(b)) => *a.borrow() == *b.borrow(),
-            (Value::Struct(a), Value::Struct(b)) => *a.borrow() == *b.borrow(),
+            (Value::Struct(a, an), Value::Struct(b, bn)) => an == bn && *a.borrow() == *b.borrow(),
             (Value::Enum { tag: ta, data: da }, Value::Enum { tag: tb, data: db }) => {
                 ta == tb && *da.borrow() == *db.borrow()
             }
@@ -161,7 +161,7 @@ impl Value {
             Value::Float(_) => "float",
             Value::Str(_) => "str",
             Value::Array(_) => "array",
-            Value::Struct(_) => "struct",
+            Value::Struct(_, _) => "struct",
             Value::Enum { .. } => "enum",
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",

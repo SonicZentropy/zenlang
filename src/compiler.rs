@@ -1070,7 +1070,7 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Return);
             }
 
-            Expr::StructLit { name: _, fields, spread } => {
+            Expr::StructLit { name, fields, spread } => {
                 if let Some(spread_expr) = spread {
                     // Compile spread base, then override with explicit fields via StoreField
                     self.compile_expr(spread_expr);
@@ -1085,7 +1085,8 @@ impl<'a> FunctionCompiler<'a> {
                         self.load_const(Value::Str(field_name.clone().into()));
                         self.compile_expr(val);
                     }
-                    self.emit_op(Opcode::MakeStruct(fields.len() as u16));
+                    let type_const_idx = self.chunk.add_constant(Value::Str(name.clone().into()));
+                    self.emit_op(Opcode::MakeStruct(type_const_idx, fields.len() as u16));
                 }
             }
 
@@ -1234,7 +1235,7 @@ fn const_hash(val: &Value) -> u64 {
             h
         }
         Value::Function(idx) => 5 ^ (*idx as u64),
-        Value::Array(_) | Value::Struct(_) | Value::Enum { .. }
+        Value::Array(_) | Value::Struct(..) | Value::Enum { .. }
         | Value::NativeFunction(_) | Value::Foreign(_)
         | Value::Closure(_) => {
             // These types use pointer identity, hash is not stable;
