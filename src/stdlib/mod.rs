@@ -8,6 +8,7 @@ use crate::Result;
 pub fn register_builtins(vm: &mut VM) {
     // Debug / I/O
     vm.register_native("print", Rc::new(print_impl));
+    vm.register_native("assert", Rc::new(assert_impl));
     vm.register_native("assert_eq", Rc::new(assert_eq_impl));
     vm.register_native("type_of", Rc::new(type_of_impl));
 
@@ -41,6 +42,7 @@ pub fn register_builtins(vm: &mut VM) {
 pub fn native_names() -> Vec<String> {
     vec![
         "print".into(),
+        "assert".into(),
         "assert_eq".into(),
         "type_of".into(),
         "len".into(),
@@ -70,6 +72,14 @@ fn print_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         print!("{:?}", arg);
     }
     println!();
+    Ok(Value::Nil)
+}
+
+fn assert_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    if args.first().map(|v| !v.is_truthy()).unwrap_or(true) {
+        let msg = args.get(1).and_then(|v| v.as_str()).unwrap_or_else(|| "assertion failed".into());
+        return Err(crate::error::Error::Script { msg: format!("assert failed: {msg}") });
+    }
     Ok(Value::Nil)
 }
 

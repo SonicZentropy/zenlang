@@ -29,6 +29,8 @@ enum Command {
     Check { path: camino::Utf8PathBuf },
     /// Start the LSP language server (stdin/stdout)
     Lsp,
+    /// Run tests
+    Test { paths: Vec<camino::Utf8PathBuf> },
 }
 
 fn main() -> zenlang::Result<()> {
@@ -44,6 +46,7 @@ fn main() -> zenlang::Result<()> {
         Some(Command::Repl) => run_repl(),
         Some(Command::Disasm { path }) => run_disasm(path),
         Some(Command::Check { path }) => run_check(path),
+        Some(Command::Test { paths }) => run_tests(paths),
         Some(Command::Lsp) => {
             zenlang::lsp::run_server();
             Ok(())
@@ -94,6 +97,79 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
             tracing::info!("reload result: {:?}", result);
         }
         std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    Ok(())
+}
+
+fn run_tests(paths: &[camino::Utf8PathBuf]) -> zenlang::Result<()> {
+    let test_files: Vec<camino::Utf8PathBuf> = if paths.is_empty() {
+        let test_dir = camino::Utf8Path::new("tests");
+        if !test_dir.is_dir() {
+            eprintln!("no tests/ directory found and no paths specified");
+            std::process::exit(1);
+        }
+        let mut files: Vec<_> = std::fs::read_dir("tests")
+            .map_err(|e| Error::Io { source: e })?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|s| s == "zen").unwrap_or(false))
+            .map(|e| camino::Utf8PathBuf::from_path_buf(e.path()).unwrap_or_default())
+            .filter(|p| !p.as_str().is_empty())
+            .collect();
+        files.sort();
+        files
+    } else {
+        paths.to_vec()
+    };
+
+    if test_files.is_empty() {
+        eprintln!("no test files found");
+        std::process::exit(0);
+    }
+
+    let total = test_files.len();
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+
+    for path in &test_files {
+        let source = match std::fs::read_to_string(path.as_std_path()) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("FAIL {path} — io error: {e}");
+                failed += 1;
+                continue;
+            }
+        };
+
+        let result = (|| -> zenlang::Result<()> {
+            let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
+            let parser = zenlang::parser::Parser::new(&source, &tokens);
+            let mut program = parser.parse()?;
+            let native_names = zenlang::stdlib::native_names();
+            let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
+            let types = zenlang::typeck::check(&program, &mut symbols)?;
+            let (fns, global_names) = zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
+            let mut vm = VM::new();
+            zenlang::stdlib::register_builtins(&mut vm);
+            vm.load_bytecode(fns, global_names);
+            vm.run_main()?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                println!("PASS {path}");
+                passed += 1;
+            }
+            Err(e) => {
+                eprintln!("FAIL {path} — {e}");
+                failed += 1;
+            }
+        }
+    }
+
+    println!("\n{passed}/{total} tests passed");
+    if failed > 0 {
+        std::process::exit(failed as i32);
     }
     Ok(())
 }
