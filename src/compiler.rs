@@ -75,6 +75,15 @@ pub fn compile(
                 let idx = function_names.len() + 1;
                 function_names.insert(name.to_string(), idx);
             }
+            Stmt::Impl { type_name, methods } => {
+                for m in methods {
+                    if let Stmt::Fn { name, .. } = &m.node {
+                        let qualified = format!("{}::{}", type_name, name);
+                        let idx = function_names.len() + 1;
+                        function_names.insert(qualified, idx);
+                    }
+                }
+            }
             Stmt::Mod { body, .. } => {
                 for s in body {
                     register_function_names(&s.node, function_names);
@@ -163,6 +172,39 @@ pub fn compile(
             fc.exit_scope();
 
             functions.push(fc.finalize());
+            } else if let Stmt::Impl { type_name, methods } = &stmt.node {
+                for m in methods {
+                    if let Stmt::Fn { name, params, return_type: _, body } = &m.node {
+                        let qualified = format!("{}::{}", type_name, name);
+                        let arity = params.len() as u32;
+                        let mut fc = FunctionCompiler::new(
+                            qualified, arity, globals.clone(), &function_names,
+                            &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(), symbols,
+                        );
+                        fc.enter_scope();
+                        for param in params {
+                            fc.add_local(&param.name);
+                        }
+                        let stmt_count = body.len();
+                        for (i, s) in body.iter().enumerate() {
+                            fc.set_line_by_offset(s.span.start());
+                            if i == stmt_count - 1 && matches!(&s.node, Stmt::Expr(_)) {
+                                if let Stmt::Expr(expr) = &s.node {
+                                    fc.compile_expr(expr);
+                                }
+                            } else {
+                                fc.compile_stmt(&s.node);
+                            }
+                        }
+                        match body.last() {
+                            Some(last) if matches!(last.node, Stmt::Expr(_)) => {}
+                            _ => { fc.none(); }
+                        }
+                        fc.emit_op(Opcode::Return);
+                        fc.exit_scope();
+                        functions.push(fc.finalize());
+                    }
+                }
             } else if let Stmt::Mod { body, .. } = &stmt.node {
                 compile_functions(body, functions, globals, function_names,
                     errors, line_offsets, lambda_counter, lambda_fns, symbols);
@@ -372,13 +414,14 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 global_order.push(name.to_string());
             }
         }
-        Stmt::Impl { methods, .. } => {
+        Stmt::Impl { type_name, methods } => {
             for m in methods {
                 if let Stmt::Fn { name, .. } = &m.node {
-                    if !globals.contains_key(name.as_str()) {
+                    let qualified = format!("{}::{}", type_name, name);
+                    if !globals.contains_key(&qualified) {
                         let idx = globals.len() as u16;
-                        globals.insert(name.to_string(), idx);
-                        global_order.push(name.to_string());
+                        globals.insert(qualified.clone(), idx);
+                        global_order.push(qualified);
                     }
                 }
             }

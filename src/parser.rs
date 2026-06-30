@@ -481,6 +481,11 @@ impl<'a> Parser<'a> {
             TokenKind::Loop => self.loop_stmt(),
             TokenKind::Match => self.match_expr(),
 
+            TokenKind::Self_ => {
+                self.advance();
+                Ok(Expr::Ident("self".into()))
+            }
+
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
                 if self.is_struct_lit_start() {

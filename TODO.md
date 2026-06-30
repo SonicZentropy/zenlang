@@ -194,22 +194,50 @@ Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... 
 
 ---
 
-## Summary of work by file
+## Phase 11 — Fix `impl` block compilation (COMPLETE)
 
-| File | Phases affected |
+`compile_functions` now recurses into `Stmt::Impl`. Methods are compiled as `BytecodeFn` entries with qualified names like `"Point::area"`. Also added `self` keyword support in expression position (`self.x`).
+
+| File | Change |
 |---|---|
-| `src/ast.rs` | 1b (`Pattern::EnumVariant`), 2a (`Type::Option/Result`) |
-| `src/parser.rs` | 1b (pattern parsing), 2a (generic type syntax), 10 (shorthand fields) |
-| `src/symbol.rs` | 1a (`SymKind::EnumConstructor`) |
-| `src/resolver.rs` | 1a (register constructors), 1b (resolve patterns), 2b (auto-register Option/Result) |
-| `src/typeck.rs` | 1a (validate constructor call), 1b (match arm with bindings), 2a (type compatibility) |
-| `src/compiler.rs` | 1a (emit `MakeEnum` for constructors), 1b (match arm with tag/field extraction) |
-| `src/ir.rs` | 1b (`LoadEnumTag`, `LoadEnumField` opcodes) |
-| `src/vm.rs` | 1b (execute new opcodes) |
-| `src/stdlib/mod.rs` | 0 (`assert`), 2b (Option/Result helpers) |
-| `src/main.rs` | 0 (`test` subcommand) |
-| `src/formatter.rs` | 2a (new type variants) |
-| `src/lsp.rs` | 9 (spread in find_definition) |
-| `tests/*.zen` | 3 (all) |
+| `src/compiler.rs` | `compile_functions`: recurse into `Stmt::Impl`, compile each method body as `BytecodeFn` (same as top-level `Stmt::Fn`) using qualified name `"TypeName::method_name"`. `register_function_names`: register qualified method names. `register_global_stmt`: register qualified names as globals. |
+| `src/parser.rs` | Add `TokenKind::Self_` prefix parser that emits `Expr::Ident("self")` — allows `self.x` in method bodies. |
+| `tests/methods.zen` | Tests `impl` block with `&self` parameter, method accessing `self.x * self.y`, and `self` as regular function param. |
+
+**Verified**: `zenc disasm tests/methods.zen` shows `Point::area` as a separate `BytecodeFn` with `LoadLocal 0` / `LoadField` / `Mul` / `Return`.
+
+**Dependencies**: None.
 
 ---
+
+## Phase 12 — Type-check method calls and fields
+
+**Problem**: `Expr::MethodCall` and `Expr::Field` in `typeck.rs` are stubs that return `Type::Unit` — no field type lookup, no method resolution.
+
+**Changes**:
+
+| File | Change |
+|---|---|
+| `src/typeck.rs` | `Expr::Field { obj, field }`: resolve `obj`'s struct type, find the field in `StructDef.fields`, return its declared type |
+| `src/typeck.rs` | `Expr::MethodCall { obj, method, args }`: resolve `obj`'s struct type, find the method in the struct's methods (stored via mangled name `"Type::method"`), validate arg types, return the method's return type |
+
+**Dependencies**: Phase 11 (methods must be resolvable).
+
+---
+
+## Phase 13 — Wire up method calls in the VM
+
+**Problem**: The VM's `CallMethod` handler only handles `Value::Foreign` (via registry) and `Value::Function` (as a raw call). `Value::Struct` hits the error case. Also, `CallMethod` for `Value::Function` has an off-by-one frame `bp` — `self` is at `bp-1` instead of `bp`.
+
+**Changes**:
+
+| File | Change |
+|---|---|
+| `src/value.rs` | `Value::Struct(Rc<..>)` → `Value::Struct(Rc<..>, String)` — store struct type name alongside the field map |
+| `src/compiler.rs` | `StructLit` compilation: after `MakeStruct`, add a new opcode `SetStructTypeName` that pops a string from constant pool and stores it on the struct value |
+| `src/ir.rs` | Add `Opcode::SetStructTypeName(u16)` — takes a constant-pool index for the type name string. Encode/decode/disasm |
+| `src/vm.rs` | Execute `SetStructTypeName`: pops the struct, sets its type name, pushes it back |
+| `src/vm.rs` | `CallMethod` handler: add `Value::Struct(_, type_name)` branch — concatenate `"{type_name}::{method}"`, look up the function in `self.functions` by iterating (or add a name→idx map), set `bp = args_start - 1` so `self` is at slot 0 |
+| All `Value::Struct` match arms | Update pattern matches to destructure the new tuple variant |
+
+**Dependencies**: Phases 11, 12.
