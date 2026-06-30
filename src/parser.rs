@@ -591,6 +591,10 @@ impl<'a> Parser<'a> {
 
     fn if_stmt(&mut self) -> Result<Expr> {
         self.advance(); // consume 'if'
+        // if let pattern = expr { ... }
+        if self.check(&TokenKind::Let) {
+            return self.if_let_stmt();
+        }
         let cond = self.expression(Precedence::Lowest)?;
         let then = self.block()?;
         let else_ = if self.r#match(TokenKind::Else) {
@@ -605,11 +609,79 @@ impl<'a> Parser<'a> {
         Ok(Expr::If { cond: Box::new(cond), then: Box::new(then), else_ })
     }
 
+    /// Parse `if let pattern = expr { then } else { else_ }` desugared to:
+    /// `match expr { pattern => then, _ => else_ }`
+    fn if_let_stmt(&mut self) -> Result<Expr> {
+        self.advance(); // consume 'let'
+        let pattern = self.parse_pattern()?;
+        self.expect(TokenKind::Eq)?;
+        let value = self.expression(Precedence::Lowest)?;
+        let then = self.block()?;
+        let else_expr = if self.r#match(TokenKind::Else) {
+            if self.check(&TokenKind::If) {
+                // Don't consume 'if' here — if_stmt() does that
+                self.if_stmt()?
+            } else {
+                self.block()?
+            }
+        } else {
+            Expr::Unit
+        };
+        // Build match arms: pattern => then, _ => else_expr
+        let arms = vec![
+            MatchArm {
+                pattern,
+                guard: None,
+                body: Box::new(then),
+            },
+            MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: None,
+                body: Box::new(else_expr),
+            },
+        ];
+        Ok(Expr::Match {
+            expr: Box::new(value),
+            arms,
+        })
+    }
+
     fn while_stmt(&mut self) -> Result<Expr> {
         self.advance(); // consume 'while'
+        // while let pattern = expr { ... }
+        if self.check(&TokenKind::Let) {
+            return self.while_let_stmt();
+        }
         let cond = self.expression(Precedence::Lowest)?;
         let body = self.block()?;
         Ok(Expr::While { cond: Box::new(cond), body: Box::new(body) })
+    }
+
+    /// Parse `while let pattern = expr { body }` desugared to:
+    /// `loop { match expr { pattern => body, _ => break } }`
+    fn while_let_stmt(&mut self) -> Result<Expr> {
+        self.advance(); // consume 'let'
+        let pattern = self.parse_pattern()?;
+        self.expect(TokenKind::Eq)?;
+        let value = self.expression(Precedence::Lowest)?;
+        let body = self.block()?;
+        let match_arm = MatchArm {
+            pattern,
+            guard: None,
+            body: Box::new(body),
+        };
+        let break_arm = MatchArm {
+            pattern: Pattern::Wildcard,
+            guard: None,
+            body: Box::new(Expr::Break),
+        };
+        let match_expr = Expr::Match {
+            expr: Box::new(value),
+            arms: vec![match_arm, break_arm],
+        };
+        Ok(Expr::Loop(Box::new(Expr::Block(vec![
+            Spanned { node: Stmt::Expr(match_expr), span: Span::new(0, 0) },
+        ]))))
     }
 
     fn for_stmt(&mut self) -> Result<Expr> {

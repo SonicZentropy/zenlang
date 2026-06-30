@@ -148,16 +148,16 @@ Lambdas (`|x, y| x + y`) are fully wired up to the closure runtime (`Value::Clos
 
 ---
 
-## Phase 8 — `if let` / `while let` syntax
+## Phase 8 — `if let` / `while let` syntax (COMPLETE)
 
-Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... }` and `while let Some(x) = iter { ... }`.
+Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... }` and `while let Some(x) = iter { ... }`. Desugared at parse time into existing `match` / `loop` AST nodes — no changes needed in typeck or compiler.
 
 | File | Change |
 |---|---|
-| `src/ast.rs` | Add `Expr::IfLet { pattern, expr, then, else_ }` and `Expr::WhileLet { pattern, expr, body }` |
-| `src/parser.rs` | Parse `if let pattern = expr { ... }` and `while let pattern = expr { ... }` |
-| `src/typeck.rs` | Check patterns similarly to `match` arms |
-| `src/compiler.rs` | Compile similarly to `match { pattern => then, _ => else_ }` |
+| `src/parser.rs` | `if_stmt` / `while_stmt` check for `let` after keyword and delegate to `if_let_stmt` / `while_let_stmt`. `if_let_stmt` desugars `if let pat = expr { then } else { else_ }` to `match expr { pat => then, _ => else_ }`. `while_let_stmt` desugars `while let pat = expr { body }` to `loop { match expr { pat => body, _ => break } }`. |
+| `tests/if_let.zen` | Tests `if let Some(v) = x`, `if let None = y`, `if let` without else, `while let`, `if let` with `Ok`/`Err`, `else if let` chaining. |
+
+**Key fix**: In `if_let_stmt`, `else if let` must use `self.check(&TokenKind::If)` (not `self.r#match`) so `if_stmt` can consume the `if` token itself.
 
 **Dependencies**: Phase 1b (pattern matching infrastructure).
 

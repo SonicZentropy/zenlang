@@ -1,0 +1,57 @@
+fn main() {
+    // if let with Some
+    let x = Some(42);
+    if let Some(v) = x {
+        assert(v == 42);
+    } else {
+        assert(false);
+    }
+
+    // if let matching None (zero-field variant)
+    let y = None;
+    if let None = y {
+        assert(true);
+    } else {
+        assert(false);
+    }
+
+    // if let without else (implicit else = ())
+    let z = Some(1);
+    if let Some(_) = z {
+        assert(true);
+    }
+
+    // while let — breaks when pattern doesn't match
+    let mut opt = Some(10);
+    while let Some(v) = opt {
+        assert(v == 10);
+        opt = None;
+    }
+
+    // if let with Ok
+    let res: Result<i64, str> = Ok(10);
+    if let Ok(v) = res {
+        assert(v == 10);
+    } else {
+        assert(false);
+    }
+
+    // if let with Err
+    let res2: Result<str, str> = Err("msg");
+    if let Err(e) = res2 {
+        assert(e == "msg");
+    } else {
+        assert(false);
+    }
+
+    // else if let chain
+    let val: Result<i64, str> = Err("fail");
+    if let Ok(v) = val {
+        assert(false);
+        assert(v == 0);
+    } else if let Err(e) = val {
+        assert(e == "fail");
+    } else {
+        assert(false);
+    }
+}
