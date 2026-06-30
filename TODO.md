@@ -120,13 +120,13 @@ Warn/error if `match` on an enum does not cover all variants. Currently partial 
 
 ---
 
-## Phase 6 — `disasm` display fix
+## Phase 6 — `disasm` display fix (COMPLETE)
 
 `Opcode::from_byte()` returns placeholder operands (always 0), so disassembly shows `LoadConst 0` for every constant regardless of the actual operand bytes. The operand values must be read from the byte stream during disassembly, not from the opcode placeholder.
 
 | File | Change |
 |---|---|
-| `src/ir.rs` | `disassemble()` should read u16 operands from `self.code` directly at the current offset instead of using the opcode's placeholder values. `decode_at` already computes `next` correctly — the display code just needs to use `self.read_u16()` to get actual operand values. |
+| `src/ir.rs` | `disassemble()` reads u16 operands from `self.code` directly at `offset + 1` (or `offset + 3` for 2-operand ops like `MakeEnum`/`CallMethod`/`NewClosure`) instead of using the opcode's placeholder values. |
 
 **Dependencies**: None.
 

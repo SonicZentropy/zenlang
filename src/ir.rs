@@ -303,36 +303,63 @@ impl Chunk {
                 Some(v) => v,
                 None => break,
             };
+            // Read actual u16 operands from byte stream (from_byte returns placeholder 0)
+            let read_u16 = |off: usize| -> u16 {
+                if off + 1 < self.code.len() { self.read_u16(off) } else { 0 }
+            };
             print!("{:04x}  {:>4}  ", offset, line);
             match op {
-                Opcode::LoadConst(idx) => {
+                Opcode::LoadConst(_) => {
+                    let idx = read_u16(offset + 1);
                     let val = &self.constants[idx as usize];
                     println!("LoadConst  {:>4}  '{}'", idx, format_val(val));
                 }
-                Opcode::LoadLocal(idx) => println!("LoadLocal  {:>4}", idx),
-                Opcode::StoreLocal(idx) => println!("StoreLocal {:>4}", idx),
-                Opcode::LoadGlobal(idx) => println!("LoadGlobal {:>4}", idx),
-                Opcode::StoreGlobal(idx) => println!("StoreGlobal{:>4}", idx),
-                Opcode::Call(idx) => println!("Call       {:>4}", idx),
-                Opcode::Jump(offset_val) => println!("Jump       {:>4} -> {:04x}", offset_val, next as u16 + offset_val),
-                Opcode::JumpIfFalse(offset_val) => println!("JumpIfFalse{:>4} -> {:04x}", offset_val, next as u16 + offset_val),
-                Opcode::Loop(offset_val) => println!("Loop       {:>4} -> {:04x}", offset_val, next.wrapping_sub(offset_val as usize + 1)),
-                Opcode::MakeStruct(count) => println!("MakeStruct {:>4}", count),
-                Opcode::MakeArray(count) => println!("MakeArray  {:>4}", count),
-                Opcode::MakeEnum(tag, data) => println!("MakeEnum   tag={:>4} data={:>4}", tag, data),
-                Opcode::CallMethod(method, args) => {
+                Opcode::LoadLocal(_) => println!("LoadLocal  {:>4}", read_u16(offset + 1)),
+                Opcode::StoreLocal(_) => println!("StoreLocal {:>4}", read_u16(offset + 1)),
+                Opcode::LoadGlobal(_) => println!("LoadGlobal {:>4}", read_u16(offset + 1)),
+                Opcode::StoreGlobal(_) => println!("StoreGlobal{:>4}", read_u16(offset + 1)),
+                Opcode::Call(_) => println!("Call       {:>4}", read_u16(offset + 1)),
+                Opcode::Jump(_) => {
+                    let target = read_u16(offset + 1);
+                    println!("Jump       {:>4} -> {:04x}", target, next as u16 + target);
+                }
+                Opcode::JumpIfFalse(_) => {
+                    let target = read_u16(offset + 1);
+                    println!("JumpIfFalse{:>4} -> {:04x}", target, next as u16 + target);
+                }
+                Opcode::Loop(_) => {
+                    let target = read_u16(offset + 1);
+                    println!("Loop       {:>4} -> {:04x}", target, next.wrapping_sub(target as usize + 1));
+                }
+                Opcode::MakeStruct(_) => println!("MakeStruct {:>4}", read_u16(offset + 1)),
+                Opcode::MakeArray(_) => println!("MakeArray  {:>4}", read_u16(offset + 1)),
+                Opcode::MakeEnum(_, _) => {
+                    let tag = read_u16(offset + 1);
+                    let data = read_u16(offset + 3);
+                    println!("MakeEnum   tag={:>4} data={:>4}", tag, data);
+                }
+                Opcode::CallMethod(_, _) => {
+                    let method = read_u16(offset + 1);
+                    let args = read_u16(offset + 3);
                     let method_name = self.method_names.get(method as usize).map(|s| s.as_str()).unwrap_or("?");
                     println!("CallMethod {:>4} '{}' args={}", method, method_name, args);
                 }
-                Opcode::LoadField(idx) => {
+                Opcode::LoadField(_) => {
+                    let idx = read_u16(offset + 1);
                     let field_name = self.field_names.get(idx as usize).map(|s| s.as_str()).unwrap_or("?");
                     println!("LoadField  {:>4} '{}'", idx, field_name);
                 }
-                Opcode::StoreField(idx) => {
+                Opcode::StoreField(_) => {
+                    let idx = read_u16(offset + 1);
                     let field_name = self.field_names.get(idx as usize).map(|s| s.as_str()).unwrap_or("?");
                     println!("StoreField {:>4} '{}'", idx, field_name);
                 }
-                Opcode::NewClosure(fn_idx, up_count) => println!("NewClosure fn={:>4} up={}", fn_idx, up_count),
+                Opcode::NewClosure(_, _) => {
+                    let fn_idx = read_u16(offset + 1);
+                    let up_count = read_u16(offset + 3);
+                    println!("NewClosure fn={:>4} up={}", fn_idx, up_count);
+                }
+                Opcode::LoadEnumField(_) => println!("LoadEnumField {:>4}", read_u16(offset + 1)),
                 Opcode::Return => println!("Return"),
                 Opcode::Pop => println!("Pop"),
                 Opcode::Dup => println!("Dup"),
@@ -361,7 +388,6 @@ impl Chunk {
                 Opcode::Shr => println!("Shr"),
                 Opcode::BitNot => println!("BitNot"),
                 Opcode::LoadEnumTag => println!("LoadEnumTag"),
-                Opcode::LoadEnumField(idx) => println!("LoadEnumField {:>4}", idx),
                 Opcode::Halt => println!("Halt"),
             }
             offset = next;
