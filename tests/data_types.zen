@@ -30,4 +30,9 @@ fn main() {
     // string operations
     let s = "hello";
     assert(len(s) == 5);
+
+    // type_of
+    assert(type_of(42) == "int");
+    assert(type_of("hi") == "str");
+    assert(type_of(()) == "nil");
 }

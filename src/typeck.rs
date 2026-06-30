@@ -292,12 +292,34 @@ impl<'a> TypeChecker<'a> {
                     return Type::Named(enum_name.into());
                 }
                 let ft = self.check_expr(func);
-                for arg in args {
-                    self.check_expr(arg);
-                }
                 match &ft {
-                    Type::Fn { ret, .. } => *ret.clone(),
+                    Type::Fn { params, ret } => {
+                        // Empty params = variadic (e.g. print), skip validation
+                        if !params.is_empty() {
+                            if params.len() != args.len() {
+                                self.error(format!(
+                                    "expected {} arguments, got {}",
+                                    params.len(), args.len(),
+                                ));
+                            }
+                            for (i, arg) in args.iter().enumerate() {
+                                let arg_ty = self.check_expr(arg);
+                                if let Some(param_ty) = params.get(i) {
+                                    if !self.types_compatible(&arg_ty, param_ty) {
+                                        self.error(format!(
+                                            "argument {} type mismatch: expected '{}', got '{}'",
+                                            i, self.type_display(param_ty), self.type_display(&arg_ty),
+                                        ));
+                                    }
+                                }
+                            }
+                        } else {
+                            for arg in args { self.check_expr(arg); }
+                        }
+                        *ret.clone()
+                    }
                     _ => {
+                        for arg in args { self.check_expr(arg); }
                         self.error("calling non-function type");
                         Type::Unit
                     }

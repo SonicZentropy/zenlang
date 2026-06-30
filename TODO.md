@@ -94,6 +94,72 @@ When you write `match x { Some(v) => ..., None => ... }`, the parser recognizes 
 
 ---
 
+## Phase 4 — Native function return types
+
+Give each native function an accurate type signature so the type checker reports correct types for stdlib calls. Currently all natives are typed as `() -> I64`, but many return `Bool`, `Str`, or `Float`.
+
+| File | Change |
+|---|---|
+| `src/resolver.rs` | Change `native_names` registration to use a richer signature map: e.g. `FnSignature { name: "contains", params: vec![Type::Str, Type::Str], return_type: Some(Type::Bool) }` instead of hardcoding `Type::I64` |
+| `src/typeck.rs` | `check_call` for native functions: validate argument types against declared parameter types, return the declared return type instead of `Type::I64` |
+| `tests/stdlib.zen` | Enable strict type assertions like `type_of(x) == "int"`, `contains(s, "ell") == true` |
+
+**Dependencies**: None.
+
+---
+
+## Phase 5 — Exhaustive match checking
+
+Warn/error if `match` on an enum does not cover all variants. Currently partial matches compile silently at runtime (no arm matches → fall-through to next).
+
+| File | Change |
+|---|---|
+| `src/typeck.rs` | In `check_expr` for `match`: when scrutinee type is an enum, collect all variant names covered and compare to all variant names in the enum def. Emit error if any variant is missing and no wildcard arm present. |
+
+**Dependencies**: Phase 1b (enum pattern matching).
+
+---
+
+## Phase 6 — `disasm` display fix
+
+`Opcode::from_byte()` returns placeholder operands (always 0), so disassembly shows `LoadConst 0` for every constant regardless of the actual operand bytes. The operand values must be read from the byte stream during disassembly, not from the opcode placeholder.
+
+| File | Change |
+|---|---|
+| `src/ir.rs` | `disassemble()` should read u16 operands from `self.code` directly at the current offset instead of using the opcode's placeholder values. `decode_at` already computes `next` correctly — the display code just needs to use `self.read_u16()` to get actual operand values. |
+
+**Dependencies**: None.
+
+---
+
+## Phase 7 — Closure support
+
+Fully wire up parsed lambdas (`|x, y| x + y`) to the existing closure runtime (`Value::Closure`, upvalues, `NewClosure` opcode). Currently lambdas are parsed into `Expr::Lambda` but compilation may be incomplete.
+
+| File | Change |
+|---|---|
+| `src/compiler.rs` | `compile_expr` for `Expr::Lambda`: compile the lambda body as a separate `BytecodeFn`, emit `NewClosure` to create a closure at runtime, handle upvalue capture for outer variables. |
+| `src/vm.rs` | Test that `|x| x + 1` works, closures can capture and mutate outer `let mut` variables. |
+
+**Dependencies**: None.
+
+---
+
+## Phase 8 — `if let` / `while let` syntax
+
+Sugar for single-arm pattern matching: `if let Some(x) = val { ... } else { ... }` and `while let Some(x) = iter { ... }`.
+
+| File | Change |
+|---|---|
+| `src/ast.rs` | Add `Expr::IfLet { pattern, expr, then, else_ }` and `Expr::WhileLet { pattern, expr, body }` |
+| `src/parser.rs` | Parse `if let pattern = expr { ... }` and `while let pattern = expr { ... }` |
+| `src/typeck.rs` | Check patterns similarly to `match` arms |
+| `src/compiler.rs` | Compile similarly to `match { pattern => then, _ => else_ }` |
+
+**Dependencies**: Phase 1b (pattern matching infrastructure).
+
+---
+
 ## Summary of work by file
 
 | File | Phases affected |

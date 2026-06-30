@@ -10,6 +10,21 @@ fn main() {
     assert(len("") == 0);
     assert(len("abc") == 3);
 
+    // contains
+    assert(contains("hello world", "world"));
+    assert(!contains("hello world", "xyz"));
+
+    // trim
+    assert(trim("  hi  ") == "hi");
+
+    // to_upper / to_lower
+    assert(to_upper("abc") == "ABC");
+    assert(to_lower("XYZ") == "xyz");
+
+    // substring
+    assert(substring("hello", 0, 2) == "he");
+    assert(substring("hello", 1, 4) == "ell");
+
     // abs
     assert(abs(-5) == 5);
     assert(abs(5) == 5);
@@ -53,27 +68,21 @@ fn main() {
     assert(f1 > 2.9);
     assert(f1 < 3.1);
 
-    // trim
-    let t = trim(" hi ");
-    assert(len(t) == 2);
-
-    // to_upper
-    let u = to_upper("abc");
-    assert(len(u) == 3);
-
-    // to_lower
-    let l = to_lower("XYZ");
-    assert(len(l) == 3);
-
-    // substring
-    let sub = substring("hello", 0, 2);
-    assert(len(sub) == 2);
-
     // to_str
-    let s2 = to_str(42);
-    assert(len(s2) > 0);
+    assert(to_str(42) == "42");
+    assert(to_str(true) == "true");
 
     // type_of
-    let _ti = type_of(42);
-    let _ts = type_of("str");
+    assert(type_of(42) == "int");
+    assert(type_of("hi") == "str");
+    assert(type_of(()) == "nil");
+
+    // Option/Result helpers
+    assert(is_some(Some(1)));
+    assert(is_none(None));
+    assert(is_ok(Ok(1)));
+    assert(is_err(Err("err")));
+    assert(unwrap(Some(42)) == 42);
+    assert(unwrap_or(None, 99) == 99);
+    assert(expect(Some(1), "should work") == 1);
 }
