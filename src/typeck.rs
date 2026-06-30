@@ -101,9 +101,27 @@ impl<'a> TypeChecker<'a> {
                 self.check_expr(expr);
             }
             Stmt::Return(Some(expr)) => {
-                self.check_expr(expr);
+                let ty = self.check_expr(expr);
+                if let Some(rt) = _return_type {
+                    if !self.types_compatible(&ty, rt) {
+                        self.error(format!(
+                            "return type mismatch: expected '{}', got '{}'",
+                            self.type_display(rt),
+                            self.type_display(&ty),
+                        ));
+                    }
+                }
             }
-            Stmt::Return(None) => {}
+            Stmt::Return(None) => {
+                if let Some(rt) = _return_type {
+                    if !self.types_compatible(&Type::Unit, rt) {
+                        self.error(format!(
+                            "return type mismatch: expected '{}', got '()'",
+                            self.type_display(rt),
+                        ));
+                    }
+                }
+            }
             Stmt::Fn { name: _, params, return_type, body } => {
                 self.symbols.enter_scope();
                 for param in params {

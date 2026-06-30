@@ -95,6 +95,7 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
         }
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
+    Ok(())
 }
 
 fn run_disasm(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {

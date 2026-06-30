@@ -13,3 +13,11 @@ fn an_error() -> int {
     let x = "test";
     return x;
 }
+
+fn returnstring() -> int {
+    return "test"
+}
+
+fn implicit_returnstring() -> int {
+    "test"
+}
