@@ -7,6 +7,12 @@ use crate::token::TokenKind;
 // ---------- Types ----------
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct TypeParam {
+    pub name: CompactString,
+    pub bounds: Vec<Type>, // trait bounds (Phase 1)
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     I64,
     F32,
@@ -15,6 +21,7 @@ pub enum Type {
     Str,
     Unit,
     Named(CompactString),
+    Generic(CompactString),
     Array(Box<Type>),
     Fn { params: Vec<Type>, ret: Box<Type> },
     Option(Box<Type>),
@@ -107,20 +114,24 @@ pub enum Stmt {
     Return(Option<Expr>),
     Fn {
         name: CompactString,
+        type_params: Vec<TypeParam>,
         params: Vec<Param>,
         return_type: Option<Type>,
         body: Vec<Spanned<Stmt>>,
     },
     Struct {
         name: CompactString,
+        type_params: Vec<TypeParam>,
         fields: Vec<StructField>,
     },
     Enum {
         name: CompactString,
+        type_params: Vec<TypeParam>,
         variants: Vec<EnumVariant>,
     },
     Impl {
         type_name: CompactString,
+        type_params: Vec<TypeParam>, // e.g. impl<T> Vec<T>
         methods: Vec<Spanned<Stmt>>,
     },
     Use {

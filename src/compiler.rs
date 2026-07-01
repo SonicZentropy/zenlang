@@ -75,7 +75,7 @@ pub fn compile(
                 let idx = function_names.len() + 1;
                 function_names.insert(name.to_string(), idx);
             }
-            Stmt::Impl { type_name, methods } => {
+            Stmt::Impl { type_name, methods, .. } => {
                 for m in methods {
                     if let Stmt::Fn { name, .. } = &m.node {
                         let qualified = format!("{}::{}", type_name, name);
@@ -140,7 +140,7 @@ pub fn compile(
         lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>,
         symbols: &SymbolTable) {
         for stmt in stmts {
-            if let Stmt::Fn { name, params, return_type: _, body } = &stmt.node {
+            if let Stmt::Fn { name, params, return_type: _, body, .. } = &stmt.node {
                 let arity = params.len() as u32;
             let mut fc = FunctionCompiler::new(
                 name.to_string(), arity, globals.clone(), &function_names,
@@ -172,9 +172,9 @@ pub fn compile(
             fc.exit_scope();
 
             functions.push(fc.finalize());
-            } else if let Stmt::Impl { type_name, methods } = &stmt.node {
+            } else if let Stmt::Impl { type_name, methods, .. } = &stmt.node {
                 for m in methods {
-                    if let Stmt::Fn { name, params, return_type: _, body } = &m.node {
+                    if let Stmt::Fn { name, params, return_type: _, body, .. } = &m.node {
                         let qualified = format!("{}::{}", type_name, name);
                         let arity = params.len() as u32;
                         let mut fc = FunctionCompiler::new(
@@ -414,7 +414,7 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 global_order.push(name.to_string());
             }
         }
-        Stmt::Impl { type_name, methods } => {
+        Stmt::Impl { type_name, methods, .. } => {
             for m in methods {
                 if let Stmt::Fn { name, .. } = &m.node {
                     let qualified = format!("{}::{}", type_name, name);

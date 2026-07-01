@@ -743,6 +743,7 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
             SymKind::Struct(_) => CompletionItemKind::STRUCT,
             SymKind::Enum(_) => CompletionItemKind::ENUM,
             SymKind::EnumConstructor { .. } => CompletionItemKind::ENUM,
+            SymKind::TypeParam(_) => CompletionItemKind::TYPE_PARAMETER,
             SymKind::Module(_) => CompletionItemKind::MODULE,
         };
         items.push(CompletionItem {
@@ -1031,7 +1032,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 tags: None,
             })
         }
-        Stmt::Struct { name, fields } => {
+        Stmt::Struct { name, fields, .. } => {
             let children = fields
                 .iter()
                 .map(|f| DocumentSymbol {
@@ -1056,7 +1057,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 tags: None,
             })
         }
-        Stmt::Enum { name, variants } => {
+        Stmt::Enum { name, variants, .. } => {
             let children = variants
                 .iter()
                 .map(|v| DocumentSymbol {
@@ -1142,7 +1143,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     match &entry.kind {
                         SymKind::Function(_) => SemanticTokenType::FUNCTION,
                         SymKind::Variable(_) => SemanticTokenType::VARIABLE,
-                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::Module(_) => SemanticTokenType::TYPE,
+                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::TypeParam(_) | SymKind::Module(_) => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1286,6 +1287,7 @@ fn symkind_display(kind: &SymKind) -> String {
             };
             format!("{}{} (enum {})", variant_name, fields_str, enum_name)
         }
+        SymKind::TypeParam(name) => format!("type param '{}'", name),
     }
 }
 
@@ -1298,6 +1300,7 @@ fn type_display(ty: &crate::ast::Type) -> String {
         crate::ast::Type::Str => "str".into(),
         crate::ast::Type::Unit => "()".into(),
         crate::ast::Type::Named(n) => n.to_string(),
+        crate::ast::Type::Generic(n) => n.to_string(),
         crate::ast::Type::Array(inner) => format!("[{}]", type_display(inner)),
         crate::ast::Type::Fn { params, ret } => {
             let ps: Vec<String> = params.iter().map(type_display).collect();

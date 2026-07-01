@@ -1,4 +1,4 @@
-use crate::ast::{StructField, Type};
+use crate::ast::{StructField, Type, TypeParam};
 use std::collections::HashMap;
 
 /// Unique identifier for a resolved symbol.
@@ -7,6 +7,7 @@ pub type SymId = usize;
 #[derive(Debug, Clone)]
 pub struct FnSignature {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub params: Vec<(String, Type)>,
     pub return_type: Option<Type>,
 }
@@ -14,12 +15,14 @@ pub struct FnSignature {
 #[derive(Debug, Clone)]
 pub struct StructDef {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub fields: Vec<StructField>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EnumDef {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub variants: Vec<(String, Vec<Type>)>,
 }
 
@@ -30,6 +33,7 @@ pub enum SymKind {
     Struct(StructDef),
     Enum(EnumDef),
     EnumConstructor { enum_name: String, variant_name: String, tag: u16, fields: Vec<Type> },
+    TypeParam(String),
     Module(usize),
 }
 

@@ -29,12 +29,12 @@ pub fn register(vm: &mut VM) {
 
 pub fn signatures() -> Vec<FnSignature> {
     vec![
-        FnSignature { name: "log_set_level".into(), params: vec![("level".into(), Type::Str)], return_type: Some(Type::Unit) },
-        FnSignature { name: "log_trace".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
-        FnSignature { name: "log_debug".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
-        FnSignature { name: "log_info".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
-        FnSignature { name: "log_warn".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
-        FnSignature { name: "log_error".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature { type_params: vec![], name: "log_set_level".into(), params: vec![("level".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature { type_params: vec![], name: "log_trace".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature { type_params: vec![], name: "log_debug".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature { type_params: vec![], name: "log_info".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature { type_params: vec![], name: "log_warn".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature { type_params: vec![], name: "log_error".into(), params: vec![("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
     ]
 }
 

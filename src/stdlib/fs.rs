@@ -55,24 +55,24 @@ pub fn register(vm: &mut VM) {
 
 pub fn signatures() -> Vec<FnSignature> {
     vec![
-        FnSignature { name: "read_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_str_str()) },
-        FnSignature { name: "read_lines".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_array_str_str()) },
-        FnSignature { name: "write_file".into(), params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { name: "append_file".into(), params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)], return_type: Some(result_unit_str()) },
+        FnSignature { type_params: vec![], name: "read_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_str_str()) },
+        FnSignature { type_params: vec![], name: "read_lines".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_array_str_str()) },
+        FnSignature { type_params: vec![], name: "write_file".into(), params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)], return_type: Some(result_unit_str()) },
+        FnSignature { type_params: vec![], name: "append_file".into(), params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)], return_type: Some(result_unit_str()) },
 
-        FnSignature { name: "list_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_array_str_str()) },
-        FnSignature { name: "is_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
-        FnSignature { name: "is_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
-        FnSignature { name: "create_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { name: "create_dirs".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { name: "remove_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { name: "remove_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
+        FnSignature { type_params: vec![], name: "list_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_array_str_str()) },
+        FnSignature { type_params: vec![], name: "is_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
+        FnSignature { type_params: vec![], name: "is_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
+        FnSignature { type_params: vec![], name: "create_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
+        FnSignature { type_params: vec![], name: "create_dirs".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
+        FnSignature { type_params: vec![], name: "remove_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
+        FnSignature { type_params: vec![], name: "remove_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
 
-        FnSignature { name: "path_join".into(), params: vec![("a".into(), Type::Str), ("b".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { name: "path_dirname".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { name: "path_basename".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { name: "path_extension".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { name: "path_exists".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
+        FnSignature { type_params: vec![], name: "path_join".into(), params: vec![("a".into(), Type::Str), ("b".into(), Type::Str)], return_type: Some(Type::Str) },
+        FnSignature { type_params: vec![], name: "path_dirname".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
+        FnSignature { type_params: vec![], name: "path_basename".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
+        FnSignature { type_params: vec![], name: "path_extension".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
+        FnSignature { type_params: vec![], name: "path_exists".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
     ]
 }
 

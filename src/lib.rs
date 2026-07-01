@@ -16,6 +16,7 @@ pub mod hotreload;
 pub mod lsp;
 pub mod formatter;
 pub mod stdlib;
+pub mod parser_test;
 
 pub use error::{Error, Result};
 pub use span::{SourceLocation, Span, Spanned};

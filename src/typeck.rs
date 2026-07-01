@@ -123,8 +123,14 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Stmt::Fn { name: _, params, return_type, body } => {
+            Stmt::Fn { name: _, type_params, params, return_type, body, .. } => {
                 self.symbols.enter_scope();
+                // Register generic type parameters in scope
+                for tp in type_params {
+                    if self.symbols.lookup(&tp.name).is_none() {
+                        let _ = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
+                    }
+                }
                 for param in params {
                     let ty = param.type_ann.clone().unwrap_or(Type::Unit);
                     if self.symbols.lookup(&param.name).is_none() {
@@ -152,10 +158,22 @@ impl<'a> TypeChecker<'a> {
                 }
                 self.symbols.exit_scope();
             }
-            Stmt::Impl { type_name, methods } => {
+            Stmt::Impl { type_name, type_params, methods, .. } => {
                 for method in methods {
-                    if let Stmt::Fn { name: _, params, return_type, body } = &method.node {
+                    if let Stmt::Fn { name: _, type_params: method_type_params, params, return_type, body, .. } = &method.node {
                         self.symbols.enter_scope();
+                        // Register generic type parameters from impl block
+                        for tp in type_params {
+                            if self.symbols.lookup(&tp.name).is_none() {
+                                let _ = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
+                            }
+                        }
+                        // Register generic type parameters from method
+                        for tp in method_type_params {
+                            if self.symbols.lookup(&tp.name).is_none() {
+                                let _ = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
+                            }
+                        }
                         for param in params {
                             let ty = if param.type_ann.is_none() && param.name == "self" {
                                 Type::Named(type_name.clone())
@@ -721,6 +739,8 @@ impl<'a> TypeChecker<'a> {
         match (&a, &b) {
             // Unit (from foreign field access, unknown at compile time) is compatible with everything
             (Type::Unit, _) | (_, Type::Unit) => true,
+            // Generic type parameters are compatible with any type (type erasure)
+            (Type::Generic(_), _) | (_, Type::Generic(_)) => true,
             (Type::I64, Type::I64) => true,
             (Type::F32, Type::F32) => true,
             (Type::F64, Type::F64) => true,
@@ -750,6 +770,14 @@ impl<'a> TypeChecker<'a> {
             Type::Named(s) if s == "float" => Type::F64,
             Type::Named(s) if s == "bool" => Type::Bool,
             Type::Named(s) if s == "str" => Type::Str,
+            Type::Named(s) => {
+                // Check if this name is a generic type parameter in scope
+                if self.symbols.lookup(s).is_some_and(|e| matches!(e.kind, SymKind::TypeParam(_))) {
+                    Type::Generic(s.clone())
+                } else {
+                    ty.clone()
+                }
+            }
             _ => ty.clone(),
         }
     }
@@ -763,6 +791,7 @@ impl<'a> TypeChecker<'a> {
             Type::Str => "str".into(),
             Type::Unit => "()".into(),
             Type::Named(s) => s.to_string(),
+            Type::Generic(s) => s.to_string(),
             Type::Array(inner) => format!("[{}]", self.type_display(inner)),
             Type::Fn { params, ret } => {
                 let p: Vec<String> = params.iter().map(|t| self.type_display(t)).collect();

@@ -253,6 +253,7 @@ impl<'a> Parser<'a> {
     fn function_decl(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
+        let type_params = self.parse_type_params()?;
 
         self.expect(TokenKind::OpenParen)?;
         let params = self.param_list()?;
@@ -266,7 +267,24 @@ impl<'a> Parser<'a> {
 
         let body = self.block_stmts()?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Fn { name: name.into(), params, return_type, body }, span))
+        Ok(Spanned::new(Stmt::Fn { name: name.into(), type_params, params, return_type, body }, span))
+    }
+
+    fn parse_type_params(&mut self) -> Result<Vec<TypeParam>> {
+        let mut params = Vec::new();
+        if !self.r#match(TokenKind::Lt) {
+            return Ok(params);
+        }
+        loop {
+            let name = self.expect_ident()?;
+            let bounds = Vec::new();
+            params.push(TypeParam { name: name.into(), bounds });
+            if !self.r#match(TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect(TokenKind::Gt)?;
+        Ok(params)
     }
 
     fn param_list(&mut self) -> Result<Vec<Param>> {
@@ -302,6 +320,7 @@ impl<'a> Parser<'a> {
     fn struct_decl(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
+        let type_params = self.parse_type_params()?;
 
         self.expect(TokenKind::OpenBrace)?;
         let mut fields = Vec::new();
@@ -314,7 +333,7 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Struct { name: name.into(), fields }, span))
+        Ok(Spanned::new(Stmt::Struct { name: name.into(), type_params, fields }, span))
     }
 
     // ---------- Enum declarations ----------
@@ -322,6 +341,7 @@ impl<'a> Parser<'a> {
     fn enum_decl(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
+        let type_params = self.parse_type_params()?;
 
         self.expect(TokenKind::OpenBrace)?;
         let mut variants = Vec::new();
@@ -343,13 +363,14 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Enum { name: name.into(), variants }, span))
+        Ok(Spanned::new(Stmt::Enum { name: name.into(), type_params, variants }, span))
     }
 
     // ---------- Impl blocks ----------
 
     fn impl_decl(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
+        let type_params = self.parse_type_params()?;
         let type_name = self.expect_ident()?;
 
         self.expect(TokenKind::OpenBrace)?;
@@ -364,7 +385,7 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Impl { type_name: type_name.into(), methods }, span))
+        Ok(Spanned::new(Stmt::Impl { type_params, type_name: type_name.into(), methods }, span))
     }
 
     // ---------- Expressions (Pratt parser) ----------
@@ -830,30 +851,42 @@ impl<'a> Parser<'a> {
             TokenKind::Ident(s) if s == "bool" => { self.advance(); Ok(Type::Bool) }
             TokenKind::Ident(s) if s == "str" => { self.advance(); Ok(Type::Str) }
             TokenKind::Ident(s) if s == "void" => { self.advance(); Ok(Type::Unit) }
-            TokenKind::Ident(s) if s == "Option" => {
-                self.advance();
-                self.expect(TokenKind::Lt)?;
-                let inner = self.parse_type()?;
-                self.expect(TokenKind::Gt)?;
-                Ok(Type::Option(Box::new(inner)))
-            }
-            TokenKind::Ident(s) if s == "Result" => {
-                self.advance();
-                self.expect(TokenKind::Lt)?;
-                let ok = self.parse_type()?;
-                self.expect(TokenKind::Comma)?;
-                let err = self.parse_type()?;
-                self.expect(TokenKind::Gt)?;
-                Ok(Type::Result(Box::new(ok), Box::new(err)))
-            }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
+                // Check for generic type arguments: Type<T, U>
+                if self.r#match(TokenKind::Lt) {
+                    let mut args = Vec::new();
+                    loop {
+                        args.push(self.parse_type()?);
+                        if !self.r#match(TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    self.expect(TokenKind::Gt)?;
+                    // Map known generic types
+                    if args.len() == 1 {
+                        match name.as_str() {
+                            "Option" => return Ok(Type::Option(Box::new(args.into_iter().next().unwrap()))),
+                            _ => {}
+                        }
+                    } else if args.len() == 2 {
+                        match name.as_str() {
+                            "Result" => {
+                                let err = args.pop().unwrap();
+                                let ok = args.pop().unwrap();
+                                return Ok(Type::Result(Box::new(ok), Box::new(err)));
+                            }
+                            _ => {}
+                        }
+                    }
+                    // For user-defined generic types, store as Named with args in the name for now
+                    // The resolver/typeck will handle proper substitution
+                    Ok(Type::Named(name.into()))
                 // Check for array type: [Type] or [Type; N]
-                if self.r#match(TokenKind::OpenBracket) {
+                } else if self.r#match(TokenKind::OpenBracket) {
                     if self.r#match(TokenKind::CloseBracket) {
                         return Ok(Type::Array(Box::new(Type::Named(name.into()))));
                     }
-                    // For now, just handle [Type]
                     let inner = self.parse_type()?;
                     self.expect(TokenKind::CloseBracket)?;
                     Ok(Type::Array(Box::new(inner)))
@@ -1051,10 +1084,10 @@ mod tests {
     use super::*;
     use crate::lexer::Lexer;
 
-    fn parse(source: &str) -> Result<Program> {
-        let tokens = Lexer::new(source).tokenize()?;
-        Parser::new(source, &tokens).parse()
-    }
+pub fn parse(source: &str) -> Result<Program> {
+    let tokens = Lexer::new(source).tokenize()?;
+    Parser::new(source, &tokens).parse()
+}
 
     #[test]
     fn test_empty_program() {
@@ -1092,7 +1125,7 @@ mod tests {
         let prog = parse("fn add(a: i32, b: i32) -> i32 { a + b }").unwrap();
         assert_eq!(prog.stmts.len(), 1);
         match &prog.stmts[0].node {
-            Stmt::Fn { name, params, return_type, body } => {
+            Stmt::Fn { name, params, return_type, body, .. } => {
                 assert_eq!(name, "add");
                 assert_eq!(params.len(), 2);
                 assert_eq!(params[0].name, "a");
@@ -1220,7 +1253,7 @@ update();
     fn test_struct_decl() {
         let prog = parse("struct Vec2 { x: f64, y: f64 }").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Struct { name, fields } => {
+            Stmt::Struct { name, fields, .. } => {
                 assert_eq!(name, "Vec2");
                 assert_eq!(fields.len(), 2);
             }
@@ -1232,7 +1265,7 @@ update();
     fn test_enum_decl() {
         let prog = parse("enum Option { Some(i32), None }").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Enum { name, variants } => {
+            Stmt::Enum { name, variants, .. } => {
                 assert_eq!(name, "Option");
                 assert_eq!(variants.len(), 2);
             }
@@ -1268,7 +1301,7 @@ update();
         let prog = parse("impl Vec2 { fn length(&self) -> f64 { 0.0 } }").unwrap();
         assert_eq!(prog.stmts.len(), 1);
         match &prog.stmts[0].node {
-            Stmt::Impl { type_name, methods } => {
+            Stmt::Impl { type_name, methods, .. } => {
                 assert_eq!(type_name, "Vec2");
                 assert_eq!(methods.len(), 1);
             }
