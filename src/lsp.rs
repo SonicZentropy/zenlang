@@ -261,6 +261,16 @@ fn init_lsp_tracing() -> tracing_appender::non_blocking::WorkerGuard {
     guard
 }
 
+/// Start the LSP language server on stdin/stdout.
+///
+/// Compatible with Neovim's built-in LSP, VS Code, and any editor that
+/// speaks the LSP protocol over stdio. Provides:
+/// - Text-sync diagnostics
+/// - Completions
+/// - Hover type info
+/// - Document symbols
+/// - Semantic token coloring
+/// - Go-to-definition
 pub fn run_server() {
     let _guard = init_lsp_tracing();
     info!("LSP server starting");

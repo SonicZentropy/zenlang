@@ -24,6 +24,7 @@ pub struct ForeignObject {
 }
 
 impl ForeignObject {
+    /// Wrap a Rust value as a foreign object with the given type name.
     pub fn new<T: 'static>(type_name: &'static str, data: T) -> Self {
         Self {
             type_id: TypeId::of::<T>(),
@@ -32,6 +33,7 @@ impl ForeignObject {
         }
     }
 
+    /// Try to borrow the inner data as `T`. Returns `None` if the type doesn't match.
     pub fn downcast<T: 'static>(&self) -> Option<std::cell::Ref<'_, T>> {
         let r = self.data.borrow();
         if (*r).is::<T>() {
@@ -41,6 +43,7 @@ impl ForeignObject {
         }
     }
 
+    /// Try to mutably borrow the inner data as `T`. Returns `None` if the type doesn't match.
     pub fn downcast_mut<T: 'static>(&self) -> Option<std::cell::RefMut<'_, T>> {
         let r = self.data.borrow_mut();
         if (*r).is::<T>() {
@@ -74,18 +77,47 @@ impl PartialEq for ForeignObject {
     }
 }
 
+/// A runtime value in the Zenlang VM.
+///
+/// All values are boxed — integers, floats, strings, arrays, structs, enums,
+/// functions, foreign objects, and closures. The VM operates uniformly on `Value`,
+/// which enables type-erased generics without monomorphization.
+///
+/// ```rust
+/// use zenlang::Value;
+///
+/// let v = Value::Int(42);
+/// assert_eq!(v.as_int(), Some(42));
+/// assert_eq!(v.type_name(), "int");
+/// assert!(v.is_truthy());
+///
+/// let s: Value = "hello".into();
+/// assert_eq!(s.as_str(), Some("hello".to_string()));
+/// ```
 pub enum Value {
+    /// `nil` — the absence of a value.
     Nil,
+    /// `true` or `false`.
     Bool(bool),
+    /// 64-bit signed integer.
     Int(i64),
+    /// 64-bit float (also stores `f32` values from the source).
     Float(f64),
+    /// Reference-counted string. Strings are immutable.
     Str(Rc<str>),
+    /// A mutable array of values.
     Array(Rc<RefCell<Vec<Value>>>),
-    Struct(Rc<RefCell<HashMap<String, Value>>>, String), // type name for method dispatch
+    /// A struct with named fields. The `String` holds the struct type name for method dispatch.
+    Struct(Rc<RefCell<HashMap<String, Value>>>, String),
+    /// An enum value with a tag (variant index) and field data.
     Enum { tag: u16, data: Rc<RefCell<Vec<Value>>> },
+    /// A compiled script function identified by its index into the VM's function table.
     Function(usize),
+    /// A native Rust function registered via the interop system.
     NativeFunction(NativeFn),
+    /// A foreign (Rust) object registered via the type registry.
     Foreign(Rc<RefCell<ForeignObject>>),
+    /// A closure with captured upvalues.
     Closure(Rc<RefCell<ClosureData>>),
 }
 
@@ -153,6 +185,7 @@ impl PartialEq for Value {
 }
 
 impl Value {
+    /// Return a human-readable name for this value's runtime type.
     pub fn type_name(&self) -> &'static str {
         match self {
             Value::Nil => "nil",
@@ -170,6 +203,7 @@ impl Value {
         }
     }
 
+    /// Returns `true` if this value is truthy: `nil` is false, `bool` defers to the value, everything else is true.
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Nil => false,
@@ -178,6 +212,7 @@ impl Value {
         }
     }
 
+    /// Extract the value as an `i64`. Returns `None` if it's not an `Int`.
     pub fn as_int(&self) -> Option<i64> {
         match self {
             Value::Int(n) => Some(*n),
@@ -185,6 +220,7 @@ impl Value {
         }
     }
 
+    /// Extract the value as an `f64`. Ints are implicitly convertible to float. Returns `None` otherwise.
     pub fn as_float(&self) -> Option<f64> {
         match self {
             Value::Float(n) => Some(*n),
@@ -193,6 +229,7 @@ impl Value {
         }
     }
 
+    /// Extract the value as a `bool`. Returns `None` if it's not a `Bool`.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),
@@ -200,6 +237,7 @@ impl Value {
         }
     }
 
+    /// Extract the value as a `String`. Returns `None` if it's not a `Str`.
     pub fn as_str(&self) -> Option<String> {
         match self {
             Value::Str(s) => Some(s.to_string()),

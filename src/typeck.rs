@@ -6,9 +6,13 @@ use crate::error::{Error, Result};
 use crate::span::{SourceLocation, Span};
 use crate::symbol::*;
 
+/// Opaque identifier for AST nodes — used by [`TypeMap`] for lookups.
 pub type NodeId = usize;
 
 /// Maps expression/statement node addresses to their inferred types.
+///
+/// Populated by [`check()`] and used by the compiler during code generation
+/// to determine the types of intermediate values.
 pub struct TypeMap {
     map: HashMap<*const Expr, Type>,
     _sentinel: Vec<Expr>,
@@ -28,6 +32,11 @@ impl TypeMap {
     }
 }
 
+/// Run type-checking on the entire program.
+///
+/// Returns a [`TypeMap`] mapping each expression to its inferred type.
+/// Errors are collected and returned as a single `Error::TypeError` (or
+/// `Error::ParseMultiple` if there are multiple).
 pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
     let mut checker = TypeChecker { symbols, type_map: TypeMap::new(), errors: Vec::new(), current_span: Span::new(0, 0) };
     for stmt in &program.stmts {

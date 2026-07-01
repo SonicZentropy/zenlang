@@ -52,6 +52,11 @@ impl Precedence {
     }
 }
 
+/// Recursive-descent parser for the Zenlang language.
+///
+/// Consumes a token stream from the lexer and produces an AST ([`Program`]).
+/// Supports expressions, statements, declarations (fn, struct, enum, impl),
+/// patterns, type annotations, and generics.
 pub struct Parser<'a> {
     tokens: &'a [Spanned<Token>],
     current: usize,
@@ -60,6 +65,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    /// Create a new parser from source text and tokenized output of the lexer.
     pub fn new(source: &'a str, tokens: &'a [Spanned<Token>]) -> Self {
         Self { tokens, current: 0, errors: Vec::new(), source }
     }
@@ -79,6 +85,8 @@ impl<'a> Parser<'a> {
         (line, col)
     }
 
+    /// Parse the full token stream into a [`Program`].
+    /// Returns accumulated parse errors if any occurred.
     pub fn parse(mut self) -> Result<Program> {
         let mut stmts = Vec::new();
         while !self.is_at_end() {

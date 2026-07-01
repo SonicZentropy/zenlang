@@ -1,5 +1,14 @@
 # Changelist
 
+## Phase 0 — Type-erased generics
+
+- Generic function definitions with `<T, U>` syntax — `fn identity<T>(x: T) -> T { x }`.
+- Generic struct/enum definitions with type params — `struct Foo<T> { x: T }`.
+- Generic impl blocks — `impl<T> Vec<T> { fn push(&self, val: T) { } }`.
+- **Type erasure** strategy: no monomorphization. Generic params are `Type::Generic("T")` in the type checker, compatible with any type. The VM already boxes all values as `Value` enum, so no runtime changes needed.
+- `resolve_type` helper converts `Type::Named("T")` → `Type::Generic("T")` at registration time when `"T"` matches the declaration's type params.
+- All 123 tests pass including 3 generic integration tests.
+
 ## Phase 13 — VM dispatch for struct method calls
 
 - `Value::Struct(Rc<..>)` → `Value::Struct(Rc<..>, String)` — stores struct type name alongside the field map for runtime method lookup.

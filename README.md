@@ -7,6 +7,7 @@ and a tight bytecode VM.
 ## Features
 
 - **Rust-like syntax**: `let`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls.
+- **Generics (type-erased)**: generic functions, structs, enums, and impl blocks with `<T>` syntax — no monomorphization, compiles once.
 - **Struct sugar**: named field shorthand (`Point { x, y }`), spread operator (`Point { x: 1, ..base }`).
 - **Expression-oriented**: blocks (`{ ... }`) return values; `if`/`match` are expressions.
 - **Bytecode VM**: register-based stack VM with ~50 opcodes. No IR, single-pass codegen.
@@ -175,6 +176,23 @@ impl Point {
 }
 
 let a = p.area();  // method call dispatch
+```
+
+### Generics
+
+Type-erased generics work on functions, structs, enums, and impl blocks. Type parameters are inferred from arguments at call sites — no monomorphization, so compile times stay fast.
+
+```rust
+fn identity<T>(x: T) -> T { x }
+
+print(identity(42));       // T = i64
+print(identity("hello"));  // T = str
+
+fn pair<T, U>(a: T, b: U) -> T { a }
+print(pair(1, "two"));     // T = i64, U = str
+
+struct Option<T> { Some(T), None }
+enum Result<T, E> { Ok(T), Err(E) }
 ```
 
 ### Arrays & Strings

@@ -29,6 +29,14 @@ pub fn offset_to_line(offsets: &[usize], byte_offset: usize) -> usize {
     }
 }
 
+/// Compile a type-checked program into bytecode.
+///
+/// Returns a tuple of `(functions, global_names)` where:
+/// - `functions` contains the compiled `BytecodeFn` for each function.
+/// - `global_names` lists the names of global variables in definition order.
+///
+/// The output is ready to be loaded into a [`VM`](crate::vm::VM) via
+/// [`VM::load_bytecode`](crate::vm::VM::load_bytecode).
 pub fn compile(
     program: &Program,
     _types: &TypeMap,

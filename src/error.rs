@@ -1,6 +1,14 @@
 use crate::span::SourceLocation;
 use snafu::prelude::*;
 
+/// Errors produced by the Zenlang pipeline phases: lexing, parsing, resolution,
+/// type checking, compilation, and runtime execution.
+///
+/// ```rust
+/// use zenlang::error::Error;
+/// let err = Error::Runtime { msg: "test".into(), stack_trace: vec![] };
+/// assert!(err.to_string().contains("test"));
+/// ```
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
@@ -32,4 +40,5 @@ pub enum Error {
     ParseMultiple { errors: Vec<Error> },
 }
 
+/// Convenience alias for `Result<T, Error>` across the entire codebase.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
