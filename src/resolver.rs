@@ -164,7 +164,7 @@ impl Resolver {
                     }
                 }
             }
-            Stmt::Impl { type_name, type_params, methods, .. } => {
+            Stmt::Impl { type_name, type_params, methods, trait_name, .. } => {
                 for method in methods {
                     if let Stmt::Fn { name, type_params: fn_type_params, params, return_type, body: _, .. } = &method.node {
                         let combined_type_params: Vec<TypeParam> = type_params.iter().chain(fn_type_params.iter()).cloned().collect();
@@ -184,6 +184,34 @@ impl Resolver {
                             self.error(e);
                         }
                     }
+                }
+                // If this is a trait impl, verify the trait exists
+                if let Some(trait_name) = trait_name {
+                    if self.symbols.lookup(trait_name).is_none() {
+                        self.error(format!("cannot find trait '{}'", trait_name));
+                    }
+                }
+            }
+            Stmt::Trait { name, type_params, methods } => {
+                let mut method_sigs = Vec::new();
+                for method in methods {
+                    if let Stmt::Fn { name: fn_name, type_params: fn_type_params, params, return_type, body: _ } = &method.node {
+                        let combined_type_params: Vec<TypeParam> = type_params.iter().chain(fn_type_params.iter()).cloned().collect();
+                        let sig = FnSignature {
+                            name: fn_name.to_string(),
+                            type_params: combined_type_params.clone(),
+                            params: params.iter().map(|p| {
+                                let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Unit), &combined_type_params);
+                                (p.name.to_string(), ty)
+                            }).collect(),
+                            return_type: return_type.clone(),
+                        };
+                        method_sigs.push(sig);
+                    }
+                }
+                let def = TraitDef { name: name.to_string(), type_params: type_params.clone(), method_sigs };
+                if let Err(e) = self.symbols.define(name, SymKind::Trait(def)) {
+                    self.error(e);
                 }
             }
             Stmt::Mod { name, body } => {
@@ -264,6 +292,32 @@ impl Resolver {
                         self.symbols.exit_scope();
                     }
                 }
+            }
+            Stmt::Trait { type_params, methods, .. } => {
+                // Register generic type parameters in scope for method resolution
+                self.symbols.enter_scope();
+                for tp in type_params {
+                    if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                        self.error(e);
+                    }
+                }
+                // Resolve types in method signatures
+                for method in methods {
+                    if let Stmt::Fn { name: _, type_params: fn_type_params, params, body: _, .. } = &method.node {
+                        for tp in fn_type_params {
+                            if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                                self.error(e);
+                            }
+                        }
+                        for param in params {
+                            let ty = param.type_ann.clone().unwrap_or(Type::Unit);
+                            if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty)) {
+                                self.error(e);
+                            }
+                        }
+                    }
+                }
+                self.symbols.exit_scope();
             }
             Stmt::Let { name, type_ann, init, .. } => {
                 if let Some(expr) = init {

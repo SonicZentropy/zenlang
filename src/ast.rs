@@ -151,9 +151,17 @@ pub enum Stmt {
         type_params: Vec<TypeParam>,
         variants: Vec<EnumVariant>,
     },
-    /// `impl<T> TypeName { methods }`
+    /// `impl<T> TypeName { methods }` or `impl<T> TraitName for TypeName { methods }`
     Impl {
         type_name: CompactString,
+        type_params: Vec<TypeParam>,
+        trait_name: Option<CompactString>,
+        methods: Vec<Spanned<Stmt>>,
+    },
+    /// `trait Name<T> { fn method(...) -> Type; ... }`
+    /// Method bodies are empty (`vec![]`) — trait methods are signatures only.
+    Trait {
+        name: CompactString,
         type_params: Vec<TypeParam>,
         methods: Vec<Spanned<Stmt>>,
     },

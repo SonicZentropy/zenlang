@@ -32,6 +32,7 @@ pub enum TokenKind {
     Mod,
     Const,
     Type,
+    Trait,
     Underscore,
 
     // Operators & Delimiters
@@ -122,6 +123,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Mod => write!(f, "`mod`"),
             TokenKind::Const => write!(f, "`const`"),
             TokenKind::Type => write!(f, "`type`"),
+            TokenKind::Trait => write!(f, "`trait`"),
             TokenKind::Underscore => write!(f, "`_`"),
             TokenKind::Plus => write!(f, "`+`"),
             TokenKind::PlusEq => write!(f, "`+=`"),
@@ -218,6 +220,7 @@ pub fn match_keyword(ident: &str) -> Option<TokenKind> {
         "mod" => Some(TokenKind::Mod),
         "const" => Some(TokenKind::Const),
         "type" => Some(TokenKind::Type),
+        "trait" => Some(TokenKind::Trait),
         "_" => Some(TokenKind::Underscore),
         _ => None,
     }

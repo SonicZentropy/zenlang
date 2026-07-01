@@ -696,6 +696,7 @@ fn hover(state: &DocumentState, pos: &Position) -> Option<Hover> {
             | Stmt::Struct { name: n, .. }
             | Stmt::Enum { name: n, .. } => n == name,
             Stmt::Impl { type_name, .. } => type_name == name,
+            Stmt::Trait { name: n, .. } => n == name,
             _ => false,
         })
         .map(|s| s.span);
@@ -738,7 +739,7 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
     let mut items = Vec::new();
     for kw in &[
         "fn", "let", "mut", "if", "else", "while", "for", "loop", "break", "continue", "return",
-        "match", "in", "struct", "enum", "impl", "true", "false",
+        "match", "in", "struct", "enum", "impl", "trait", "true", "false",
     ] {
         items.push(CompletionItem {
             label: kw.to_string(),
@@ -754,6 +755,7 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
             SymKind::Enum(_) => CompletionItemKind::ENUM,
             SymKind::EnumConstructor { .. } => CompletionItemKind::ENUM,
             SymKind::TypeParam(_) => CompletionItemKind::TYPE_PARAMETER,
+            SymKind::Trait(_) => CompletionItemKind::INTERFACE,
             SymKind::Module(_) => CompletionItemKind::MODULE,
         };
         items.push(CompletionItem {
@@ -858,6 +860,17 @@ fn find_definition_in_stmt(
             None
         }
         Stmt::Impl { methods, .. } => {
+            for method in methods {
+                if let Some(span) = find_definition_in_stmt(method, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Stmt::Trait { name: trait_name, methods, .. } => {
+            if trait_name.as_str() == name {
+                return Some(name_span_in_source(source, stmt.span, name)?);
+            }
             for method in methods {
                 if let Some(span) = find_definition_in_stmt(method, source, name) {
                     return Some(span);
@@ -1092,6 +1105,41 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 tags: None,
             })
         }
+        Stmt::Trait { name, methods, .. } => {
+            let children = methods
+                .iter()
+                .filter_map(|m| {
+                    if let Stmt::Fn { name: fn_name, params, .. } = &m.node {
+                        let detail = Some(format!(
+                            "fn({})",
+                            params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+                        ));
+                        Some(DocumentSymbol {
+                            name: fn_name.to_string(),
+                            detail,
+                            kind: SymbolKind::METHOD,
+                            range,
+                            selection_range: range,
+                            children: None,
+                            deprecated: None,
+                            tags: None,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            Some(DocumentSymbol {
+                name: name.to_string(),
+                detail: None,
+                kind: SymbolKind::INTERFACE,
+                range,
+                selection_range: range,
+                children: Some(children),
+                deprecated: None,
+                tags: None,
+            })
+        }
         Stmt::Let { name, .. } => Some(DocumentSymbol {
             name: name.to_string(),
             detail: None,
@@ -1137,6 +1185,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
             | TokenKind::Struct
             | TokenKind::Enum
             | TokenKind::Impl
+            | TokenKind::Trait
             | TokenKind::Self_
             | TokenKind::Pub
             | TokenKind::Use
@@ -1153,7 +1202,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     match &entry.kind {
                         SymKind::Function(_) => SemanticTokenType::FUNCTION,
                         SymKind::Variable(_) => SemanticTokenType::VARIABLE,
-                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::TypeParam(_) | SymKind::Module(_) => SemanticTokenType::TYPE,
+                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::TypeParam(_) | SymKind::Module(_) | SymKind::Trait(_) => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1286,6 +1335,7 @@ fn symkind_display(kind: &SymKind) -> String {
                 .join(", ")
         ),
         SymKind::Module(_) => "module".to_string(),
+        SymKind::Trait(def) => format!("trait {{ {} }}", def.method_sigs.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", ")),
         SymKind::EnumConstructor { enum_name, variant_name, tag: _, fields } => {
             let fields_str = if fields.is_empty() {
                 String::new()

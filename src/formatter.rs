@@ -159,7 +159,7 @@ impl FmtState {
 fn must_start_line(kind: &TokenKind, _prev: &Option<TokenKind>) -> bool {
     match kind {
         // Top-level declarations
-        TokenKind::Fn | TokenKind::Struct | TokenKind::Enum | TokenKind::Impl => true,
+        TokenKind::Fn | TokenKind::Struct | TokenKind::Enum | TokenKind::Impl | TokenKind::Trait => true,
         // Statement keywords that start a line
         TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop => true,
         // Let binding
@@ -204,7 +204,7 @@ fn is_keyword_that_needs_space(k: &TokenKind) -> bool {
         TokenKind::Fn | TokenKind::Let | TokenKind::Mut |
         TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop |
         TokenKind::Return | TokenKind::Match | TokenKind::Struct |
-        TokenKind::Enum | TokenKind::Impl | TokenKind::Pub | TokenKind::Use |
+        TokenKind::Enum | TokenKind::Impl | TokenKind::Trait | TokenKind::Pub | TokenKind::Use |
         TokenKind::Const | TokenKind::Type | TokenKind::In
     )
 }

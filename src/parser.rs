@@ -116,6 +116,8 @@ impl<'a> Parser<'a> {
             self.enum_decl()
         } else if self.r#match(TokenKind::Impl) {
             self.impl_decl()
+        } else if self.r#match(TokenKind::Trait) {
+            self.trait_decl()
         } else if self.r#match(TokenKind::Use) {
             self.use_decl()
         } else if self.r#match(TokenKind::Mod) {
@@ -162,6 +164,8 @@ impl<'a> Parser<'a> {
             self.enum_decl()
         } else if self.r#match(TokenKind::Impl) {
             self.impl_decl()
+        } else if self.r#match(TokenKind::Trait) {
+            self.trait_decl()
         } else if self.r#match(TokenKind::Use) {
             self.use_decl()
         } else if self.r#match(TokenKind::Mod) {
@@ -379,7 +383,12 @@ impl<'a> Parser<'a> {
     fn impl_decl(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let type_params = self.parse_type_params()?;
-        let type_name = self.expect_ident()?;
+        let first_ident = self.expect_ident()?;
+        let (trait_name, type_name) = if self.r#match(TokenKind::For) {
+            (Some(first_ident.into()), self.expect_ident()?.into())
+        } else {
+            (None, first_ident.into())
+        };
 
         self.expect(TokenKind::OpenBrace)?;
         let mut methods = Vec::new();
@@ -393,7 +402,48 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Impl { type_params, type_name: type_name.into(), methods }, span))
+        Ok(Spanned::new(Stmt::Impl { type_params, type_name, trait_name, methods }, span))
+    }
+
+    fn trait_decl(&mut self) -> Result<Spanned<Stmt>> {
+        let start = self.prev_span();
+        let type_params = self.parse_type_params()?;
+        let name = self.expect_ident()?;
+
+        self.expect(TokenKind::OpenBrace)?;
+        let mut methods = Vec::new();
+        while !self.check(&TokenKind::CloseBrace) && !self.is_at_end() {
+            if self.r#match(TokenKind::Fn) {
+                // Parse just the signature (no body)
+                let fn_name = self.expect_ident()?.into();
+                let method_type_params = self.parse_type_params()?;
+                self.expect(TokenKind::OpenParen)?;
+                let params = self.param_list()?;
+                self.expect(TokenKind::CloseParen)?;
+                let return_type = if self.r#match(TokenKind::Arrow) {
+                    Some(self.parse_type()?)
+                } else {
+                    None
+                };
+                self.expect(TokenKind::Semi)?;
+                let span = start.merge(&self.prev_span());
+                methods.push(Spanned::new(
+                    Stmt::Fn {
+                        name: fn_name,
+                        type_params: method_type_params,
+                        params,
+                        return_type,
+                        body: vec![],
+                    },
+                    span,
+                ));
+            } else {
+                return Err(self.error("expected method signature inside trait block"));
+            }
+        }
+        self.expect(TokenKind::CloseBrace)?;
+        let span = start.merge(&self.prev_span());
+        Ok(Spanned::new(Stmt::Trait { name: name.into(), type_params, methods: methods }, span))
     }
 
     // ---------- Expressions (Pratt parser) ----------
@@ -1072,7 +1122,7 @@ impl<'a> Parser<'a> {
             }
             match self.peek().node.kind {
                 TokenKind::Fn | TokenKind::Let | TokenKind::Struct
-                | TokenKind::Enum | TokenKind::Impl
+                | TokenKind::Enum | TokenKind::Impl | TokenKind::Trait
                 | TokenKind::Pub | TokenKind::Use | TokenKind::Mod => return,
                 _ => {}
             }

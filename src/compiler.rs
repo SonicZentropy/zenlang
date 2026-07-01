@@ -97,6 +97,7 @@ pub fn compile(
                     register_function_names(&s.node, function_names);
                 }
             }
+            Stmt::Trait { .. } => {}
             _ => {}
         }
     }
@@ -241,6 +242,7 @@ fn count_lambdas_in_stmt(stmt: &Stmt) -> usize {
         Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
         Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
         Stmt::Impl { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
+        Stmt::Trait { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
         Stmt::Mod { body, .. } => count_lambdas_in_stmts(body),
         _ => 0,
     }
@@ -404,6 +406,7 @@ fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result:
                     );
                 }
             }
+            Stmt::Trait { .. } => {}
             Stmt::Return(None) => {}
             Stmt::Mod { body, .. } => {
                 collect_free_in_stmts(body, &local_own, result);
@@ -456,6 +459,7 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 }
             }
         }
+        Stmt::Trait { .. } => {}
         _ => {}
     }
 }
@@ -661,6 +665,9 @@ impl<'a> FunctionCompiler<'a> {
             for m in methods {
                 self.compile_stmt(&m.node);
             }
+        }
+        Stmt::Trait { .. } => {
+            // Traits are compile-time only; nothing to compile
         }
         Stmt::Use { .. } => {
             // Already resolved by the resolver; nothing to compile

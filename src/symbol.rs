@@ -26,6 +26,17 @@ pub struct EnumDef {
     pub variants: Vec<(String, Vec<Type>)>,
 }
 
+/// A trait declaration: `trait Name<T> { fn method(...) -> Type; ... }`
+#[derive(Debug, Clone)]
+pub struct TraitDef {
+    /// The name of the trait.
+    pub name: String,
+    /// Generic type parameters on the trait.
+    pub type_params: Vec<TypeParam>,
+    /// The method signatures that implementors must provide.
+    pub method_sigs: Vec<FnSignature>,
+}
+
 #[derive(Debug, Clone)]
 pub enum SymKind {
     Variable(Type),
@@ -35,6 +46,8 @@ pub enum SymKind {
     EnumConstructor { enum_name: String, variant_name: String, tag: u16, fields: Vec<Type> },
     TypeParam(String),
     Module(usize),
+    /// A trait declaration with its method signatures.
+    Trait(TraitDef),
 }
 
 #[derive(Debug, Clone)]

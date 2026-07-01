@@ -215,7 +215,7 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } => {}
+            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } | Stmt::Trait { .. } => {}
             Stmt::Mod { body, .. } => {
                 self.symbols.enter_scope();
                 for stmt in body {

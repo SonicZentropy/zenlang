@@ -2,6 +2,7 @@ use crate::ast::{Stmt, Type, EnumVariant};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::resolver::resolve;
+use crate::symbol::SymKind;
 use crate::typeck;
 use crate::compiler;
 use crate::vm::VM;
@@ -362,4 +363,86 @@ fn test_try_operator_early_return() {
     let result = vm.run_main().unwrap();
     // try_or_default() returns Err("fail") early due to ?, match extracts 0
     assert_eq!(result, Value::Int(0));
+}
+
+#[test]
+fn test_trait_decl_parse() {
+    let source = r#"
+        trait Shape {
+            fn area() -> f64;
+            fn name() -> str;
+        }
+    "#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let program = Parser::new(source, &tokens).parse().unwrap();
+    assert_eq!(program.stmts.len(), 1);
+    match &program.stmts[0].node {
+        Stmt::Trait { name, type_params, methods } => {
+            assert_eq!(name, "Shape");
+            assert!(type_params.is_empty());
+            assert_eq!(methods.len(), 2);
+            if let Stmt::Fn { name: fn_name, params, return_type, body, .. } = &methods[0].node {
+                assert_eq!(fn_name, "area");
+                assert!(params.is_empty());
+                assert!(return_type.is_some());
+                assert!(body.is_empty());
+            } else {
+                panic!("expected fn sig in trait");
+            }
+        }
+        _ => panic!("expected Trait stmt"),
+    }
+}
+
+#[test]
+fn test_trait_resolve_and_symbol() {
+    let source = r#"
+        trait Shape {
+            fn area() -> f64;
+        }
+    "#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let mut program = Parser::new(source, &tokens).parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let entry = symbols.lookup("Shape").unwrap();
+    match &entry.kind {
+        SymKind::Trait(def) => {
+            assert_eq!(def.name, "Shape");
+            assert_eq!(def.method_sigs.len(), 1);
+            assert_eq!(def.method_sigs[0].name, "area");
+        }
+        _ => panic!("expected Trait sym"),
+    }
+}
+
+#[test]
+fn test_trait_impl_pipeline() {
+    use crate::compiler;
+    use crate::vm::VM;
+    use crate::value::Value;
+
+    let source = r#"
+        struct Circle { radius: f64 }
+        impl Circle {
+            fn area(&self) -> f64 {
+                self.radius * self.radius * 3.14159
+            }
+        }
+        let c = Circle { radius: 2.0 };
+        c.area()
+    "#;
+
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let parser = Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let types = crate::typeck::check(&program, &mut symbols).unwrap();
+    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let mut vm = VM::new();
+    crate::stdlib::register_builtins(&mut vm);
+    vm.load_bytecode(fns, global_names);
+    let result = vm.run_main().unwrap();
+    assert!((result.as_float().unwrap() - 12.56636).abs() < 0.001);
 }
