@@ -1,0 +1,23 @@
+fn main() {
+    let name = "world";
+    let msg = "hello {name}";
+    assert(msg == "hello world");
+
+    let a = 1;
+    let b = 2;
+    let sum_str = "{a} + {b} = {a + b}";
+    assert(sum_str == "1 + 2 = 3");
+
+    let pi = 3.14159;
+    let pi_str = "pi is about {pi}";
+    assert(pi_str == "pi is about 3.14159");
+
+    let escaped = "hello {{name}}";
+    assert(escaped == "hello {name}");
+
+    let no_interp = "plain string";
+    assert(no_interp == "plain string");
+
+    let empty = "";
+    assert(empty == "");
+}

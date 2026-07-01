@@ -1,4 +1,4 @@
-use crate::ast::{Stmt, Type, EnumVariant};
+use crate::ast::{Stmt, Type, EnumVariant, Expr, BinOp};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::resolver::resolve;
@@ -445,4 +445,91 @@ fn test_trait_impl_pipeline() {
     vm.load_bytecode(fns, global_names);
     let result = vm.run_main().unwrap();
     assert!((result.as_float().unwrap() - 12.56636).abs() < 0.001);
+}
+
+#[test]
+fn test_trait_impl_trait_for_type_pipeline() {
+    use crate::compiler;
+    use crate::vm::VM;
+    use crate::value::Value;
+
+    let source = r#"
+        struct Circle { radius: f64 }
+        trait Shape { fn area(&self) -> f64; }
+        impl Shape for Circle {
+            fn area(&self) -> f64 {
+                self.radius * self.radius * 3.14159
+            }
+        }
+        let c = Circle { radius: 2.0 };
+        c.area()
+    "#;
+
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let parser = Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let types = crate::typeck::check(&program, &mut symbols).unwrap();
+    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let mut vm = VM::new();
+    crate::stdlib::register_builtins(&mut vm);
+    vm.load_bytecode(fns, global_names);
+    let result = vm.run_main().unwrap();
+    assert!((result.as_float().unwrap() - 12.56636).abs() < 0.001);
+}
+
+#[test]
+fn test_trait_impl_missing_trait_errors() {
+    let source = r#"
+        struct Foo { x: i64 }
+        impl NonExistent for Foo {
+            fn bar(&self) -> i64 { self.x }
+        }
+    "#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let parser = Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let result = crate::resolver::resolve_with_natives(&mut program, &native_names);
+    assert!(result.is_err(), "expected resolver error for missing trait");
+}
+
+#[test]
+fn test_string_interpolation_desugars_to_concat() {
+    let source = r#""hello {name}""#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let program = Parser::new(source, &tokens).parse().unwrap();
+    assert_eq!(program.stmts.len(), 1);
+    match &program.stmts[0].node {
+        Stmt::Expr(Expr::Binary { op: BinOp::Add, .. }) => {} // desugared to add chain
+        other => panic!("expected Binary Add, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_string_interpolation_no_interp_passthrough() {
+    let source = r#""hello world""#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let program = Parser::new(source, &tokens).parse().unwrap();
+    match &program.stmts[0].node {
+        Stmt::Expr(Expr::Str(_)) => {} // plain string, no desugar
+        other => panic!("expected Expr::Str, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_string_interpolation_empty_error() {
+    let source = r#""hello {} world""#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let result = Parser::new(source, &tokens).parse();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_string_interpolation_unterminated_error() {
+    let source = r#""hello {name""#;
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let result = Parser::new(source, &tokens).parse();
+    assert!(result.is_err());
 }

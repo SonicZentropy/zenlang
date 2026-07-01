@@ -79,3 +79,66 @@ fn resolve_stmts(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn parse(source: &str) -> Program {
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        Parser::new(source, &tokens).parse().unwrap()
+    }
+
+    #[test]
+    fn test_inline_mod_resolved() {
+        let mut program = parse(r#"
+            mod math {
+                fn add(a: i64, b: i64) -> i64 { a + b }
+            }
+            use math::add;
+            add(2, 3)
+        "#);
+        // Inline modules have non-empty bodies; resolve_modules should pass through
+        resolve_modules(&mut program, Path::new("test.zen")).unwrap();
+        // Verify the inline mod survived
+        assert_eq!(program.stmts.len(), 3);
+    }
+
+    #[test]
+    fn test_empty_mod_needs_file() {
+        // `mod foo;` should fail because foo.zen doesn't exist
+        let mut program = parse("mod foo;");
+        let result = resolve_modules(&mut program, Path::new("test.zen"));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::Io { .. } => {} // expected — file not found
+            other => panic!("expected Io error, got {other}"),
+        }
+    }
+
+    #[test]
+    fn test_mod_resolution_wraps_lex_errors() {
+        // Create a temp dir with a module file with syntax errors
+        let dir = std::env::temp_dir().join("zen_mod_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let mod_file = dir.join("bad_syntax.zen");
+        std::fs::write(&mod_file, "fn broken(").unwrap();
+
+        // The source_path should be the directory containing the mod, not the mod itself
+        let source_path = dir.join("main.zen");
+        std::fs::write(&source_path, "mod bad_syntax;").unwrap();
+
+        let mut program = parse("mod bad_syntax;");
+        let result = resolve_modules(&mut program, &source_path);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::ModResolution { module, .. } => {
+                assert_eq!(module, "bad_syntax");
+            }
+            other => panic!("expected ModResolution error, got {other}"),
+        }
+    }
+}

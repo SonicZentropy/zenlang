@@ -987,6 +987,91 @@ mod tests {
     }
 
     #[test]
+    fn test_string_interpolation_float() {
+        let result = run("let pi = 3.14; \"pi is {pi}\"");
+        assert_eq!(result, Value::Str("pi is 3.14".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_bool() {
+        let result = run("let b = true; \"it is {b}\"");
+        assert_eq!(result, Value::Str("it is true".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_empty_str() {
+        let result = run("\"\"");
+        assert_eq!(result, Value::Str("".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_only_expr() {
+        let result = run("\"{42}\"");
+        assert_eq!(result, Value::Str("42".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_expr_first() {
+        let result = run("let x = \"hello\"; \"{x} world\"");
+        assert_eq!(result, Value::Str("hello world".into()));
+    }
+
+    #[test]
+    fn test_trait_impl_pipeline() {
+        let source = r#"
+            struct Circle { radius: f64 }
+            trait Shape { fn area(&self) -> f64; }
+            impl Shape for Circle {
+                fn area(&self) -> f64 {
+                    self.radius * self.radius * 3.14159
+                }
+            }
+            let c = Circle { radius: 2.0 };
+            c.area()
+        "#;
+        let result = run(source);
+        assert!((result.as_float().unwrap() - 12.56636).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_trait_multiple_impls() {
+        let source = r#"
+            struct Circle { radius: f64 }
+            struct Rect { w: f64, h: f64 }
+            trait Shape { fn area(&self) -> f64; }
+            impl Shape for Circle {
+                fn area(&self) -> f64 { self.radius * self.radius * 3.14159 }
+            }
+            impl Shape for Rect {
+                fn area(&self) -> f64 { self.w * self.h }
+            }
+            let c = Circle { radius: 2.0 };
+            let r = Rect { w: 3.0, h: 4.0 };
+            c.area();
+            r.area()
+        "#;
+        let result = run(source);
+        assert!((result.as_float().unwrap() - 12.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_trait_method_dispatch() {
+        let source = r#"
+            struct A { val: i64 }
+            struct B { val: i64 }
+            trait GetVal { fn get(&self) -> i64; }
+            impl GetVal for A { fn get(&self) -> i64 { self.val } }
+            impl GetVal for B { fn get(&self) -> i64 { self.val * 2 } }
+            let a = A { val: 10 };
+            let b = B { val: 10 };
+            a.get();
+            b.get()
+        "#;
+        let result = run(source);
+        assert_eq!(result, Value::Int(20));
+    }
+
+    #[test]
     fn test_add_ints() {
         let result = run("1 + 2");
         assert_eq!(result, Value::Int(3));
