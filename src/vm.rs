@@ -957,6 +957,36 @@ mod tests {
     }
 
     #[test]
+    fn test_string_interpolation_basic() {
+        let result = run("let name = \"world\"; \"hello {name}\"");
+        assert_eq!(result, Value::Str("hello world".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_int() {
+        let result = run("\"the answer is {42}\"");
+        assert_eq!(result, Value::Str("the answer is 42".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_multiple() {
+        let result = run("let a = 1; let b = 2; \"{a} + {b} = {a + b}\"");
+        assert_eq!(result, Value::Str("1 + 2 = 3".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_no_interp() {
+        let result = run("\"hello world\"");
+        assert_eq!(result, Value::Str("hello world".into()));
+    }
+
+    #[test]
+    fn test_string_interpolation_escaped_brace() {
+        let result = run("\"hello {{name}}\"");
+        assert_eq!(result, Value::Str("hello {name}".into()));
+    }
+
+    #[test]
     fn test_add_ints() {
         let result = run("1 + 2");
         assert_eq!(result, Value::Int(3));
@@ -1486,7 +1516,7 @@ mod tests {
     #[test]
     fn test_to_str() {
         let result = run("to_str(42)");
-        assert_eq!(result, Value::Str("Int(42)".into()));
+        assert_eq!(result, Value::Str("42".into()));
     }
 
     #[test]

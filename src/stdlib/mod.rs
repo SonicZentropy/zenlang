@@ -310,7 +310,17 @@ fn to_float_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn to_str_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
-        Some(val) => Ok(Value::Str(format!("{val:?}").into())),
+        Some(val) => Ok(Value::Str(match val {
+            Value::Nil => "nil".into(),
+            Value::Bool(b) => (if *b { "true" } else { "false" }).into(),
+            Value::Int(n) => format!("{n}").into(),
+            Value::Float(f) => format!("{f}").into(),
+            Value::Str(s) => s.clone(),
+            Value::Array(_) => "[...]".into(),
+            Value::Struct(_, name) => format!("{name} {{...}}").into(),
+            Value::Enum { tag, .. } => format!("Enum({tag})").into(),
+            _ => format!("{val:?}").into(),
+        })),
         None => Ok(Value::Str("nil".into())),
     }
 }

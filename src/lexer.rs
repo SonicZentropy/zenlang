@@ -496,6 +496,8 @@ impl<'a> Lexer<'a> {
                     match esc {
                         '"' => s.push('"'),
                         '\\' => s.push('\\'),
+                        '{' => s.push('{'),
+                        '}' => s.push('}'),
                         'n' => s.push('\n'),
                         'r' => s.push('\r'),
                         't' => s.push('\t'),

@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::span::{SourceLocation, Span, Spanned};
@@ -552,7 +553,7 @@ impl<'a> Parser<'a> {
             // Literals
             TokenKind::Int(n) => { self.advance(); Ok(Expr::Int(n)) }
             TokenKind::Float(n) => { self.advance(); Ok(Expr::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); Ok(Expr::Str(s)) }
+            TokenKind::Str(s) => { self.advance(); self.interpolated_string(s) }
             TokenKind::Bool(b) => { self.advance(); Ok(Expr::Bool(b)) }
             TokenKind::Underscore => { self.advance(); Ok(Expr::Unit) }
 
@@ -663,6 +664,72 @@ impl<'a> Parser<'a> {
 
             _ => Err(self.error(&format!("unexpected token '{}'", self.peek().node.lexeme)))
         }
+    }
+
+    fn interpolated_string(&mut self, s: CompactString) -> Result<Expr> {
+        let s = s.to_string();
+        if !s.contains('{') {
+            return Ok(Expr::Str(s.into()));
+        }
+        let mut parts = Vec::new();
+        let bytes = s.as_bytes();
+        let len = bytes.len();
+        let mut pos = 0;
+        let mut text_start = 0;
+
+        while pos < len {
+            if pos + 1 < len && bytes[pos] == b'{' && bytes[pos + 1] == b'{' {
+                pos += 2;
+                continue;
+            }
+            if pos + 1 < len && bytes[pos] == b'}' && bytes[pos + 1] == b'}' {
+                pos += 2;
+                continue;
+            }
+            if bytes[pos] == b'{' {
+                if text_start < pos {
+                    let text = s[text_start..pos].replace("{{", "{").replace("}}", "}");
+                    parts.push(Expr::Str(text.into()));
+                }
+                pos += 1;
+                let expr_start = pos;
+                let mut depth: u32 = 1;
+                while depth > 0 && pos < len {
+                    if bytes[pos] == b'{' { depth += 1; }
+                    else if bytes[pos] == b'}' { depth -= 1; }
+                    pos += 1;
+                }
+                if depth > 0 {
+                    return Err(self.error("unterminated string interpolation"));
+                }
+                let expr_src = s[expr_start..pos - 1].trim();
+                if expr_src.is_empty() {
+                    return Err(self.error("empty string interpolation"));
+                }
+                let expr = parse_interpolated_expr(expr_src)?;
+                parts.push(Expr::Call {
+                    func: Box::new(Expr::Ident("to_str".into())),
+                    args: vec![expr],
+                });
+                text_start = pos;
+            } else {
+                pos += 1;
+            }
+        }
+        if text_start < len {
+            let text = s[text_start..].replace("{{", "{").replace("}}", "}");
+            parts.push(Expr::Str(text.into()));
+        }
+
+        let mut result = parts.remove(0);
+        for part in parts {
+            result = Expr::Binary {
+                op: BinOp::Add,
+                lhs: Box::new(result),
+                rhs: Box::new(part),
+            };
+        }
+        Ok(result)
     }
 
     fn lambda_param_list(&mut self) -> Result<Vec<Param>> {
@@ -1162,6 +1229,20 @@ fn compound_to_binop(tok: &TokenKind) -> BinOp {
         TokenKind::ShrEq => BinOp::Shr,
         _ => unreachable!(),
     }
+}
+
+fn parse_interpolated_expr(source: &str) -> Result<Expr> {
+    use crate::lexer::Lexer;
+    let tokens = Lexer::new(source).tokenize().map_err(|e| Error::Parse {
+        location: crate::span::SourceLocation::new(None, crate::span::Span::new(0, source.len()), 1, 1),
+        msg: format!("invalid interpolation expression: {e}"),
+    })?;
+    let mut parser = Parser::new(source, &tokens);
+    let expr = parser.expression(Precedence::Lowest)?;
+    if !parser.is_at_end() {
+        return Err(parser.error("unexpected tokens after interpolation expression"));
+    }
+    Ok(expr)
 }
 
 #[cfg(test)]
