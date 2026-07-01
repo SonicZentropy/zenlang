@@ -102,6 +102,17 @@ fn error_to_diagnostics(source: &str, err: &Error) -> Vec<Diagnostic> {
                 ..Default::default()
             }];
         }
+        Error::ModResolution { module, source } => {
+            return vec![Diagnostic {
+                range: Range {
+                    start: Position { line: 0, character: 0 },
+                    end: Position { line: 0, character: 0 },
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: format!("error loading module '{}': {}", module, source),
+                ..Default::default()
+            }];
+        }
         Error::Io { .. } => return Vec::new(),
         Error::Script { msg } => {
             return vec![Diagnostic {
