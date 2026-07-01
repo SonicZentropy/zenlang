@@ -1165,6 +1165,215 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
     }
 }
 
+/// Check whether a raw string token (span into source, including outer `"`)
+/// contains interpolation markers (`{…}`). Returns `false` if all braces
+/// are escaped (either `\{` / `\}` or `{{` / `}}`).
+fn raw_string_is_interpolated(source: &str, span: Span) -> bool {
+    if span.end() - span.start() < 2 {
+        return false;
+    }
+    let inner = &source[span.start() + 1..span.end() - 1];
+    let bytes = inner.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' && i + 1 < bytes.len() {
+            i += 2; // skip escape (including \{ \})
+            continue;
+        }
+        if bytes[i] == b'{' {
+            if i + 1 < bytes.len() && bytes[i + 1] == b'{' {
+                i += 2; // {{ → literal brace
+                continue;
+            }
+            return true; // bare { → interpolation start
+        }
+        i += 1;
+    }
+    false
+}
+
+/// Push a single delta-encoded semantic token at the given byte offset.
+fn push_semantic_token(
+    tokens: &mut Vec<SemanticToken>,
+    prev_line: &mut u32,
+    prev_col: &mut u32,
+    source: &str,
+    start: usize,
+    length: usize,
+    token_type: SemanticTokenType,
+) {
+    if length == 0 {
+        return;
+    }
+    let pos = offset_to_position(source, start);
+    let len = length as u32;
+
+    let delta_line = if *prev_line == 0 && *prev_col == 0 {
+        pos.line
+    } else if pos.line == *prev_line {
+        0
+    } else {
+        pos.line - *prev_line
+    };
+    let delta_col = if pos.line == *prev_line {
+        pos.character - *prev_col
+    } else {
+        pos.character
+    };
+
+    tokens.push(SemanticToken {
+        delta_line,
+        delta_start: delta_col,
+        length: len,
+        token_type: token_type_index(token_type),
+        token_modifiers_bitset: 0,
+    });
+    *prev_line = pos.line;
+    *prev_col = pos.character;
+}
+
+/// Emit semantic tokens for the expression content of an interpolation
+/// block `{expr}`. Uses the lexer to re-tokenize the sub-expression and
+/// maps identifiers through the global symbol table.
+fn emit_expr_semantic_tokens(
+    tokens: &mut Vec<SemanticToken>,
+    prev_line: &mut u32,
+    prev_col: &mut u32,
+    source: &str,
+    start: usize,
+    length: usize,
+    symbols: &SymbolTable,
+) {
+    let expr_src = &source[start..start + length];
+    let lex_tokens = match Lexer::new(expr_src).tokenize() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+    for spanned in &lex_tokens {
+        let span_start = spanned.span.start();
+        let span_len = spanned.span.end() - spanned.span.start();
+        if span_len == 0 {
+            continue;
+        }
+        let tok = &spanned.node;
+        let token_type = match &tok.kind {
+            TokenKind::Fn | TokenKind::Let | TokenKind::Mut | TokenKind::If
+            | TokenKind::Else | TokenKind::While | TokenKind::For
+            | TokenKind::Loop | TokenKind::Break | TokenKind::Continue
+            | TokenKind::Return | TokenKind::Match | TokenKind::In
+            | TokenKind::Struct | TokenKind::Enum | TokenKind::Impl
+            | TokenKind::Trait | TokenKind::Self_ | TokenKind::Pub
+            | TokenKind::Use | TokenKind::Mod | TokenKind::Const
+            | TokenKind::Type | TokenKind::Underscore => SemanticTokenType::KEYWORD,
+            // Skip nested strings inside interpolation (unusual but safe)
+            TokenKind::Str(_) => continue,
+            TokenKind::Int(_) | TokenKind::Float(_) => SemanticTokenType::NUMBER,
+            TokenKind::Bool(_) => SemanticTokenType::KEYWORD,
+            TokenKind::Ident(_) => {
+                let ident_name = tok.lexeme.to_string();
+                if let Some(entry) = symbols.lookup(&ident_name) {
+                    match &entry.kind {
+                        SymKind::Function(_) => SemanticTokenType::FUNCTION,
+                        SymKind::Variable(_) => SemanticTokenType::VARIABLE,
+                        SymKind::Struct(_)
+                        | SymKind::Enum(_)
+                        | SymKind::EnumConstructor { .. }
+                        | SymKind::TypeParam(_)
+                        | SymKind::Module(_)
+                        | SymKind::Trait(_) => SemanticTokenType::TYPE,
+                    }
+                } else {
+                    SemanticTokenType::VARIABLE
+                }
+            }
+            _ => continue,
+        };
+        push_semantic_token(tokens, prev_line, prev_col, source, start + span_start, span_len, token_type);
+    }
+}
+
+/// Emit semantic tokens for an interpolated string, splitting the raw
+/// token span into literal STRING segments and coloured expression tokens
+/// for each `{…}` interpolation block.
+fn emit_interpolated_string_tokens(
+    state: &DocumentState,
+    tokens: &mut Vec<SemanticToken>,
+    prev_line: &mut u32,
+    prev_col: &mut u32,
+    span: Span,
+) {
+    let source = &state.source;
+    let raw = &source[span.start()..span.end()];
+    if raw.len() < 2 {
+        return;
+    }
+    let inner_start = span.start() + 1;
+    let inner = &raw[1..raw.len() - 1];
+    let bytes = inner.as_bytes();
+    let len = bytes.len();
+    let mut pos = 0;
+    let mut text_start = 0;
+
+    while pos < len {
+        // Skip \{ and \} escape sequences
+        if bytes[pos] == b'\\' && pos + 1 < len && (bytes[pos + 1] == b'{' || bytes[pos + 1] == b'}') {
+            pos += 2;
+            continue;
+        }
+        // Skip {{ and }} escaped braces
+        if bytes[pos] == b'{' && pos + 1 < len && bytes[pos + 1] == b'{' {
+            pos += 2;
+            continue;
+        }
+        if bytes[pos] == b'}' && pos + 1 < len && bytes[pos + 1] == b'}' {
+            pos += 2;
+            continue;
+        }
+        if bytes[pos] == b'{' {
+            // Emit literal text before this interpolation
+            if text_start < pos {
+                push_semantic_token(tokens, prev_line, prev_col, source, inner_start + text_start, pos - text_start, SemanticTokenType::STRING);
+            }
+            pos += 1;
+            let expr_byte_start = pos;
+            let mut depth = 1u32;
+            while depth > 0 && pos < len {
+                if bytes[pos] == b'\\' && pos + 1 < len {
+                    pos += 2; // skip escaped char
+                    continue;
+                }
+                if bytes[pos] == b'{' {
+                    if pos + 1 < len && bytes[pos + 1] == b'{' { pos += 2; continue; }
+                    depth += 1;
+                } else if bytes[pos] == b'}' {
+                    if pos + 1 < len && bytes[pos + 1] == b'}' { pos += 2; continue; }
+                    depth -= 1;
+                    if depth == 0 {
+                        pos += 1;
+                        break;
+                    }
+                } else {
+                    pos += 1;
+                }
+            }
+            // Emit expression tokens (between { and })
+            let expr_len = pos - 1 - expr_byte_start;
+            if depth == 0 && expr_len > 0 {
+                emit_expr_semantic_tokens(tokens, prev_line, prev_col, source, inner_start + expr_byte_start, expr_len, &state.symbols);
+            } else {
+                // Unterminated or empty — treat remaining as literal text
+                push_semantic_token(tokens, prev_line, prev_col, source, inner_start + text_start, len - text_start, SemanticTokenType::STRING);
+            }
+            text_start = pos;
+        } else {
+            pos += 1;
+        }
+    }
+    if text_start < len {
+        push_semantic_token(tokens, prev_line, prev_col, source, inner_start + text_start, len - text_start, SemanticTokenType::STRING);
+    }
+}
+
 fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
     let mut tokens: Vec<SemanticToken> = Vec::new();
     let mut prev_line = 0u32;
@@ -1204,7 +1413,13 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
             | TokenKind::Const
             | TokenKind::Type
             | TokenKind::Underscore => SemanticTokenType::KEYWORD,
-            TokenKind::Str(_) => SemanticTokenType::STRING,
+            TokenKind::Str(_) => {
+                if raw_string_is_interpolated(&state.source, spanned.span) {
+                    emit_interpolated_string_tokens(state, &mut tokens, &mut prev_line, &mut prev_col, spanned.span);
+                    continue;
+                }
+                SemanticTokenType::STRING
+            }
             TokenKind::Int(_) | TokenKind::Float(_) => SemanticTokenType::NUMBER,
             TokenKind::Bool(_) => SemanticTokenType::KEYWORD,
             TokenKind::Ident(_) => {
