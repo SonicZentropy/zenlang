@@ -15,6 +15,7 @@ pub mod interop;
 pub mod hotreload;
 pub mod lsp;
 pub mod formatter;
+pub mod mod_resolver;
 pub mod stdlib;
 pub mod parser_test;
 

@@ -71,6 +71,7 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
+    zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;
@@ -144,6 +145,7 @@ fn run_tests(paths: &[camino::Utf8PathBuf]) -> zenlang::Result<()> {
             let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
             let parser = zenlang::parser::Parser::new(&source, &tokens);
             let mut program = parser.parse()?;
+            zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
             let native_names = zenlang::stdlib::native_names();
             let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
             let types = zenlang::typeck::check(&program, &mut symbols)?;
@@ -181,6 +183,7 @@ fn run_disasm(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
+    zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;
@@ -199,6 +202,7 @@ fn run_check(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
+    zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let _types = zenlang::typeck::check(&program, &mut symbols)?;
@@ -275,6 +279,8 @@ fn run_repl() -> zenlang::Result<()> {
                 continue;
             }
         };
+        // REPL input has no backing file, so pass "." as path — module loading won't apply
+        let _ = zenlang::mod_resolver::resolve_modules(&mut program, std::path::Path::new("."));
         let native_names = zenlang::stdlib::native_names();
         let mut symbols = match zenlang::resolver::resolve_with_natives(&mut program, &native_names) {
             Ok(s) => s,

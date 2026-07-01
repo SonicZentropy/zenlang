@@ -38,6 +38,9 @@ pub enum Error {
 
     #[snafu(display("multiple parse errors"))]
     ParseMultiple { errors: Vec<Error> },
+
+    #[snafu(display("error loading module '{module}': {source}"))]
+    ModResolution { module: String, source: Box<Error> },
 }
 
 /// Convenience alias for `Result<T, Error>` across the entire codebase.

@@ -146,7 +146,13 @@ impl<'a> Parser<'a> {
     fn mod_decl(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?.into();
-        let body = self.block_stmts()?;
+        // `mod name;` — file-backed module (body will be loaded by mod_resolver)
+        // `mod name { ... }` — inline module
+        let body = if self.r#match(TokenKind::Semi) {
+            vec![]
+        } else {
+            self.block_stmts()?
+        };
         let span = start.merge(&self.prev_span());
         Ok(Spanned::new(Stmt::Mod { name, body }, span))
     }
