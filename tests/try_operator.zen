@@ -1,25 +1,39 @@
-fn try_unwrap() -> Result<i64, str> {
+// Test the ? operator desugaring inside functions returning Result
+
+fn try_ok() -> Result<i64, str> {
     Ok(42)
 }
 
 fn try_or_default() -> Result<i64, str> {
+    // Err("fail")? should short-circuit with Err("fail")
     let x = Err("fail")?;
     Ok(x)
 }
 
+fn use_try_to_unwrap() -> Result<i64, str> {
+    let a = try_ok()?;
+    Ok(a)
+}
+
 fn main() {
-    // Basic unwrap
-    let a = try_unwrap()?;
-    assert(a == 42);
-
-    // Inline usage
-    let b = Ok(10)?;
-    assert(b == 10);
-
-    // Early return with Err — try_or_default returns 0 via match
-    let c = match try_or_default() {
+    // Test function returning Result via ?
+    let a = match (use_try_to_unwrap()) {
         Ok(v) => v,
         Err(_) => 0,
     };
-    assert(c == 0);
+    assert(a == 42);
+
+    // Test early return — try_or_default returns Err("fail")
+    let c = match (try_or_default()) {
+        Ok(v) => v,
+        Err(_) => 999,
+    };
+    assert(c == 999);
+
+    // Inline Ok(10) works with match
+    let b = match (Ok(10)) {
+        Ok(v) => v,
+        Err(_) => 0,
+    };
+    assert(b == 10);
 }

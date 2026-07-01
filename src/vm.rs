@@ -18,11 +18,12 @@ struct CallFrame {
     function_idx: usize,
     ip: usize,
     bp: usize,
+    is_method: bool,
 }
 
 impl CallFrame {
     fn new(function_idx: usize, bp: usize) -> Self {
-        Self { function_idx, ip: 0, bp }
+        Self { function_idx, ip: 0, bp, is_method: false }
     }
 }
 
@@ -604,7 +605,8 @@ impl VM {
                                     let fn_def = &self.functions[fn_idx];
                                     // bp = args_start - 1 so receiver (self) is at local 0
                                     let bp = args_start - 1;
-                                    let frame = CallFrame::new(fn_idx, bp);
+                                    let mut frame = CallFrame::new(fn_idx, bp);
+                                    frame.is_method = true;
                                     self.frames.push(frame);
                                     let slot_count = fn_def.chunk.locals as usize;
                                     while self.stack.len() < bp + slot_count {
@@ -633,10 +635,13 @@ impl VM {
                     let result = self.stack.pop().unwrap_or(Value::Nil);
                     let frame = self.frames.pop().unwrap();
 
-                    // Remove callee + args (everything from bp-1 upward), keeping
-                    // result on top. For the main frame (bp == 0) this is a no-op
-                    // since there is no callee.
-                    if frame.bp > 0 {
+                    if frame.is_method {
+                        // Struct method: bp points to receiver. Trim stack at bp
+                        // (removing receiver + args) and keep values below.
+                        self.stack.truncate(frame.bp);
+                    } else if frame.bp > 0 {
+                        // Regular call: bp points past the callee. Trim at bp-1
+                        // to remove callee + args.
                         self.stack.truncate(frame.bp - 1);
                     } else {
                         self.stack.truncate(frame.bp);
@@ -1047,11 +1052,10 @@ mod tests {
             }
             let c = Circle { radius: 2.0 };
             let r = Rect { w: 3.0, h: 4.0 };
-            c.area();
-            r.area()
+            c.area() + r.area()
         "#;
         let result = run(source);
-        assert!((result.as_float().unwrap() - 12.0).abs() < 0.001);
+        assert!((result.as_float().unwrap() - 24.56636).abs() < 0.001);
     }
 
     #[test]
@@ -1064,11 +1068,10 @@ mod tests {
             impl GetVal for B { fn get(&self) -> i64 { self.val * 2 } }
             let a = A { val: 10 };
             let b = B { val: 10 };
-            a.get();
-            b.get()
+            a.get() + b.get()
         "#;
         let result = run(source);
-        assert_eq!(result, Value::Int(20));
+        assert_eq!(result, Value::Int(30));
     }
 
     #[test]

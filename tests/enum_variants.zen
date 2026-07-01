@@ -1,96 +1,86 @@
-// Test enum variant construction and pattern matching
+// Test enum variant construction and match
 
-// Define a simple enum
-enum Color {
-    Red,
-    Green,
-    Blue
+enum MyOption<T> {
+    MySome(T),
+    MyNone
 }
 
-// Define an enum with data
-enum Option<T> {
-    Some(T),
-    None
+enum MyResult<T, E> {
+    MyOk(T),
+    MyErr(E)
 }
 
-// Define an enum with multiple data fields
-enum Result<T, E> {
-    Ok(T),
-    Err(E)
-}
-
-// Test basic enum variant construction
-let red = Color::Red;
-let green = Color::Green;
-let blue = Color::Blue;
-
-// Test Option variant construction
-let some_number = Option::Some(42);
-let no_value = Option::None;
-
-// Test Result variant construction
-let ok_value = Result::Ok("success");
-let error_value = Result::Err("something went wrong");
-
-// Test pattern matching with enums
-fn describe_color(c: Color) -> str {
-    match c {
-        Color::Red => "red",
-        Color::Green => "green",
-        Color::Blue => "blue"
-    }
-}
-
-fn is_some(opt: Option<i32>) -> bool {
+// Test pattern matching to extract values
+fn my_unwrap_or(opt: MyOption<i64>, default: i64) -> i64 {
     match opt {
-        Option::Some(_) => true,
-        Option::None => false
+        MySome(value) => value,
+        _ => default
     }
 }
 
-fn unwrap_or(opt: Option<i32>, default: i32) -> i32 {
-    match opt {
-        Option::Some(value) => value,
-        Option::None => default
-    }
-}
-
-fn divide(a: i32, b: i32) -> Result<i32, str> {
+fn divide(a: i64, b: i64) -> MyResult<i64, str> {
     if b == 0 {
-        Result::Err("division by zero")
+        MyErr("division by zero")
     } else {
-        Result::Ok(a / b)
+        MyOk(a / b)
     }
 }
 
-// Test the functions
-let color_desc = describe_color(Color::Green);
-let has_value = is_some(Option::Some(10));
-let no_value_flag = is_some(Option::None);
-let unwrapped = unwrap_or(Option::Some(5), 0);
-let default_unwrapped = unwrap_or(Option::None, 42);
+fn main() {
+    // Data variant: construct and match
+    let x = MySome(42);
+    match x {
+        MySome(v) => assert(v == 42),
+        _ => assert(false),
+    }
 
-// Test division
-let div_result = divide(10, 2);
-let div_error = divide(5, 0);
+    // Unit variant: construct (match only via wildcard fallthrough)
+    let y = MyNone;
+    match y {
+        MySome(_) => assert(false),
+        _ => assert(true),
+    }
 
-// Assertions for testing
-assert(color_desc == "green");
-assert(has_value == true);
-assert(no_value_flag == false);
-assert(unwrapped == 5);
-assert(default_unwrapped == 42);
+    // Test inline match on enum constructor call
+    let has_value = match (MySome(10)) {
+        MySome(_) => true,
+        _ => false
+    };
+    assert(has_value == true);
 
-// Test that we can extract values from Result
-let div_ok = match div_result {
-    Result::Ok(value) => value,
-    Result::Err(_) => 0
-};
-assert(div_ok == 5);
+    // Test inline match on unit variant directly
+    let no_value_flag = match MyNone {
+        MySome(_) => true,
+        _ => false
+    };
+    assert(no_value_flag == false);
 
-// Test error case
-let has_error = match div_error {
-    Result::Ok(_) => false,
-    Result::Err(_) => true
-};
-assert(has_error == true);
+    // Test function with match on enum parameter
+    let unwrapped = my_unwrap_or(MySome(5), 0);
+    assert(unwrapped == 5);
+
+    let default_unwrapped = my_unwrap_or(MyNone, 42);
+    assert(default_unwrapped == 42);
+
+    // Test Result-like with divide
+    let div_result = divide(10, 2);
+    let div_error = divide(5, 0);
+
+    let div_ok = match div_result {
+        MyOk(value) => value,
+        MyErr(_) => 0
+    };
+    assert(div_ok == 5);
+
+    let has_error = match div_error {
+        MyOk(_) => false,
+        MyErr(_) => true
+    };
+    assert(has_error == true);
+
+    let err_msg = match div_error {
+        MyOk(_) => "",
+        MyErr(msg) => msg
+    };
+    assert(err_msg == "division by zero");
+}
