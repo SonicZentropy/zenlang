@@ -3,6 +3,9 @@ use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::resolver::resolve;
 use crate::typeck;
+use crate::compiler;
+use crate::vm::VM;
+use crate::value::Value;
 
 fn parse(source: &str) -> crate::error::Result<crate::ast::Program> {
     let tokens = Lexer::new(source).tokenize()?;
@@ -282,4 +285,81 @@ fn test_generic_fn_type_erasure() {
     vm.load_bytecode(fns, global_names);
     let result = vm.run_main().unwrap();
     assert_eq!(result, Value::Int(52));
+}
+
+#[test]
+fn test_try_operator_simple() {
+    let source = r#"
+        let x = Ok(42)?;
+        x
+    "#;
+
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let parser = Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let types = crate::typeck::check(&program, &mut symbols).unwrap();
+    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let mut vm = VM::new();
+    crate::stdlib::register_builtins(&mut vm);
+    vm.load_bytecode(fns, global_names);
+    let result = vm.run_main().unwrap();
+    assert_eq!(result, Value::Int(42));
+}
+
+#[test]
+fn test_try_operator_ok_value() {
+    let source = r#"
+        fn try_unwrap() -> Result<i64, str> {
+            Ok(42)
+        }
+        try_unwrap()?
+    "#;
+
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let parser = Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let types = crate::typeck::check(&program, &mut symbols).unwrap();
+    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let mut vm = VM::new();
+    crate::stdlib::register_builtins(&mut vm);
+    vm.load_bytecode(fns, global_names);
+    let result = vm.run_main().unwrap();
+    assert_eq!(result, Value::Int(42));
+}
+
+#[test]
+fn test_try_operator_early_return() {
+    use crate::compiler;
+    use crate::vm::VM;
+    use crate::value::Value;
+
+    let source = r#"
+        fn try_or_default() -> Result<i64, str> {
+            let x = Err("fail")?;
+            Ok(x)
+        }
+        let res = try_or_default();
+        match res {
+            Ok(v) => v,
+            Err(e) => 0,
+        }
+    "#;
+
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let parser = Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let types = crate::typeck::check(&program, &mut symbols).unwrap();
+    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let mut vm = VM::new();
+    crate::stdlib::register_builtins(&mut vm);
+    vm.load_bytecode(fns, global_names);
+    let result = vm.run_main().unwrap();
+    // try_or_default() returns Err("fail") early due to ?, match extracts 0
+    assert_eq!(result, Value::Int(0));
 }

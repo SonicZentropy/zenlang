@@ -46,7 +46,7 @@ impl Precedence {
             TokenKind::Star | TokenKind::Slash | TokenKind::Percent
                 | TokenKind::Shl | TokenKind::Shr => Precedence::Factor,
             TokenKind::And | TokenKind::Or | TokenKind::Caret => Precedence::Term,
-            TokenKind::OpenParen | TokenKind::Dot | TokenKind::OpenBracket => Precedence::Call,
+            TokenKind::OpenParen | TokenKind::Dot | TokenKind::OpenBracket | TokenKind::Question => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }
@@ -461,6 +461,27 @@ impl<'a> Parser<'a> {
                 let index = self.expression(Precedence::Lowest)?;
                 self.expect(TokenKind::CloseBracket)?;
                 expr = Expr::Index { obj: Box::new(expr), index: Box::new(index) };
+            } else if matches!(tok, TokenKind::Question) {
+                self.advance();
+                // Desugar expr?  →  match expr { Ok(val) => val, Err(e) => return Err(e) }
+                let val_binding = "val";
+                let err_binding = "e";
+                let arms = vec![
+                    MatchArm {
+                        pattern: Pattern::EnumVariant { variant_name: "Ok".into(), bindings: vec![val_binding.into()] },
+                        guard: None,
+                        body: Box::new(Expr::Ident(val_binding.into())),
+                    },
+                    MatchArm {
+                        pattern: Pattern::EnumVariant { variant_name: "Err".into(), bindings: vec![err_binding.into()] },
+                        guard: None,
+                        body: Box::new(Expr::Return(Some(Box::new(Expr::Call {
+                            func: Box::new(Expr::Ident("Err".into())),
+                            args: vec![Expr::Ident(err_binding.into())],
+                        })))),
+                    },
+                ];
+                expr = Expr::Match { expr: Box::new(expr), arms };
             } else {
                 break;
             }

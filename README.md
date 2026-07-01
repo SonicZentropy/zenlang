@@ -6,7 +6,7 @@ and a tight bytecode VM.
 
 ## Features
 
-- **Rust-like syntax**: `let`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls.
+- **Rust-like syntax**: `let`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls, `?` try operator.
 - **Generics (type-erased)**: generic functions, structs, enums, and impl blocks with `<T>` syntax — no monomorphization, compiles once.
 - **Struct sugar**: named field shorthand (`Point { x, y }`), spread operator (`Point { x: 1, ..base }`).
 - **Expression-oriented**: blocks (`{ ... }`) return values; `if`/`match` are expressions.
@@ -143,7 +143,7 @@ for i in 0..5 {
 }
 ```
 
-### Match
+### Match / Try operator
 
 ```rust
 let val = match x {
@@ -151,6 +151,12 @@ let val = match x {
     2 => "two",
     _ => "other",
 };
+
+// The ? operator desugars to a match on Result:
+fn try_unwrap() -> Result<i64, str> {
+    Ok(42)
+}
+let x = try_unwrap()?;  // x = 42, or early return with Err
 ```
 
 ### Structs, Enums, Impl

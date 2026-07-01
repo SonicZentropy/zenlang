@@ -1,0 +1,25 @@
+fn try_unwrap() -> Result<i64, str> {
+    Ok(42)
+}
+
+fn try_or_default() -> Result<i64, str> {
+    let x = Err("fail")?;
+    Ok(x)
+}
+
+fn main() {
+    // Basic unwrap
+    let a = try_unwrap()?;
+    assert(a == 42);
+
+    // Inline usage
+    let b = Ok(10)?;
+    assert(b == 10);
+
+    // Early return with Err — try_or_default returns 0 via match
+    let c = match try_or_default() {
+        Ok(v) => v,
+        Err(_) => 0,
+    };
+    assert(c == 0);
+}

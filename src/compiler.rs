@@ -1024,7 +1024,9 @@ impl<'a> FunctionCompiler<'a> {
                             self.emit_op(Opcode::Eq);
                             let next = self.current_offset();
                             self.emit_op(Opcode::JumpIfFalse(0));
-                            self.emit_op(Opcode::Pop);
+                            // NOTE: No Pop here — the original enum value is still
+                            // on the stack (after Dup + LoadEnumTag + Eq consumed the
+                            // dup'ed copy). It's needed by the binding loop below.
                             self.enter_scope();
                             for (i, binding) in bindings.iter().enumerate() {
                                 self.emit_op(Opcode::Dup);

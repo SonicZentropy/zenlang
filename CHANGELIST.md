@@ -1,5 +1,12 @@
 # Changelist
 
+## Phase — Try operator `?`
+
+- `expr?` desugars to `match expr { Ok(val) => val, Err(e) => return Err(e) }` at parse time — no new AST nodes needed, reuses `Expr::Match` infrastructure.
+- `TokenKind::Question` added to `Precedence::of()` at `Call` level so `expr?` binds as tightly as a function call.
+- Fixed match-arm stack management for `Pattern::EnumVariant`: after `Dup` + `LoadEnumTag` + `Eq` + `JumpIfFalse`, the original enum value was being incorrectly `Pop`'d before the binding loop, causing "LoadEnumField on non-enum value" at runtime. Removed the extra `Pop` — the enum value survives on the stack for the `Dup`/`LoadEnumField` binding loop.
+- 3 full-pipeline tests: inline `Ok(42)?`, function return `try_unwrap()?`, and `Err("fail")?` early return.
+
 ## Phase 0 — Type-erased generics
 
 - Generic function definitions with `<T, U>` syntax — `fn identity<T>(x: T) -> T { x }`.
