@@ -113,7 +113,10 @@ pub fn compile(
         for (i, stmt) in program.stmts.iter().enumerate() {
             fc.set_line_by_offset(stmt.span.start());
             let is_last = i == stmt_count - 1;
-            if is_last && matches!(&stmt.node, Stmt::Expr(_)) {
+            let has_main = function_names.contains_key("main");
+            // If fn main() exists, always use compile_stmt (which emits Pop for Expr),
+            // so main() provides the return value, not a trailing expression.
+            if is_last && !has_main && matches!(&stmt.node, Stmt::Expr(_)) {
                 if let Stmt::Expr(expr) = &stmt.node {
                     fc.compile_expr(expr);
                 }
@@ -121,9 +124,15 @@ pub fn compile(
                 fc.compile_stmt(&stmt.node);
             }
         }
-        match program.stmts.last() {
-            Some(s) if matches!(&s.node, Stmt::Expr(_)) => {}
-            _ => { fc.none(); }
+        if function_names.contains_key("main") {
+            let main_idx = function_names["main"];
+            fc.load_const(Value::Function(main_idx));
+            fc.emit_op(Opcode::Call(0));
+        } else {
+            match program.stmts.last() {
+                Some(s) if matches!(&s.node, Stmt::Expr(_)) => {}
+                _ => { fc.none(); }
+            }
         }
         fc.emit_op(Opcode::Return);
         functions.push(fc.finalize());

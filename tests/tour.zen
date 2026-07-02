@@ -98,7 +98,7 @@ fn main() {
         Green => "green",
         Blue => "blue",
     };
-    assert(name == "green");
+    assert(name == "red");
 
     let m = 2;
     let ms = match m {

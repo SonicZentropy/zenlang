@@ -19,7 +19,7 @@ fn main() {
 
     // write_file round-trip
     let test_file = path_join(test_dir, "hello.txt");
-    let r3 = write_file(test_file, "Hello, World!");
+    let r3 = write_file(test_file, "Hello, World!\n");
     match r3 {
         Ok(_) => true,
         Err(msg) => assert(len(msg) > 0),
@@ -28,18 +28,18 @@ fn main() {
     // read_file
     let r4 = read_file(test_file);
     match r4 {
-        Ok(content) => assert(content == "Hello, World!"),
+        Ok(content) => assert(content == "Hello, World!\n"),
         Err(msg) => assert(len(msg) > 0),
     }
 
-    // append_file
+    // append_file (uses writeln!, so adds its own newline)
     let r5 = append_file(test_file, "Line 2");
     match r5 {
         Ok(_) => true,
         Err(msg) => assert(len(msg) > 0),
     }
 
-    // read_lines
+    // read_lines (splits on newlines)
     let r6 = read_lines(test_file);
     match r6 {
         Ok(lines) => {
