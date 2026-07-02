@@ -1,5 +1,14 @@
 # Changelist
 
+## Phase — Iterator protocol
+
+- General `Iterator` protocol: any value with a `.next(&mut self) -> Option<T>` method drives a `for` loop.
+- `for var in iter_expr { body }` (generic case; inline range literals keep their existing fast path) desugars in the compiler to `let __for_iter = iter(iter_expr); loop { match __for_iter.next() { Some(var) => { body }, None => break } }`, reusing existing `Match`/`Loop`/`CallMethod` codegen — no new opcodes.
+- New native `iter(x)`: wraps `Array`/`Range`/`Str` values in foreign cursor objects (`ArrayIter`/`RangeIter`/`StrIter`, in `src/stdlib/iter.rs`) each exposing `next()`; passes `Struct`/`Foreign` values through unchanged since they're assumed to already implement the protocol.
+- User-defined structs become iterable for free by implementing `fn next(&mut self) -> Option<T>` in an `impl` block — no special-casing needed, reuses existing struct method dispatch.
+- Fixed `Opcode::CallMethod`'s `Value::Foreign` dispatch in `vm.rs` to pass the receiver as `args[0]` to registered native methods (previously dropped, so foreign methods couldn't see or mutate their own receiver).
+- `tests/iterators.zen` covers arrays, strings, range variables, custom struct iterators, manual `iter()`/`.next()` use, and `break`/`continue`.
+
 ## Phase — Try operator `?`
 
 - `expr?` desugars to `match expr { Ok(val) => val, Err(e) => return Err(e) }` at parse time — no new AST nodes needed, reuses `Expr::Match` infrastructure.

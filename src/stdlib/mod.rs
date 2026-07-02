@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
-use crate::symbol::FnSignature;
+use crate::Result;
 use crate::ast::Type;
+use crate::symbol::FnSignature;
 use crate::value::Value;
 use crate::vm::{VM, VMContext};
-use crate::Result;
 
 mod fs;
+mod iter;
 mod log;
 
 /// Register all built-in stdlib functions with the given VM.
@@ -36,6 +37,10 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("min", Rc::new(min_impl));
     vm.register_native("max", Rc::new(max_impl));
     vm.register_native("sqrt", Rc::new(sqrt_impl));
+
+    // Iterators
+    vm.register_native("iter", Rc::new(iter::iter_impl));
+    iter::register(vm);
 
     // Array operations
     vm.register_native("push", Rc::new(push_impl));
@@ -67,34 +72,188 @@ pub fn native_names() -> Vec<String> {
 pub fn native_fn_sigs() -> Vec<FnSignature> {
     // Unit param type = compatible with everything (acts as type variable)
     let mut sigs = vec![
-        FnSignature { type_params: vec![], name: "print".into(), params: vec![], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "assert".into(), params: vec![("cond".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "assert_eq".into(), params: vec![("a".into(), Type::Unit), ("b".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "type_of".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "len".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::I64) },
-        FnSignature { type_params: vec![], name: "contains".into(), params: vec![("s".into(), Type::Str), ("sub".into(), Type::Str)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "trim".into(), params: vec![("s".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "to_upper".into(), params: vec![("s".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "to_lower".into(), params: vec![("s".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "substring".into(), params: vec![("s".into(), Type::Str), ("start".into(), Type::I64), ("end".into(), Type::I64)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "abs".into(), params: vec![("n".into(), Type::I64)], return_type: Some(Type::I64) },
-        FnSignature { type_params: vec![], name: "min".into(), params: vec![("a".into(), Type::I64), ("b".into(), Type::I64)], return_type: Some(Type::I64) },
-        FnSignature { type_params: vec![], name: "max".into(), params: vec![("a".into(), Type::I64), ("b".into(), Type::I64)], return_type: Some(Type::I64) },
-        FnSignature { type_params: vec![], name: "sqrt".into(), params: vec![("n".into(), Type::F64)], return_type: Some(Type::F64) },
-        FnSignature { type_params: vec![], name: "push".into(), params: vec![("arr".into(), Type::Unit), ("val".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "pop".into(), params: vec![("arr".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "insert".into(), params: vec![("arr".into(), Type::Unit), ("idx".into(), Type::I64), ("val".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "remove".into(), params: vec![("arr".into(), Type::Unit), ("idx".into(), Type::I64)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "to_int".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::I64) },
-        FnSignature { type_params: vec![], name: "to_float".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::F64) },
-        FnSignature { type_params: vec![], name: "to_str".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "is_some".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "is_none".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "is_ok".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "is_err".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "unwrap".into(), params: vec![("val".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "unwrap_or".into(), params: vec![("val".into(), Type::Unit), ("default".into(), Type::Unit)], return_type: Some(Type::Unit) },
-        FnSignature { type_params: vec![], name: "expect".into(), params: vec![("val".into(), Type::Unit), ("msg".into(), Type::Str)], return_type: Some(Type::Unit) },
+        FnSignature {
+            type_params: vec![],
+            name: "print".into(),
+            params: vec![],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "assert".into(),
+            params: vec![("cond".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "assert_eq".into(),
+            params: vec![("a".into(), Type::Unit), ("b".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "type_of".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "len".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "contains".into(),
+            params: vec![("s".into(), Type::Str), ("sub".into(), Type::Str)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "trim".into(),
+            params: vec![("s".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "to_upper".into(),
+            params: vec![("s".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "to_lower".into(),
+            params: vec![("s".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "substring".into(),
+            params: vec![
+                ("s".into(), Type::Str),
+                ("start".into(), Type::I64),
+                ("end".into(), Type::I64),
+            ],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "abs".into(),
+            params: vec![("n".into(), Type::I64)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "min".into(),
+            params: vec![("a".into(), Type::I64), ("b".into(), Type::I64)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "max".into(),
+            params: vec![("a".into(), Type::I64), ("b".into(), Type::I64)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "sqrt".into(),
+            params: vec![("n".into(), Type::F64)],
+            return_type: Some(Type::F64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "push".into(),
+            params: vec![("arr".into(), Type::Unit), ("val".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "pop".into(),
+            params: vec![("arr".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "insert".into(),
+            params: vec![
+                ("arr".into(), Type::Unit),
+                ("idx".into(), Type::I64),
+                ("val".into(), Type::Unit),
+            ],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "remove".into(),
+            params: vec![("arr".into(), Type::Unit), ("idx".into(), Type::I64)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "to_int".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "to_float".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::F64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "to_str".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "is_some".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "is_none".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "is_ok".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "is_err".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "unwrap".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "unwrap_or".into(),
+            params: vec![("val".into(), Type::Unit), ("default".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "expect".into(),
+            params: vec![("val".into(), Type::Unit), ("msg".into(), Type::Str)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "iter".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
     ];
     sigs.extend(fs::signatures());
     sigs.extend(log::signatures());
@@ -113,8 +272,13 @@ fn print_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn assert_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     if args.first().map(|v| !v.is_truthy()).unwrap_or(true) {
-        let msg = args.get(1).and_then(|v| v.as_str()).unwrap_or_else(|| "assertion failed".into());
-        return Err(crate::error::Error::Script { msg: format!("assert failed: {msg}") });
+        let msg = args
+            .get(1)
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| "assertion failed".into());
+        return Err(crate::error::Error::Script {
+            msg: format!("assert failed: {msg}"),
+        });
     }
     Ok(Value::Nil)
 }
@@ -141,7 +305,11 @@ fn len_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Str(s)) => Ok(Value::Int(s.len() as i64)),
         Some(Value::Array(arr)) => Ok(Value::Int(arr.borrow().len() as i64)),
         Some(Value::Range(start, end, inclusive)) => {
-            let len = if *inclusive { *end - *start + 1 } else { *end - *start };
+            let len = if *inclusive {
+                *end - *start + 1
+            } else {
+                *end - *start
+            };
             Ok(Value::Int(len.max(0)))
         }
         _ => Ok(Value::Int(0)),
@@ -249,9 +417,7 @@ fn push_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn pop_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
-        Some(Value::Array(arr)) => {
-            Ok(arr.borrow_mut().pop().unwrap_or(Value::Nil))
-        }
+        Some(Value::Array(arr)) => Ok(arr.borrow_mut().pop().unwrap_or(Value::Nil)),
         _ => Ok(Value::Nil),
     }
 }
@@ -339,19 +505,27 @@ fn enum_tag(val: &Value) -> Option<u16> {
 }
 
 fn is_some_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(0))))
+    Ok(Value::Bool(
+        args.first().map_or(false, |v| enum_tag(v) == Some(0)),
+    ))
 }
 
 fn is_none_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(1))))
+    Ok(Value::Bool(
+        args.first().map_or(false, |v| enum_tag(v) == Some(1)),
+    ))
 }
 
 fn is_ok_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(0))))
+    Ok(Value::Bool(
+        args.first().map_or(false, |v| enum_tag(v) == Some(0)),
+    ))
 }
 
 fn is_err_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    Ok(Value::Bool(args.first().map_or(false, |v| enum_tag(v) == Some(1))))
+    Ok(Value::Bool(
+        args.first().map_or(false, |v| enum_tag(v) == Some(1)),
+    ))
 }
 
 fn unwrap_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
@@ -359,29 +533,38 @@ fn unwrap_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Enum { tag, data }) if *tag == 0 => {
             Ok(data.borrow().first().cloned().unwrap_or(Value::Nil))
         }
-        Some(Value::Enum { tag: _, data: _ }) => {
-            Err(crate::error::Error::Script { msg: "unwrap failed: got None/Err".into() })
-        }
-        _ => Err(crate::error::Error::Script { msg: "unwrap called on non-enum value".into() }),
+        Some(Value::Enum { tag: _, data: _ }) => Err(crate::error::Error::Script {
+            msg: "unwrap failed: got None/Err".into(),
+        }),
+        _ => Err(crate::error::Error::Script {
+            msg: "unwrap called on non-enum value".into(),
+        }),
     }
 }
 
 fn unwrap_or_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1)) {
-        (Some(Value::Enum { tag, data }), Some(default)) if *tag == 0 => {
-            Ok(data.borrow().first().cloned().unwrap_or_else(|| default.clone()))
-        }
+        (Some(Value::Enum { tag, data }), Some(default)) if *tag == 0 => Ok(data
+            .borrow()
+            .first()
+            .cloned()
+            .unwrap_or_else(|| default.clone())),
         (_, Some(default)) => Ok(default.clone()),
         _ => Ok(Value::Nil),
     }
 }
 
 fn expect_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let msg = args.get(1).and_then(|v| v.as_str()).unwrap_or_else(|| "expect failed".into());
+    let msg = args
+        .get(1)
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| "expect failed".into());
     match args.first() {
         Some(Value::Enum { tag, data }) if *tag == 0 => {
             Ok(data.borrow().first().cloned().unwrap_or(Value::Nil))
         }
-        _ => Err(crate::error::Error::Script { msg: format!("expect failed: {msg}") }),
+        _ => Err(crate::error::Error::Script {
+            msg: format!("expect failed: {msg}"),
+        }),
     }
 }

@@ -5,7 +5,12 @@ use crate::token::{Token, TokenKind};
 pub fn format_source(source: &str, tab_size: usize) -> Result<String, crate::error::Error> {
     let tokens = Lexer::new(source).tokenize_with_comments()?;
     let mut out = String::with_capacity(source.len());
-    let mut f = FmtState { indent: 0, tab_size, bol: true, prev_kind: None };
+    let mut f = FmtState {
+        indent: 0,
+        tab_size,
+        bol: true,
+        prev_kind: None,
+    };
 
     let mut i = 0;
     while i < tokens.len() {
@@ -36,7 +41,9 @@ impl FmtState {
             return i + 1;
         }
 
-        let next_non_comment = tokens[i + 1..].iter().find(|t| !matches!(t.node.kind, TokenKind::Comment));
+        let next_non_comment = tokens[i + 1..]
+            .iter()
+            .find(|t| !matches!(t.node.kind, TokenKind::Comment));
 
         // ---- spacing before ----
         if matches!(kind, TokenKind::CloseBrace) {
@@ -74,14 +81,15 @@ impl FmtState {
         let after = match kind {
             TokenKind::OpenBrace => {
                 self.indent += 1;
-                true  // newline after
+                true // newline after
             }
             TokenKind::CloseBrace => {
                 // newline after unless followed by `else` (which adds its own space)
-                let after_is_else = next_non_comment.is_some_and(|s| matches!(&s.node.kind, TokenKind::Else));
-                !after_is_else  // true → newline, false → nothing (else handles spacing)
+                let after_is_else =
+                    next_non_comment.is_some_and(|s| matches!(&s.node.kind, TokenKind::Else));
+                !after_is_else // true → newline, false → nothing (else handles spacing)
             }
-            TokenKind::Semi => true,  // newline
+            TokenKind::Semi => true, // newline
             TokenKind::Comma => {
                 out.push(' ');
                 false
@@ -90,13 +98,27 @@ impl FmtState {
                 out.push(' ');
                 false
             }
-            k if is_bin_op(k) || is_compare_op(k)
-                || matches!(k, TokenKind::And | TokenKind::Or | TokenKind::Caret
-                    | TokenKind::Shl | TokenKind::Shr
-                    | TokenKind::PlusEq | TokenKind::MinusEq | TokenKind::StarEq
-                    | TokenKind::SlashEq | TokenKind::PercentEq
-                    | TokenKind::AndEq | TokenKind::OrEq
-                    | TokenKind::CaretEq | TokenKind::ShlEq | TokenKind::ShrEq) => {
+            k if is_bin_op(k)
+                || is_compare_op(k)
+                || matches!(
+                    k,
+                    TokenKind::And
+                        | TokenKind::Or
+                        | TokenKind::Caret
+                        | TokenKind::Shl
+                        | TokenKind::Shr
+                        | TokenKind::PlusEq
+                        | TokenKind::MinusEq
+                        | TokenKind::StarEq
+                        | TokenKind::SlashEq
+                        | TokenKind::PercentEq
+                        | TokenKind::AndEq
+                        | TokenKind::OrEq
+                        | TokenKind::CaretEq
+                        | TokenKind::ShlEq
+                        | TokenKind::ShrEq
+                ) =>
+            {
                 out.push(' ');
                 false
             }
@@ -159,7 +181,11 @@ impl FmtState {
 fn must_start_line(kind: &TokenKind, _prev: &Option<TokenKind>) -> bool {
     match kind {
         // Top-level declarations
-        TokenKind::Fn | TokenKind::Struct | TokenKind::Enum | TokenKind::Impl | TokenKind::Trait => true,
+        TokenKind::Fn
+        | TokenKind::Struct
+        | TokenKind::Enum
+        | TokenKind::Impl
+        | TokenKind::Trait => true,
         // Statement keywords that start a line
         TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop => true,
         // Let/const binding
@@ -183,14 +209,22 @@ fn needs_space_before(kind: &TokenKind, prev: &Option<TokenKind>) -> bool {
         // Assignment
         TokenKind::Eq => true,
         // Compound assignment
-        TokenKind::PlusEq | TokenKind::MinusEq | TokenKind::StarEq
-        | TokenKind::SlashEq | TokenKind::PercentEq
-        | TokenKind::AndEq | TokenKind::OrEq
-        | TokenKind::CaretEq | TokenKind::ShlEq | TokenKind::ShrEq => true,
+        TokenKind::PlusEq
+        | TokenKind::MinusEq
+        | TokenKind::StarEq
+        | TokenKind::SlashEq
+        | TokenKind::PercentEq
+        | TokenKind::AndEq
+        | TokenKind::OrEq
+        | TokenKind::CaretEq
+        | TokenKind::ShlEq
+        | TokenKind::ShrEq => true,
         // Arrows
         TokenKind::Arrow | TokenKind::FatArrow => true,
         // Colon (type annotation)
         TokenKind::Colon => true,
+        // `in` keyword (`for x in iter`) always needs a space before it
+        TokenKind::In => true,
         // After keywords that need a space before their argument
         _ => match prev {
             Some(p) if is_keyword_that_needs_space(p) => true,
@@ -200,28 +234,54 @@ fn needs_space_before(kind: &TokenKind, prev: &Option<TokenKind>) -> bool {
 }
 
 fn is_keyword_that_needs_space(k: &TokenKind) -> bool {
-    matches!(k,
-        TokenKind::Fn | TokenKind::Let | TokenKind::Mut |
-        TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop |
-        TokenKind::Return | TokenKind::Match | TokenKind::Struct |
-        TokenKind::Enum | TokenKind::Impl | TokenKind::Trait | TokenKind::Pub | TokenKind::Use |
-        TokenKind::Const | TokenKind::Type | TokenKind::In
+    matches!(
+        k,
+        TokenKind::Fn
+            | TokenKind::Let
+            | TokenKind::Mut
+            | TokenKind::If
+            | TokenKind::While
+            | TokenKind::For
+            | TokenKind::Loop
+            | TokenKind::Return
+            | TokenKind::Match
+            | TokenKind::Struct
+            | TokenKind::Enum
+            | TokenKind::Impl
+            | TokenKind::Trait
+            | TokenKind::Pub
+            | TokenKind::Use
+            | TokenKind::Const
+            | TokenKind::Type
+            | TokenKind::In
     )
 }
 
 fn is_bin_op(k: &TokenKind) -> bool {
-    matches!(k,
-        TokenKind::Plus | TokenKind::Minus | TokenKind::Star |
-        TokenKind::Slash | TokenKind::Percent |
-        TokenKind::Shl | TokenKind::Shr | TokenKind::Caret
+    matches!(
+        k,
+        TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::Percent
+            | TokenKind::Shl
+            | TokenKind::Shr
+            | TokenKind::Caret
     )
 }
 
 fn is_compare_op(k: &TokenKind) -> bool {
-    matches!(k,
-        TokenKind::EqEq | TokenKind::Ne | TokenKind::Lt |
-        TokenKind::Gt | TokenKind::Le | TokenKind::Ge |
-        TokenKind::AndAnd | TokenKind::OrOr
+    matches!(
+        k,
+        TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::Lt
+            | TokenKind::Gt
+            | TokenKind::Le
+            | TokenKind::Ge
+            | TokenKind::AndAnd
+            | TokenKind::OrOr
     )
 }
 
@@ -275,5 +335,19 @@ mod tests {
         assert!(result.contains("} else {"));
         assert!(result.contains("    42"));
         assert!(result.contains("    0"));
+    }
+
+    #[test]
+    fn test_for_in_loop_spacing() {
+        // Regression test: `in` must be preceded by a space so `for x in y`
+        // doesn't get formatted as `for xin y`.
+        let src = "fn main() {\nfor x in arr{\nsum = sum + x;\n}\n}\n";
+        let result = format_source(src, 4).unwrap();
+        println!("=== FOR IN ===");
+        println!("{result}");
+        println!("=== END ===");
+
+        assert!(result.contains("for x in arr {"));
+        assert!(!result.contains("xin"));
     }
 }

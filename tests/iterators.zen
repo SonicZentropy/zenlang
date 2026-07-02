@@ -1,0 +1,66 @@
+struct Counter { current: i64, max: i64 }
+impl Counter {
+    fn next(&mut self) -> Option<i64> {
+        if self.current >= self.max {
+            None
+        } else {
+            let v = self.current;
+            self.current = self.current + 1;
+            Some(v)
+        }
+    }
+}
+
+fn main() {
+    let mut sum = 0;
+    for x in [1, 2, 3] {
+        sum = sum + x;
+    }
+    assert(sum == 6);
+
+    let mut arr = [10, 20, 30];
+    push(arr, 40);
+    let mut sum2 = 0;
+    for x in arr {
+        sum2 = sum2 + x;
+    }
+    assert(sum2 == 100);
+
+    let mut count = 0;
+    for c in "abc" {
+        count = count + 1;
+    }
+    assert(count == 3);
+
+    let r = 2..6;
+    let mut sum3 = 0;
+    for i in r {
+        sum3 = sum3 + i;
+    }
+    assert(sum3 == 14);
+
+    let counter = Counter { current: 0, max: 5 };
+    let mut sum4 = 0;
+    let mut n = 0;
+    for x in counter {
+        sum4 = sum4 + x;
+        n = n + 1;
+    }
+    assert(n == 5);
+    assert(sum4 == 10);
+
+    let it = iter([10, 20]);
+    assert(it.next() == Some(10));
+    assert(it.next() == Some(20));
+    assert(it.next() == None);
+
+    let mut seen = 0;
+    for x in [1, 2, 3, 4, 5] {
+        if x == 2 { continue; }
+        if x == 4 { break; }
+        seen = seen + x;
+    }
+    assert(seen == 4);
+
+    print("Iterator tests complete!");
+}

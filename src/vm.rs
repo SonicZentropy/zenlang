@@ -24,13 +24,23 @@ struct CallFrame {
 
 impl CallFrame {
     fn new(function_idx: usize, bp: usize) -> Self {
-        Self { function_idx, ip: 0, bp, is_method: false, is_closure: false }
+        Self {
+            function_idx,
+            ip: 0,
+            bp,
+            is_method: false,
+            is_closure: false,
+        }
     }
 }
 
 /// The Zenlang virtual machine.
 /// Helper to build a SourceLocation from a function index and bytecode offset.
-fn source_loc_from_frame(functions: &[BytecodeFn], function_idx: usize, ip: usize) -> crate::span::SourceLocation {
+fn source_loc_from_frame(
+    functions: &[BytecodeFn],
+    function_idx: usize,
+    ip: usize,
+) -> crate::span::SourceLocation {
     let line = if let Some(chunk) = functions.get(function_idx).map(|f| &f.chunk) {
         chunk.get_line(ip.saturating_sub(1))
     } else {
@@ -162,9 +172,14 @@ impl VM {
     /// `Value::Function(old_idx)` references that may exist in global values
     /// to point at the correct new indices, restores matching global values
     /// by name, and updates `global_names`.
-    pub fn reload_functions(&mut self, fns: Vec<BytecodeFn>, new_global_names: Vec<String>) -> Result<()> {
+    pub fn reload_functions(
+        &mut self,
+        fns: Vec<BytecodeFn>,
+        new_global_names: Vec<String>,
+    ) -> Result<()> {
         // Build old name→idx map from current functions
-        let old_name_to_idx: HashMap<&str, usize> = self.functions
+        let old_name_to_idx: HashMap<&str, usize> = self
+            .functions
             .iter()
             .enumerate()
             .map(|(i, f)| (f.name.as_str(), i))
@@ -232,11 +247,10 @@ impl VM {
 
     /// Build a runtime error with a stack trace from the current call frames.
     fn runtime_error(&self, msg: impl Into<String>) -> Error {
-        let mut stack_trace: Vec<crate::span::SourceLocation> = self.frames
+        let mut stack_trace: Vec<crate::span::SourceLocation> = self
+            .frames
             .iter()
-            .map(|frame| {
-                source_loc_from_frame(&self.functions, frame.function_idx, frame.ip)
-            })
+            .map(|frame| source_loc_from_frame(&self.functions, frame.function_idx, frame.ip))
             .collect();
         stack_trace.reverse(); // innermost frame first
         Error::Runtime {
@@ -278,7 +292,8 @@ impl VM {
             }
 
             let byte = self.read_byte();
-            let op = Opcode::from_byte(byte).ok_or_else(|| self.runtime_error(format!("unknown opcode: {}", byte)))?;
+            let op = Opcode::from_byte(byte)
+                .ok_or_else(|| self.runtime_error(format!("unknown opcode: {}", byte)))?;
 
             match op {
                 Opcode::LoadConst(_) => {
@@ -345,16 +360,26 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai + bi)),
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af + bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 + bf)),
-                        (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af + *bi as f64)),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af + bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 + bf))
+                        }
+                        (Value::Float(af), Value::Int(bi)) => {
+                            self.stack.push(Value::Float(af + *bi as f64))
+                        }
                         (Value::Str(as_), Value::Str(bs)) => {
                             let mut result = as_.to_string();
                             result.push_str(bs);
                             self.stack.push(Value::Str(result.into()));
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot add {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot add {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -364,11 +389,21 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai - bi)),
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af - bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 - bf)),
-                        (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af - *bi as f64)),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af - bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 - bf))
+                        }
+                        (Value::Float(af), Value::Int(bi)) => {
+                            self.stack.push(Value::Float(af - *bi as f64))
+                        }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot subtract {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot subtract {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -378,11 +413,21 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai * bi)),
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af * bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 * bf)),
-                        (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af * *bi as f64)),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af * bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 * bf))
+                        }
+                        (Value::Float(af), Value::Int(bi)) => {
+                            self.stack.push(Value::Float(af * *bi as f64))
+                        }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot multiply {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot multiply {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -410,7 +455,11 @@ impl VM {
                             self.stack.push(Value::Float(af / *bi as f64));
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot divide {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot divide {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -426,7 +475,11 @@ impl VM {
                             self.stack.push(Value::Int(ai % bi));
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot mod {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot mod {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -437,7 +490,9 @@ impl VM {
                         Value::Int(n) => self.stack.push(Value::Int(-n)),
                         Value::Float(n) => self.stack.push(Value::Float(-n)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot negate {}", a.type_name())));
+                            return Err(
+                                self.runtime_error(format!("cannot negate {}", a.type_name()))
+                            );
                         }
                     }
                 }
@@ -551,12 +606,16 @@ impl VM {
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop(); // pop callee
-                            let mut ctx = VMContext { registry: self.foreign_registry.clone() };
+                            let mut ctx = VMContext {
+                                registry: self.foreign_registry.clone(),
+                            };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot call {}", callee.type_name())));
+                            return Err(
+                                self.runtime_error(format!("cannot call {}", callee.type_name()))
+                            );
                         }
                     }
                 }
@@ -570,17 +629,33 @@ impl VM {
                     match obj {
                         // Foreign method dispatch via registry
                         Value::Foreign(fv) => {
-                            let method_name = self.chunk().method_names.get(method_idx)
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
                                 .cloned()
                                 .unwrap_or_default();
-                            let args: Vec<Value> = self.stack.drain(args_start..).collect();
-                            self.stack.pop(); // pop receiver
-                            let mut ctx = VMContext { registry: self.foreign_registry.clone() };
-                            match self.foreign_registry.call_method(&fv.borrow().type_id, &method_name, &mut ctx, &args) {
+                            let type_id = fv.borrow().type_id;
+                            let type_name = fv.borrow().type_name;
+                            // args[0] = receiver, args[1..] = call arguments (matches the
+                            // convention used by ForeignTypeDef::method closures elsewhere).
+                            let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
+                            let mut ctx = VMContext {
+                                registry: self.foreign_registry.clone(),
+                            };
+                            match self.foreign_registry.call_method(
+                                &type_id,
+                                &method_name,
+                                &mut ctx,
+                                &args,
+                            ) {
                                 Some(Ok(result)) => self.stack.push(result),
                                 Some(Err(e)) => return Err(e),
                                 None => {
-                                    return Err(self.runtime_error(format!("foreign type '{}' has no method '{}'", fv.borrow().type_name, method_name)));
+                                    return Err(self.runtime_error(format!(
+                                        "foreign type '{}' has no method '{}'",
+                                        type_name, method_name
+                                    )));
                                 }
                             }
                         }
@@ -598,7 +673,10 @@ impl VM {
                         }
                         // Native script struct method dispatch
                         Value::Struct(_, type_name) => {
-                            let method_name = self.chunk().method_names.get(method_idx)
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
                                 .cloned()
                                 .unwrap_or_default();
                             let qualified = format!("{}::{}", type_name, method_name);
@@ -616,19 +694,27 @@ impl VM {
                                     }
                                 }
                                 None => {
-                                    return Err(self.runtime_error(format!("type '{}' has no method '{}'", type_name, method_name)));
+                                    return Err(self.runtime_error(format!(
+                                        "type '{}' has no method '{}'",
+                                        type_name, method_name
+                                    )));
                                 }
                             }
                         }
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop();
-                            let mut ctx = VMContext { registry: self.foreign_registry.clone() };
+                            let mut ctx = VMContext {
+                                registry: self.foreign_registry.clone(),
+                            };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot call method on {}", obj.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot call method on {}",
+                                obj.type_name()
+                            )));
                         }
                     }
                 }
@@ -672,7 +758,8 @@ impl VM {
                             map.insert(s.to_string(), val);
                         }
                     }
-                    self.stack.push(Value::Struct(Rc::new(RefCell::new(map)), type_name));
+                    self.stack
+                        .push(Value::Struct(Rc::new(RefCell::new(map)), type_name));
                 }
 
                 Opcode::MakeArray(_) => {
@@ -696,7 +783,8 @@ impl VM {
                         _ => {
                             return Err(self.runtime_error(format!(
                                 "range requires integer bounds, got {} and {}",
-                                start.type_name(), end.type_name()
+                                start.type_name(),
+                                end.type_name()
                             )));
                         }
                     }
@@ -718,35 +806,50 @@ impl VM {
 
                 Opcode::LoadField(_) => {
                     let field_idx = self.read_u16() as usize;
-                    let field_name = self.chunk().field_names.get(field_idx)
+                    let field_name = self
+                        .chunk()
+                        .field_names
+                        .get(field_idx)
                         .cloned()
                         .unwrap_or_default();
                     let obj = self.stack.pop().unwrap();
                     match &obj {
                         Value::Struct(map, _) => {
-                            let val = map.borrow().get(&field_name)
-                                .cloned()
-                                .unwrap_or(Value::Nil);
+                            let val = map.borrow().get(&field_name).cloned().unwrap_or(Value::Nil);
                             self.stack.push(val);
                         }
                         Value::Foreign(fv) => {
-                            match self.foreign_registry.get_field(&fv.borrow().type_id, &field_name, &obj) {
+                            match self.foreign_registry.get_field(
+                                &fv.borrow().type_id,
+                                &field_name,
+                                &obj,
+                            ) {
                                 Some(Ok(val)) => self.stack.push(val),
                                 Some(Err(e)) => return Err(e),
                                 None => {
-                                    return Err(self.runtime_error(format!("foreign type '{}' has no field '{}'", fv.borrow().type_name, field_name)));
+                                    return Err(self.runtime_error(format!(
+                                        "foreign type '{}' has no field '{}'",
+                                        fv.borrow().type_name,
+                                        field_name
+                                    )));
                                 }
                             }
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot access field on {}", obj.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot access field on {}",
+                                obj.type_name()
+                            )));
                         }
                     }
                 }
 
                 Opcode::StoreField(_) => {
                     let field_idx = self.read_u16() as usize;
-                    let field_name = self.chunk().field_names.get(field_idx)
+                    let field_name = self
+                        .chunk()
+                        .field_names
+                        .get(field_idx)
                         .cloned()
                         .unwrap_or_default();
                     let val = self.stack.pop().unwrap();
@@ -764,16 +867,27 @@ impl VM {
                         }
                         Value::Foreign(_) => {
                             let type_id = foreign_type_id.unwrap();
-                            match self.foreign_registry.set_field(&type_id, &field_name, &mut obj, val) {
+                            match self.foreign_registry.set_field(
+                                &type_id,
+                                &field_name,
+                                &mut obj,
+                                val,
+                            ) {
                                 Some(Ok(())) => self.stack.push(result_val),
                                 Some(Err(e)) => return Err(e),
                                 None => {
-                                    return Err(self.runtime_error(format!("foreign type has no field '{}'", field_name)));
+                                    return Err(self.runtime_error(format!(
+                                        "foreign type has no field '{}'",
+                                        field_name
+                                    )));
                                 }
                             }
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot set field on {}", obj.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot set field on {}",
+                                obj.type_name()
+                            )));
                         }
                     }
                 }
@@ -789,18 +903,29 @@ impl VM {
                         }
                         (Value::Str(s), Value::Int(i)) => {
                             let idx = *i as usize;
-                            let c = s.chars().nth(idx).map(|c| c.to_string()).unwrap_or_default();
+                            let c = s
+                                .chars()
+                                .nth(idx)
+                                .map(|c| c.to_string())
+                                .unwrap_or_default();
                             self.stack.push(Value::Str(c.into()));
                         }
                         (Value::Range(start, end, inclusive), Value::Int(i)) => {
                             let val = start + i;
-                            if (!*inclusive && val >= *end) || (*inclusive && val > *end) || val < *start.min(end) {
+                            if (!*inclusive && val >= *end)
+                                || (*inclusive && val > *end)
+                                || val < *start.min(end)
+                            {
                                 return Err(self.runtime_error("index out of range bounds"));
                             }
                             self.stack.push(Value::Int(val));
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot index {} with {}",
+                                obj.type_name(),
+                                index.type_name()
+                            )));
                         }
                     }
                 }
@@ -817,7 +942,11 @@ impl VM {
                             self.stack.push(result_val);
                         }
                         _ => {
-                            return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot index {} with {}",
+                                obj.type_name(),
+                                index.type_name()
+                            )));
                         }
                     }
                 }
@@ -828,10 +957,19 @@ impl VM {
                         Value::Str(s) => self.stack.push(Value::Int(s.len() as i64)),
                         Value::Array(arr) => self.stack.push(Value::Int(arr.borrow().len() as i64)),
                         Value::Range(start, end, inclusive) => {
-                            let len = if inclusive { end - start + 1 } else { end - start };
+                            let len = if inclusive {
+                                end - start + 1
+                            } else {
+                                end - start
+                            };
                             self.stack.push(Value::Int(len.max(0)));
                         }
-                        _ => return Err(self.runtime_error(format!("cannot get length of {}", val.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot get length of {}",
+                                val.type_name()
+                            )));
+                        }
                     }
                 }
 
@@ -853,7 +991,11 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai & bi)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot bitwise-and {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot bitwise-and {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -864,7 +1006,11 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai | bi)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot bitwise-or {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot bitwise-or {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -875,7 +1021,11 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai ^ bi)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot bitwise-xor {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot bitwise-xor {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -886,7 +1036,11 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai << bi)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot shift left {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot shift left {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -897,7 +1051,11 @@ impl VM {
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai >> bi)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot shift right {} and {}", a.type_name(), b.type_name())));
+                            return Err(self.runtime_error(format!(
+                                "cannot shift right {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
                         }
                     }
                 }
@@ -907,7 +1065,9 @@ impl VM {
                     match a {
                         Value::Int(n) => self.stack.push(Value::Int(!n)),
                         _ => {
-                            return Err(self.runtime_error(format!("cannot bitwise-not {}", a.type_name())));
+                            return Err(
+                                self.runtime_error(format!("cannot bitwise-not {}", a.type_name()))
+                            );
                         }
                     }
                 }
@@ -916,7 +1076,9 @@ impl VM {
                     let val = self.stack.pop().unwrap();
                     match val {
                         Value::Enum { tag, data: _ } => self.stack.push(Value::Int(tag as i64)),
-                        _ => return Err(self.runtime_error(format!("LoadEnumTag on non-enum value"))),
+                        _ => {
+                            return Err(self.runtime_error(format!("LoadEnumTag on non-enum value")));
+                        }
                     }
                 }
 
@@ -928,7 +1090,11 @@ impl VM {
                             let field = data.borrow().get(idx).cloned().unwrap_or(Value::Nil);
                             self.stack.push(field);
                         }
-                        _ => return Err(self.runtime_error(format!("LoadEnumField on non-enum value"))),
+                        _ => {
+                            return Err(
+                                self.runtime_error(format!("LoadEnumField on non-enum value"))
+                            );
+                        }
                     }
                 }
 
@@ -955,9 +1121,11 @@ pub mod tests {
         let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -971,7 +1139,8 @@ pub mod tests {
         let native_names = crate::stdlib::native_names();
         let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
         let types = crate::typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source)?;
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source)?;
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -1266,22 +1435,30 @@ pub mod tests {
     fn setup_vm_with_point() -> VM {
         let mut vm = VM::new();
         vm.register_type::<Point>("Point")
-            .field("x",
+            .field(
+                "x",
                 |obj: &Value| -> Result<Value> {
                     interop::with_foreign::<Point, _, _>(obj, |p| Ok(Value::Int(p.x as i64)))
                 },
                 |obj: &mut Value, val: Value| -> Result<()> {
                     let x = val.as_int().unwrap() as i32;
-                    interop::with_foreign_mut::<Point, _, _>(obj, |p| { p.x = x; Ok(()) })
+                    interop::with_foreign_mut::<Point, _, _>(obj, |p| {
+                        p.x = x;
+                        Ok(())
+                    })
                 },
             )
-            .field("y",
+            .field(
+                "y",
                 |obj: &Value| -> Result<Value> {
                     interop::with_foreign::<Point, _, _>(obj, |p| Ok(Value::Int(p.y as i64)))
                 },
                 |obj: &mut Value, val: Value| -> Result<()> {
                     let y = val.as_int().unwrap() as i32;
-                    interop::with_foreign_mut::<Point, _, _>(obj, |p| { p.y = y; Ok(()) })
+                    interop::with_foreign_mut::<Point, _, _>(obj, |p| {
+                        p.y = y;
+                        Ok(())
+                    })
                 },
             );
         vm
@@ -1319,7 +1496,11 @@ pub mod tests {
         let mut fv = Value::Foreign(Rc::new(RefCell::new(ForeignObject::new("Point", point))));
 
         let def = vm.foreign_registry.get(&TypeId::of::<Point>()).unwrap();
-        def.fields.get("x").unwrap().set(&mut fv, Value::Int(99)).unwrap();
+        def.fields
+            .get("x")
+            .unwrap()
+            .set(&mut fv, Value::Int(99))
+            .unwrap();
 
         let result = def.fields.get("x").unwrap().get(&fv).unwrap();
         assert_eq!(result, Value::Int(99));
@@ -1329,30 +1510,40 @@ pub mod tests {
     fn test_interop_foreign_method() {
         let mut vm = VM::new();
         vm.register_type::<Point>("Point")
-            .field("x",
+            .field(
+                "x",
                 |obj: &Value| -> Result<Value> {
                     interop::with_foreign::<Point, _, _>(obj, |p| Ok(Value::Int(p.x as i64)))
                 },
                 |obj: &mut Value, val: Value| -> Result<()> {
                     let x = val.as_int().unwrap() as i32;
-                    interop::with_foreign_mut::<Point, _, _>(obj, |p| { p.x = x; Ok(()) })
+                    interop::with_foreign_mut::<Point, _, _>(obj, |p| {
+                        p.x = x;
+                        Ok(())
+                    })
                 },
             )
-            .method("double_x", Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
-                interop::with_foreign::<Point, _, _>(&args[0], |p| Ok(Value::Int((p.x * 2) as i64)))
-            }));
+            .method(
+                "double_x",
+                Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+                    interop::with_foreign::<Point, _, _>(&args[0], |p| {
+                        Ok(Value::Int((p.x * 2) as i64))
+                    })
+                }),
+            );
 
         let point = Point { x: 5, y: 10 };
         let fv = Value::Foreign(Rc::new(RefCell::new(ForeignObject::new("Point", point))));
 
         // Call method via registry
-        let mut ctx = VMContext { registry: vm.foreign_registry.clone() };
-        let result = vm.foreign_registry.call_method(
-            &TypeId::of::<Point>(),
-            "double_x",
-            &mut ctx,
-            &[fv.clone()],
-        ).unwrap().unwrap();
+        let mut ctx = VMContext {
+            registry: vm.foreign_registry.clone(),
+        };
+        let result = vm
+            .foreign_registry
+            .call_method(&TypeId::of::<Point>(), "double_x", &mut ctx, &[fv.clone()])
+            .unwrap()
+            .unwrap();
         assert_eq!(result, Value::Int(10));
     }
 
@@ -1367,7 +1558,9 @@ pub mod tests {
         }
 
         // Verify the NativeFn works directly:
-        let ctx = &mut VMContext { registry: Rc::new(ForeignTypeRegistry::new()) };
+        let ctx = &mut VMContext {
+            registry: Rc::new(ForeignTypeRegistry::new()),
+        };
         let result = double(ctx, &[Value::Int(5)]).unwrap();
         assert_eq!(result, Value::Int(10));
     }
@@ -1423,7 +1616,8 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1436,7 +1630,8 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1452,7 +1647,8 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source1).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source1).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1466,7 +1662,8 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source2).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source2).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1487,7 +1684,8 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         let mut vm = VM::new();
         vm.load_bytecode(fns, global_names);
@@ -1500,7 +1698,8 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut symbols = crate::resolver::resolve(&mut program).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &[], source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source).unwrap();
 
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
@@ -1675,7 +1874,11 @@ fn remap_function_value(
 ) {
     match val {
         Value::Function(idx) => {
-            if let Some(name) = old_name_to_idx.iter().find(|(_, v)| **v == *idx).map(|(n, _)| *n) {
+            if let Some(name) = old_name_to_idx
+                .iter()
+                .find(|(_, v)| **v == *idx)
+                .map(|(n, _)| *n)
+            {
                 if let Some(&new_idx) = new_name_to_idx.get(name) {
                     *idx = new_idx;
                 }
@@ -1683,7 +1886,11 @@ fn remap_function_value(
         }
         Value::Closure(c) => {
             let mut data = c.borrow_mut();
-            if let Some(name) = old_name_to_idx.iter().find(|(_, v)| **v == data.fn_idx).map(|(n, _)| *n) {
+            if let Some(name) = old_name_to_idx
+                .iter()
+                .find(|(_, v)| **v == data.fn_idx)
+                .map(|(n, _)| *n)
+            {
                 if let Some(&new_idx) = new_name_to_idx.get(name) {
                     data.fn_idx = new_idx;
                 }
@@ -1732,11 +1939,11 @@ mod closure_tests {
         let tokens = Lexer::new(source).tokenize().unwrap();
         let mut program = Parser::new(source, &tokens).parse().unwrap();
         let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(
-            &program, &types, &symbols, &native_names, source
-        ).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -1773,11 +1980,11 @@ mod module_tests {
         let tokens = Lexer::new(source).tokenize().unwrap();
         let mut program = Parser::new(source, &tokens).parse().unwrap();
         let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(
-            &program, &types, &symbols, &native_names, source
-        ).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);

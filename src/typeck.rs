@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use compact_str::CompactString;
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::span::{SourceLocation, Span};
 use crate::symbol::*;
+use compact_str::CompactString;
 
 /// Opaque identifier for AST nodes — used by [`TypeMap`] for lookups.
 pub type NodeId = usize;
@@ -20,7 +20,10 @@ pub struct TypeMap {
 
 impl TypeMap {
     pub fn new() -> Self {
-        Self { map: HashMap::new(), _sentinel: Vec::new() }
+        Self {
+            map: HashMap::new(),
+            _sentinel: Vec::new(),
+        }
     }
 
     pub fn get(&self, expr: &Expr) -> Option<&Type> {
@@ -38,7 +41,12 @@ impl TypeMap {
 /// Errors are collected and returned as a single `Error::TypeError` (or
 /// `Error::ParseMultiple` if there are multiple).
 pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
-    let mut checker = TypeChecker { symbols, type_map: TypeMap::new(), errors: Vec::new(), current_span: Span::new(0, 0) };
+    let mut checker = TypeChecker {
+        symbols,
+        type_map: TypeMap::new(),
+        errors: Vec::new(),
+        current_span: Span::new(0, 0),
+    };
     for stmt in &program.stmts {
         checker.set_span(stmt.span);
         checker.check_stmt(&stmt.node, None);
@@ -46,7 +54,9 @@ pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
     if checker.errors.is_empty() {
         Ok(checker.type_map)
     } else {
-        Err(Error::ParseMultiple { errors: std::mem::take(&mut checker.errors) })
+        Err(Error::ParseMultiple {
+            errors: std::mem::take(&mut checker.errors),
+        })
     }
 }
 
@@ -78,7 +88,12 @@ impl<'a> TypeChecker<'a> {
 
     fn check_stmt(&mut self, stmt: &Stmt, _return_type: Option<&Type>) {
         match stmt {
-            Stmt::Let { name, type_ann, init, .. } => {
+            Stmt::Let {
+                name,
+                type_ann,
+                init,
+                ..
+            } => {
                 let declared = type_ann.as_ref();
                 // Temporarily remove the binding so the init expression sees
                 // the outer variable (handles `let x = x + 1` shadowing).
@@ -100,14 +115,21 @@ impl<'a> TypeChecker<'a> {
                 };
                 // Restore the binding with the inferred type
                 if let Some(entry) = removed {
-                    self.symbols.insert_into_current_scope(name, SymKind::Variable(init_ty.clone()));
+                    self.symbols
+                        .insert_into_current_scope(name, SymKind::Variable(init_ty.clone()));
                     // Update the flat symbol list entry too (preserving its id)
                     drop(entry);
                 } else {
-                    self.symbols.insert_into_current_scope(name, SymKind::Variable(init_ty.clone()));
+                    self.symbols
+                        .insert_into_current_scope(name, SymKind::Variable(init_ty.clone()));
                 }
             }
-            Stmt::Const { name, type_ann, init, .. } => {
+            Stmt::Const {
+                name,
+                type_ann,
+                init,
+                ..
+            } => {
                 let declared = type_ann.as_ref();
                 let ty = self.check_expr(init);
                 if let Some(dt) = declared {
@@ -119,7 +141,8 @@ impl<'a> TypeChecker<'a> {
                         ));
                     }
                 }
-                self.symbols.insert_into_current_scope(name, SymKind::Variable(ty));
+                self.symbols
+                    .insert_into_current_scope(name, SymKind::Variable(ty));
             }
             Stmt::Expr(expr) => {
                 self.check_expr(expr);
@@ -146,12 +169,21 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Stmt::Fn { name: _, type_params, params, return_type, body, .. } => {
+            Stmt::Fn {
+                name: _,
+                type_params,
+                params,
+                return_type,
+                body,
+                ..
+            } => {
                 self.symbols.enter_scope();
                 // Register generic type parameters in scope
                 for tp in type_params {
                     if self.symbols.lookup(&tp.name).is_none() {
-                        let _ = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
+                        let _ = self
+                            .symbols
+                            .define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
                     }
                 }
                 for param in params {
@@ -169,31 +201,51 @@ impl<'a> TypeChecker<'a> {
                         let ty = self.check_expr(e);
                         if let Some(rt) = expected_ret {
                             if !self.types_compatible(&ty, rt) {
-                                self.error_at(last.span, format!(
-                                    "function return type mismatch: expected '{}', got '{}'",
-                                    self.type_display(rt),
-                                    self.type_display(&ty),
-                                ));
+                                self.error_at(
+                                    last.span,
+                                    format!(
+                                        "function return type mismatch: expected '{}', got '{}'",
+                                        self.type_display(rt),
+                                        self.type_display(&ty),
+                                    ),
+                                );
                             }
                         }
                     }
                 }
                 self.symbols.exit_scope();
             }
-            Stmt::Impl { type_name, type_params, methods, .. } => {
+            Stmt::Impl {
+                type_name,
+                type_params,
+                methods,
+                ..
+            } => {
                 for method in methods {
-                    if let Stmt::Fn { name: _, type_params: method_type_params, params, return_type, body, .. } = &method.node {
+                    if let Stmt::Fn {
+                        name: _,
+                        type_params: method_type_params,
+                        params,
+                        return_type,
+                        body,
+                        ..
+                    } = &method.node
+                    {
                         self.symbols.enter_scope();
                         // Register generic type parameters from impl block
                         for tp in type_params {
                             if self.symbols.lookup(&tp.name).is_none() {
-                                let _ = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
+                                let _ = self
+                                    .symbols
+                                    .define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
                             }
                         }
                         // Register generic type parameters from method
                         for tp in method_type_params {
                             if self.symbols.lookup(&tp.name).is_none() {
-                                let _ = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
+                                let _ = self
+                                    .symbols
+                                    .define(&tp.name, SymKind::TypeParam(tp.name.to_string()));
                             }
                         }
                         for param in params {
@@ -228,7 +280,11 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } | Stmt::Trait { .. } | Stmt::Type { .. } => {}
+            Stmt::Struct { .. }
+            | Stmt::Enum { .. }
+            | Stmt::Use { .. }
+            | Stmt::Trait { .. }
+            | Stmt::Type { .. } => {}
             Stmt::Mod { body, .. } => {
                 self.symbols.enter_scope();
                 for stmt in body {
@@ -246,31 +302,32 @@ impl<'a> TypeChecker<'a> {
             Expr::Str(_) => Type::Str,
             Expr::Bool(_) => Type::Bool,
             Expr::Unit => Type::Unit,
-            Expr::Ident(name) => {
-                match self.symbols.lookup(name) {
-                    Some(entry) => match &entry.kind {
-                        SymKind::Variable(ty) => ty.clone(),
-                        SymKind::Function(sig) => {
-                            let ret = sig.return_type.clone().unwrap_or(Type::Unit);
-                            Type::Fn {
-                                params: sig.params.iter().map(|(_, t)| t.clone()).collect(),
-                                ret: Box::new(ret),
-                            }
+            Expr::Ident(name) => match self.symbols.lookup(name) {
+                Some(entry) => match &entry.kind {
+                    SymKind::Variable(ty) => ty.clone(),
+                    SymKind::Function(sig) => {
+                        let ret = sig.return_type.clone().unwrap_or(Type::Unit);
+                        Type::Fn {
+                            params: sig.params.iter().map(|(_, t)| t.clone()).collect(),
+                            ret: Box::new(ret),
                         }
-                        SymKind::EnumConstructor { enum_name, variant_name: _, tag: _, fields } if fields.is_empty() => {
-                            Type::Named(enum_name.clone().into())
-                        }
-                        _ => {
-                            self.error(format!("'{}' is not a variable", name));
-                            Type::Unit
-                        }
-                    },
-                    None => {
-                        self.error(format!("undefined name '{}'", name));
+                    }
+                    SymKind::EnumConstructor {
+                        enum_name,
+                        variant_name: _,
+                        tag: _,
+                        fields,
+                    } if fields.is_empty() => Type::Named(enum_name.clone().into()),
+                    _ => {
+                        self.error(format!("'{}' is not a variable", name));
                         Type::Unit
                     }
+                },
+                None => {
+                    self.error(format!("undefined name '{}'", name));
+                    Type::Unit
                 }
-            }
+            },
             Expr::Binary { op, lhs, rhs } => {
                 let lt = self.check_expr(lhs);
                 let rt = self.check_expr(rhs);
@@ -286,8 +343,16 @@ impl<'a> TypeChecker<'a> {
                         }
                         lt
                     }
-                    BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod
-                    | BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr => {
+                    BinOp::Add
+                    | BinOp::Sub
+                    | BinOp::Mul
+                    | BinOp::Div
+                    | BinOp::Mod
+                    | BinOp::BitAnd
+                    | BinOp::BitOr
+                    | BinOp::BitXor
+                    | BinOp::Shl
+                    | BinOp::Shr => {
                         if !self.types_compatible(&lt, &rt) {
                             self.error(format!(
                                 "type mismatch in arithmetic: '{}' vs '{}'",
@@ -340,16 +405,34 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::Call { func, args } => {
                 // Check if this is an enum constructor call
-                let constructor_info: Option<(String, String, Vec<Type>)> = if let Expr::Ident(name) = func.as_ref() {
-                    if let Some(entry) = self.symbols.lookup(name) {
-                        if let SymKind::EnumConstructor { enum_name, variant_name, tag: _, fields } = &entry.kind {
-                            Some((enum_name.clone(), variant_name.clone(), fields.clone()))
-                        } else { None }
-                    } else { None }
-                } else { None };
+                let constructor_info: Option<(String, String, Vec<Type>)> =
+                    if let Expr::Ident(name) = func.as_ref() {
+                        if let Some(entry) = self.symbols.lookup(name) {
+                            if let SymKind::EnumConstructor {
+                                enum_name,
+                                variant_name,
+                                tag: _,
+                                fields,
+                            } = &entry.kind
+                            {
+                                Some((enum_name.clone(), variant_name.clone(), fields.clone()))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
                 if let Some((enum_name, variant_name, fields)) = constructor_info {
                     if args.len() != fields.len() {
-                        self.error(format!("'{}' expects {} arguments, got {}", variant_name, fields.len(), args.len()));
+                        self.error(format!(
+                            "'{}' expects {} arguments, got {}",
+                            variant_name,
+                            fields.len(),
+                            args.len()
+                        ));
                         return Type::Unit;
                     }
                     for (arg, field_ty) in args.iter().zip(fields.iter()) {
@@ -357,7 +440,9 @@ impl<'a> TypeChecker<'a> {
                         if !self.types_compatible(&arg_ty, field_ty) {
                             self.error(format!(
                                 "argument type mismatch for '{}': expected '{}', got '{}'",
-                                variant_name, self.type_display(field_ty), self.type_display(&arg_ty),
+                                variant_name,
+                                self.type_display(field_ty),
+                                self.type_display(&arg_ty),
                             ));
                         }
                     }
@@ -371,7 +456,8 @@ impl<'a> TypeChecker<'a> {
                             if params.len() != args.len() {
                                 self.error(format!(
                                     "expected {} arguments, got {}",
-                                    params.len(), args.len(),
+                                    params.len(),
+                                    args.len(),
                                 ));
                             }
                             for (i, arg) in args.iter().enumerate() {
@@ -380,18 +466,24 @@ impl<'a> TypeChecker<'a> {
                                     if !self.types_compatible(&arg_ty, param_ty) {
                                         self.error(format!(
                                             "argument {} type mismatch: expected '{}', got '{}'",
-                                            i, self.type_display(param_ty), self.type_display(&arg_ty),
+                                            i,
+                                            self.type_display(param_ty),
+                                            self.type_display(&arg_ty),
                                         ));
                                     }
                                 }
                             }
                         } else {
-                            for arg in args { self.check_expr(arg); }
+                            for arg in args {
+                                self.check_expr(arg);
+                            }
                         }
                         *ret.clone()
                     }
                     _ => {
-                        for arg in args { self.check_expr(arg); }
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
                         self.error("calling non-function type");
                         Type::Unit
                     }
@@ -405,7 +497,11 @@ impl<'a> TypeChecker<'a> {
                         // Extract info from symbols before calling self methods (avoid borrow conflict)
                         let method_info = self.symbols.lookup(&qualified).and_then(|entry| {
                             if let SymKind::Function(sig) = &entry.kind {
-                                let has_self = sig.params.first().map(|(n, _)| n == "self").unwrap_or(false);
+                                let has_self = sig
+                                    .params
+                                    .first()
+                                    .map(|(n, _)| n == "self")
+                                    .unwrap_or(false);
                                 let param_tys: Vec<Type> = if has_self {
                                     sig.params[1..].iter().map(|(_, t)| t.clone()).collect()
                                 } else {
@@ -421,7 +517,10 @@ impl<'a> TypeChecker<'a> {
                                 if args.len() != param_tys.len() {
                                     self.error(format!(
                                         "method '{}::{}' expects {} argument(s), got {}",
-                                        struct_name, method, param_tys.len(), args.len(),
+                                        struct_name,
+                                        method,
+                                        param_tys.len(),
+                                        args.len(),
                                     ));
                                 }
                                 for (i, arg) in args.iter().enumerate() {
@@ -443,15 +542,34 @@ impl<'a> TypeChecker<'a> {
                                 if self.symbols.lookup(&qualified).is_some() {
                                     self.error(format!("'{}' is not a function", qualified));
                                 } else {
-                                    self.error(format!("no method named '{}' on struct '{}'", method, struct_name));
+                                    self.error(format!(
+                                        "no method named '{}' on struct '{}'",
+                                        method, struct_name
+                                    ));
                                 }
                                 Type::Unit
                             }
                         }
                     }
+                    // `Type::Unit` is also used as the type-erased "compatible
+                    // with anything" placeholder for generic/native values
+                    // (see native_fn_sigs()); method calls on such values
+                    // (e.g. `.next()` on an iterator returned by `iter()`)
+                    // can't be statically validated, so allow them through.
+                    Type::Unit => {
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        Type::Unit
+                    }
                     _ => {
-                        for arg in args { self.check_expr(arg); }
-                        self.error(format!("cannot call method on type '{}'", self.type_display(&obj_ty)));
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        self.error(format!(
+                            "cannot call method on type '{}'",
+                            self.type_display(&obj_ty)
+                        ));
                         Type::Unit
                     }
                 }
@@ -465,7 +583,10 @@ impl<'a> TypeChecker<'a> {
                                 if let Some(f) = def.fields.iter().find(|f| f.name == *field) {
                                     f.type_ann.clone()
                                 } else {
-                                    self.error(format!("struct '{}' has no field '{}'", struct_name, field));
+                                    self.error(format!(
+                                        "struct '{}' has no field '{}'",
+                                        struct_name, field
+                                    ));
                                     Type::Unit
                                 }
                             } else {
@@ -478,7 +599,10 @@ impl<'a> TypeChecker<'a> {
                         }
                     }
                     _ => {
-                        self.error(format!("cannot access field on type '{}'", self.type_display(&obj_ty)));
+                        self.error(format!(
+                            "cannot access field on type '{}'",
+                            self.type_display(&obj_ty)
+                        ));
                         Type::Unit
                     }
                 }
@@ -545,7 +669,8 @@ impl<'a> TypeChecker<'a> {
                 };
                 // Remove any existing binding (from resolver) and re-insert
                 self.symbols.remove_from_current_scope(var);
-                self.symbols.insert_into_current_scope(var, SymKind::Variable(loop_ty));
+                self.symbols
+                    .insert_into_current_scope(var, SymKind::Variable(loop_ty));
                 self.check_expr(body);
                 self.symbols.exit_scope();
                 Type::Unit
@@ -562,8 +687,12 @@ impl<'a> TypeChecker<'a> {
                         if let Some(entry) = self.symbols.lookup(n) {
                             if let SymKind::Enum(def) = &entry.kind {
                                 Some(def.clone())
-                            } else { None }
-                        } else { None }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
                     }
                     Type::Result(_, _) | Type::Option(_) => {
                         let name = match &mt {
@@ -574,13 +703,18 @@ impl<'a> TypeChecker<'a> {
                         if let Some(entry) = self.symbols.lookup(name) {
                             if let SymKind::Enum(def) = &entry.kind {
                                 Some(def.clone())
-                            } else { None }
-                        } else { None }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
                     }
                     _ => None,
                 };
                 for arm in arms {
-                    let enters_scope = matches!(arm.pattern, Pattern::Ident(_) | Pattern::EnumVariant { .. });
+                    let enters_scope =
+                        matches!(arm.pattern, Pattern::Ident(_) | Pattern::EnumVariant { .. });
                     if enters_scope {
                         self.symbols.enter_scope();
                     }
@@ -590,28 +724,45 @@ impl<'a> TypeChecker<'a> {
                                 let _ = self.symbols.define(name, SymKind::Variable(Type::Unit));
                             }
                         }
-                        Pattern::EnumVariant { variant_name, bindings } => {
+                        Pattern::EnumVariant {
+                            variant_name,
+                            bindings,
+                        } => {
                             if let Some(ref def) = enum_def {
-                                if let Some((_, field_types)) = def.variants.iter().find(|(n, _)| n == variant_name.as_str()) {
+                                if let Some((_, field_types)) = def
+                                    .variants
+                                    .iter()
+                                    .find(|(n, _)| n == variant_name.as_str())
+                                {
                                     if bindings.len() != field_types.len() {
                                         self.error(format!(
                                             "'{}' has {} fields, but pattern has {} bindings",
-                                            variant_name, field_types.len(), bindings.len(),
+                                            variant_name,
+                                            field_types.len(),
+                                            bindings.len(),
                                         ));
                                     }
                                     for (i, binding) in bindings.iter().enumerate() {
-                                        if binding.is_empty() { continue; } // wildcard _
+                                        if binding.is_empty() {
+                                            continue;
+                                        } // wildcard _
                                         // Substitute generic placeholder types with actual types from Result/Option
                                         let ty = if let Type::Result(ref ok_ty, ref err_ty) = mt {
                                             match variant_name.as_str() {
                                                 "Ok" => *ok_ty.clone(),
                                                 "Err" => *err_ty.clone(),
-                                                _ => field_types.get(i).cloned().unwrap_or(Type::Unit),
+                                                _ => field_types
+                                                    .get(i)
+                                                    .cloned()
+                                                    .unwrap_or(Type::Unit),
                                             }
                                         } else if let Type::Option(ref some_ty) = mt {
                                             match variant_name.as_str() {
                                                 "Some" => *some_ty.clone(),
-                                                _ => field_types.get(i).cloned().unwrap_or(Type::Unit),
+                                                _ => field_types
+                                                    .get(i)
+                                                    .cloned()
+                                                    .unwrap_or(Type::Unit),
                                             }
                                         } else {
                                             field_types.get(i).cloned().unwrap_or(Type::Unit)
@@ -621,7 +772,10 @@ impl<'a> TypeChecker<'a> {
                                         let _ = self.symbols.define(binding, SymKind::Variable(ty));
                                     }
                                 } else {
-                                    self.error(format!("'{}' is not a variant of this enum", variant_name));
+                                    self.error(format!(
+                                        "'{}' is not a variant of this enum",
+                                        variant_name
+                                    ));
                                 }
                             } else {
                                 self.error("cannot match enum variant on non-enum type");
@@ -650,7 +804,9 @@ impl<'a> TypeChecker<'a> {
                             }
                             Pattern::Ident(name) => {
                                 // Pattern::Ident could be a catch-all or a zero-field enum variant
-                                if def.variants.iter().any(|(vname, fields)| fields.is_empty() && vname == name.as_str()) {
+                                if def.variants.iter().any(|(vname, fields)| {
+                                    fields.is_empty() && vname == name.as_str()
+                                }) {
                                     if !covered.contains(name) {
                                         covered.push(name.clone());
                                     }
@@ -665,7 +821,10 @@ impl<'a> TypeChecker<'a> {
                     if !has_wildcard {
                         for (vname, _) in &def.variants {
                             if !covered.iter().any(|c| c.as_str() == vname) {
-                                self.error(format!("non-exhaustive match: missing variant '{}'", vname));
+                                self.error(format!(
+                                    "non-exhaustive match: missing variant '{}'",
+                                    vname
+                                ));
                             }
                         }
                     }
@@ -685,17 +844,21 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::Return(None) => Type::Unit,
             Expr::Break | Expr::Continue => Type::Unit,
-            Expr::StructLit { name, fields, spread } => {
+            Expr::StructLit {
+                name,
+                fields,
+                spread,
+            } => {
                 let entry = self.symbols.lookup(name).cloned();
                 match entry {
-                    Some(SymEntry { kind: SymKind::Struct(def), .. }) => {
+                    Some(SymEntry {
+                        kind: SymKind::Struct(def),
+                        ..
+                    }) => {
                         for (fname, fval) in fields {
                             let found = def.fields.iter().find(|f| f.name == *fname);
                             if found.is_none() {
-                                self.error(format!(
-                                    "struct '{}' has no field '{}'",
-                                    name, fname
-                                ));
+                                self.error(format!("struct '{}' has no field '{}'", name, fname));
                             }
                             self.check_expr(fval);
                         }
@@ -705,7 +868,8 @@ impl<'a> TypeChecker<'a> {
                             if spread_ty != expected {
                                 self.error(format!(
                                     "spread expression has type '{}' but expected struct '{}'",
-                                    self.type_display(&spread_ty), name
+                                    self.type_display(&spread_ty),
+                                    name
                                 ));
                             }
                         }
@@ -732,7 +896,11 @@ impl<'a> TypeChecker<'a> {
                 self.check_expr(end);
                 Type::Unit // ranges are consumed by for-loops in compilation
             }
-            Expr::Lambda { params, return_type: _, body } => {
+            Expr::Lambda {
+                params,
+                return_type: _,
+                body,
+            } => {
                 self.symbols.enter_scope();
                 for param in params {
                     let ty = param.type_ann.clone().unwrap_or(Type::Unit);
@@ -742,9 +910,13 @@ impl<'a> TypeChecker<'a> {
                 }
                 let ret = self.check_expr(body);
                 self.symbols.exit_scope();
-                Type::Fn { params: params.iter().map(|p| {
-                    p.type_ann.clone().unwrap_or(Type::Unit)
-                }).collect(), ret: Box::new(ret) }
+                Type::Fn {
+                    params: params
+                        .iter()
+                        .map(|p| p.type_ann.clone().unwrap_or(Type::Unit))
+                        .collect(),
+                    ret: Box::new(ret),
+                }
             }
         };
         self.type_map.set(expr, ty.clone());
@@ -770,7 +942,9 @@ impl<'a> TypeChecker<'a> {
             (Type::Named(a), Type::Named(b)) => a == b,
             (Type::Array(a), Type::Array(b)) => self.types_compatible(a, b),
             (Type::Option(a), Type::Option(b)) => self.types_compatible(a, b),
-            (Type::Result(oka, erra), Type::Result(okb, errb)) => self.types_compatible(oka, okb) && self.types_compatible(erra, errb),
+            (Type::Result(oka, erra), Type::Result(okb, errb)) => {
+                self.types_compatible(oka, okb) && self.types_compatible(erra, errb)
+            }
             // Named("Option") / Named("Result") from enum constructors are compatible with generic Option/Result
             (Type::Named(a), Type::Option(_)) if a == "Option" => true,
             (Type::Option(_), Type::Named(a)) if a == "Option" => true,
@@ -820,7 +994,11 @@ impl<'a> TypeChecker<'a> {
                 format!("({}) -> {}", p.join(", "), self.type_display(ret))
             }
             Type::Option(inner) => format!("Option<{}>", self.type_display(inner)),
-            Type::Result(ok, err) => format!("Result<{}, {}>", self.type_display(ok), self.type_display(err)),
+            Type::Result(ok, err) => format!(
+                "Result<{}, {}>",
+                self.type_display(ok),
+                self.type_display(err)
+            ),
         }
     }
 }

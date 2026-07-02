@@ -77,7 +77,9 @@ pub fn compile(
                 let idx = function_names.len() + 1;
                 function_names.insert(name.to_string(), idx);
             }
-            Stmt::Impl { type_name, methods, .. } => {
+            Stmt::Impl {
+                type_name, methods, ..
+            } => {
                 for m in methods {
                     if let Stmt::Fn { name, .. } = &m.node {
                         let qualified = format!("{}::{}", type_name, name);
@@ -106,8 +108,15 @@ pub fn compile(
     // Second pass: compile top-level statements into a main function
     {
         let mut fc = FunctionCompiler::new(
-            "__main__".into(), 0, globals.clone(), &function_names,
-            &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(), symbols,
+            "__main__".into(),
+            0,
+            globals.clone(),
+            &function_names,
+            &mut errors,
+            &line_offsets,
+            lambda_counter.clone(),
+            lambda_fns.clone(),
+            symbols,
         );
         let stmt_count = program.stmts.len();
         for (i, stmt) in program.stmts.iter().enumerate() {
@@ -131,7 +140,9 @@ pub fn compile(
         } else {
             match program.stmts.last() {
                 Some(s) if matches!(&s.node, Stmt::Expr(_)) => {}
-                _ => { fc.none(); }
+                _ => {
+                    fc.none();
+                }
             }
         }
         fc.emit_op(Opcode::Return);
@@ -139,59 +150,104 @@ pub fn compile(
     }
 
     // Third pass: compile user-defined functions
-    compile_functions(&program.stmts, &mut functions, &globals, &function_names,
-        &mut errors, &line_offsets, &lambda_counter, &lambda_fns, symbols);
+    compile_functions(
+        &program.stmts,
+        &mut functions,
+        &globals,
+        &function_names,
+        &mut errors,
+        &line_offsets,
+        &lambda_counter,
+        &lambda_fns,
+        symbols,
+    );
 
     // Helper to compile function declarations from a list of stmts (handles Mod recursion)
-    fn compile_functions(stmts: &[Spanned<Stmt>], functions: &mut Vec<BytecodeFn>,
+    fn compile_functions(
+        stmts: &[Spanned<Stmt>],
+        functions: &mut Vec<BytecodeFn>,
         globals: &Rc<RefCell<HashMap<String, u16>>>,
         function_names: &HashMap<String, usize>,
         mut errors: &mut Vec<Error>,
         line_offsets: &[usize],
         lambda_counter: &Rc<RefCell<usize>>,
         lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>,
-        symbols: &SymbolTable) {
+        symbols: &SymbolTable,
+    ) {
         for stmt in stmts {
-            if let Stmt::Fn { name, params, return_type: _, body, .. } = &stmt.node {
+            if let Stmt::Fn {
+                name,
+                params,
+                return_type: _,
+                body,
+                ..
+            } = &stmt.node
+            {
                 let arity = params.len() as u32;
-            let mut fc = FunctionCompiler::new(
-                name.to_string(), arity, globals.clone(), &function_names,
-                &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(), symbols,
-            );
+                let mut fc = FunctionCompiler::new(
+                    name.to_string(),
+                    arity,
+                    globals.clone(),
+                    &function_names,
+                    &mut errors,
+                    &line_offsets,
+                    lambda_counter.clone(),
+                    lambda_fns.clone(),
+                    symbols,
+                );
 
-            fc.enter_scope();
-            for param in params {
-                fc.add_local(&param.name);
-            }
-
-            let stmt_count = body.len();
-            for (i, s) in body.iter().enumerate() {
-                fc.set_line_by_offset(s.span.start());
-                if i == stmt_count - 1 && matches!(&s.node, Stmt::Expr(_)) {
-                    if let Stmt::Expr(expr) = &s.node {
-                        fc.compile_expr(expr);
-                    }
-                } else {
-                    fc.compile_stmt(&s.node);
+                fc.enter_scope();
+                for param in params {
+                    fc.add_local(&param.name);
                 }
-            }
 
-            match body.last() {
-                Some(last) if matches!(last.node, Stmt::Expr(_)) => {}
-                _ => { fc.none(); }
-            }
-            fc.emit_op(Opcode::Return);
-            fc.exit_scope();
+                let stmt_count = body.len();
+                for (i, s) in body.iter().enumerate() {
+                    fc.set_line_by_offset(s.span.start());
+                    if i == stmt_count - 1 && matches!(&s.node, Stmt::Expr(_)) {
+                        if let Stmt::Expr(expr) = &s.node {
+                            fc.compile_expr(expr);
+                        }
+                    } else {
+                        fc.compile_stmt(&s.node);
+                    }
+                }
 
-            functions.push(fc.finalize());
-            } else if let Stmt::Impl { type_name, methods, .. } = &stmt.node {
+                match body.last() {
+                    Some(last) if matches!(last.node, Stmt::Expr(_)) => {}
+                    _ => {
+                        fc.none();
+                    }
+                }
+                fc.emit_op(Opcode::Return);
+                fc.exit_scope();
+
+                functions.push(fc.finalize());
+            } else if let Stmt::Impl {
+                type_name, methods, ..
+            } = &stmt.node
+            {
                 for m in methods {
-                    if let Stmt::Fn { name, params, return_type: _, body, .. } = &m.node {
+                    if let Stmt::Fn {
+                        name,
+                        params,
+                        return_type: _,
+                        body,
+                        ..
+                    } = &m.node
+                    {
                         let qualified = format!("{}::{}", type_name, name);
                         let arity = params.len() as u32;
                         let mut fc = FunctionCompiler::new(
-                            qualified, arity, globals.clone(), &function_names,
-                            &mut errors, &line_offsets, lambda_counter.clone(), lambda_fns.clone(), symbols,
+                            qualified,
+                            arity,
+                            globals.clone(),
+                            &function_names,
+                            &mut errors,
+                            &line_offsets,
+                            lambda_counter.clone(),
+                            lambda_fns.clone(),
+                            symbols,
                         );
                         fc.enter_scope();
                         for param in params {
@@ -210,7 +266,9 @@ pub fn compile(
                         }
                         match body.last() {
                             Some(last) if matches!(last.node, Stmt::Expr(_)) => {}
-                            _ => { fc.none(); }
+                            _ => {
+                                fc.none();
+                            }
                         }
                         fc.emit_op(Opcode::Return);
                         fc.exit_scope();
@@ -218,8 +276,17 @@ pub fn compile(
                     }
                 }
             } else if let Stmt::Mod { body, .. } = &stmt.node {
-                compile_functions(body, functions, globals, function_names,
-                    errors, line_offsets, lambda_counter, lambda_fns, symbols);
+                compile_functions(
+                    body,
+                    functions,
+                    globals,
+                    function_names,
+                    errors,
+                    line_offsets,
+                    lambda_counter,
+                    lambda_fns,
+                    symbols,
+                );
             }
         }
     }
@@ -241,10 +308,10 @@ fn count_lambdas_in_stmts(stmts: &[Spanned<Stmt>]) -> usize {
 
 fn count_lambdas_in_stmt(stmt: &Stmt) -> usize {
     match stmt {
-            Stmt::Fn { body, .. } => count_lambdas_in_stmts(body),
-            Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
-            Stmt::Const { init, .. } => count_lambdas_in_expr(init),
-            Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
+        Stmt::Fn { body, .. } => count_lambdas_in_stmts(body),
+        Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
+        Stmt::Const { init, .. } => count_lambdas_in_expr(init),
+        Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
         Stmt::Impl { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
         Stmt::Trait { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
         Stmt::Mod { body, .. } => count_lambdas_in_stmts(body),
@@ -267,13 +334,16 @@ fn count_lambdas_in_expr(expr: &Expr) -> usize {
         Expr::For { iter, body, .. } => count_lambdas_in_expr(iter) + count_lambdas_in_expr(body),
         Expr::Match { expr, arms } => {
             count_lambdas_in_expr(expr)
-                + arms.iter().map(|arm| {
-                    let mut c = count_lambdas_in_expr(&arm.body);
-                    if let Some(g) = &arm.guard {
-                        c += count_lambdas_in_expr(g);
-                    }
-                    c
-                }).sum::<usize>()
+                + arms
+                    .iter()
+                    .map(|arm| {
+                        let mut c = count_lambdas_in_expr(&arm.body);
+                        if let Some(g) = &arm.guard {
+                            c += count_lambdas_in_expr(g);
+                        }
+                        c
+                    })
+                    .sum::<usize>()
         }
         Expr::Binary { lhs, rhs, .. } => count_lambdas_in_expr(lhs) + count_lambdas_in_expr(rhs),
         Expr::Unary { expr, .. } => count_lambdas_in_expr(expr),
@@ -285,7 +355,9 @@ fn count_lambdas_in_expr(expr: &Expr) -> usize {
         }
         Expr::Field { obj, .. } => count_lambdas_in_expr(obj),
         Expr::Index { obj, index } => count_lambdas_in_expr(obj) + count_lambdas_in_expr(index),
-        Expr::StructLit { fields, .. } => fields.iter().map(|(_, v)| count_lambdas_in_expr(v)).sum(),
+        Expr::StructLit { fields, .. } => {
+            fields.iter().map(|(_, v)| count_lambdas_in_expr(v)).sum()
+        }
         Expr::Array(elems) => elems.iter().map(count_lambdas_in_expr).sum(),
         Expr::Range { start, end, .. } => count_lambdas_in_expr(start) + count_lambdas_in_expr(end),
         Expr::Return(Some(inner)) => count_lambdas_in_expr(inner),
@@ -426,7 +498,11 @@ fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result:
     }
 }
 
-fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_order: &mut Vec<String>) {
+fn register_global_stmt(
+    stmt: &Stmt,
+    globals: &mut HashMap<String, u16>,
+    global_order: &mut Vec<String>,
+) {
     match stmt {
         Stmt::Fn { name, .. } | Stmt::Let { name, .. } | Stmt::Const { name, .. } => {
             if !globals.contains_key(name.as_str()) {
@@ -435,7 +511,9 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 global_order.push(name.to_string());
             }
         }
-        Stmt::Impl { type_name, methods, .. } => {
+        Stmt::Impl {
+            type_name, methods, ..
+        } => {
             for m in methods {
                 if let Stmt::Fn { name, .. } = &m.node {
                     let qualified = format!("{}::{}", type_name, name);
@@ -594,12 +672,20 @@ impl<'a> FunctionCompiler<'a> {
     fn add_local(&mut self, name: &str) -> u16 {
         let slot = self.chunk.locals as u16;
         self.chunk.locals += 1;
-        self.locals.push(Local { name: name.to_string(), depth: self.scope_depth, slot });
+        self.locals.push(Local {
+            name: name.to_string(),
+            depth: self.scope_depth,
+            slot,
+        });
         slot
     }
 
     fn resolve_local(&self, name: &str) -> Option<u16> {
-        self.locals.iter().rev().find(|l| l.name == name).map(|l| l.slot)
+        self.locals
+            .iter()
+            .rev()
+            .find(|l| l.name == name)
+            .map(|l| l.slot)
     }
 
     fn resolve_global(&self, name: &str) -> Option<u16> {
@@ -683,23 +769,23 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Return);
             }
             Stmt::Fn { .. } | Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Type { .. } => {}
-        Stmt::Impl { methods, .. } => {
-            for m in methods {
-                self.compile_stmt(&m.node);
+            Stmt::Impl { methods, .. } => {
+                for m in methods {
+                    self.compile_stmt(&m.node);
+                }
+            }
+            Stmt::Trait { .. } => {
+                // Traits are compile-time only; nothing to compile
+            }
+            Stmt::Use { .. } => {
+                // Already resolved by the resolver; nothing to compile
+            }
+            Stmt::Mod { body, .. } => {
+                for stmt in body {
+                    self.compile_stmt(&stmt.node);
+                }
             }
         }
-        Stmt::Trait { .. } => {
-            // Traits are compile-time only; nothing to compile
-        }
-        Stmt::Use { .. } => {
-            // Already resolved by the resolver; nothing to compile
-        }
-        Stmt::Mod { body, .. } => {
-            for stmt in body {
-                self.compile_stmt(&stmt.node);
-            }
-        }
-    }
     }
 
     // ---------- Expression compilation ----------
@@ -721,7 +807,13 @@ impl<'a> FunctionCompiler<'a> {
                 } else if let Some(idx) = self.resolve_global(name) {
                     self.emit_op(Opcode::LoadGlobal(idx));
                 } else if let Some(entry) = self.symbols.lookup(name) {
-                    if let SymKind::EnumConstructor { enum_name: _, variant_name: _, tag, fields } = &entry.kind {
+                    if let SymKind::EnumConstructor {
+                        enum_name: _,
+                        variant_name: _,
+                        tag,
+                        fields,
+                    } = &entry.kind
+                    {
                         if fields.is_empty() {
                             self.emit_op(Opcode::MakeEnum(*tag, 0));
                             return;
@@ -756,7 +848,13 @@ impl<'a> FunctionCompiler<'a> {
                 // Check if this is an enum constructor call
                 if let Expr::Ident(name) = func.as_ref() {
                     if let Some(entry) = self.symbols.lookup(name) {
-                        if let SymKind::EnumConstructor { enum_name: _, variant_name: _, tag, fields: _ } = &entry.kind {
+                        if let SymKind::EnumConstructor {
+                            enum_name: _,
+                            variant_name: _,
+                            tag,
+                            fields: _,
+                        } = &entry.kind
+                        {
                             for arg in args {
                                 self.compile_expr(arg);
                             }
@@ -860,7 +958,11 @@ impl<'a> FunctionCompiler<'a> {
 
             Expr::For { var, iter, body } => {
                 match iter.as_ref() {
-                    Expr::Range { start, end, inclusive } => {
+                    Expr::Range {
+                        start,
+                        end,
+                        inclusive,
+                    } => {
                         self.enter_scope();
                         self.compile_expr(start);
                         let var_slot = self.add_local("__i");
@@ -907,62 +1009,66 @@ impl<'a> FunctionCompiler<'a> {
                         self.none();
                     }
                     _ => {
-                        // Generic iterable: array or string
-                        // Evaluate the iterable once and store it
+                        // Generic iterable protocol: `iter(x)` normalizes any
+                        // iterable (array, range, string, or a user struct/
+                        // foreign object that already implements `next`) into
+                        // an iterator. The loop then repeatedly calls
+                        // `.next()`, which returns `Option<T>`: `Some(item)`
+                        // continues the loop bound to `var`, `None` stops it.
+                        //
+                        // Desugars to:
+                        //   let __for_iter = iter(iter_expr);
+                        //   loop {
+                        //       match __for_iter.next() {
+                        //           Some(var) => { body }
+                        //           None => break,
+                        //       }
+                        //   }
                         self.enter_scope();
-                        self.compile_expr(iter);
-                        let iter_slot = self.add_local("__iter");
-                        self.emit_op(Opcode::StoreLocal(iter_slot));
 
-                        // __i = 0
-                        let zero = self.add_const(Value::Int(0));
-                        self.emit_op(Opcode::LoadConst(zero));
-                        let idx_slot = self.add_local("__i");
-                        self.emit_op(Opcode::StoreLocal(idx_slot));
+                        let iter_call = Expr::Call {
+                            func: Box::new(Expr::Ident("iter".into())),
+                            args: vec![iter.as_ref().clone()],
+                        };
+                        self.compile_expr(&iter_call);
+                        let _iter_slot = self.add_local("__for_iter");
+                        self.emit_op(Opcode::StoreLocal(_iter_slot));
 
-                        // __len = __iter.len()
-                        self.emit_op(Opcode::LoadLocal(iter_slot));
-                        self.emit_op(Opcode::Len);
-                        let len_slot = self.add_local("__len");
-                        self.emit_op(Opcode::StoreLocal(len_slot));
+                        let next_call = Expr::MethodCall {
+                            obj: Box::new(Expr::Ident("__for_iter".into())),
+                            method: "next".into(),
+                            args: vec![],
+                        };
+                        let match_expr = Expr::Match {
+                            expr: Box::new(next_call),
+                            arms: vec![
+                                MatchArm {
+                                    pattern: Pattern::EnumVariant {
+                                        variant_name: "Some".into(),
+                                        bindings: vec![var.clone()],
+                                    },
+                                    guard: None,
+                                    body: body.clone(),
+                                },
+                                MatchArm {
+                                    pattern: Pattern::EnumVariant {
+                                        variant_name: "None".into(),
+                                        bindings: vec![],
+                                    },
+                                    guard: None,
+                                    body: Box::new(Expr::Break),
+                                },
+                            ],
+                        };
+                        let loop_body = Expr::Block(vec![Spanned {
+                            node: Stmt::Expr(match_expr),
+                            span: Span::new(0, 0),
+                        }]);
+                        // `Expr::Loop`'s own codegen pushes a trailing nil,
+                        // so don't add another `self.none()` here.
+                        self.compile_expr(&Expr::Loop(Box::new(loop_body)));
 
-                        let _user_var_slot = self.add_local(var);
-
-                        let loop_start = self.current_offset();
-                        // while __i < __len
-                        self.emit_op(Opcode::LoadLocal(idx_slot));
-                        self.emit_op(Opcode::LoadLocal(len_slot));
-                        self.emit_op(Opcode::Lt);
-                        let exit = self.current_offset();
-                        self.emit_op(Opcode::JumpIfFalse(0));
-
-                        // var = __iter[__i]
-                        self.emit_op(Opcode::LoadLocal(iter_slot));
-                        self.emit_op(Opcode::LoadLocal(idx_slot));
-                        self.emit_op(Opcode::LoadIndex);
-                        self.emit_op(Opcode::StoreLocal(_user_var_slot));
-
-                        self.loop_start.push(loop_start);
-                        self.loop_continue.push(loop_start);
-                        self.loop_end_jumps.push(vec![exit]);
-                        self.compile_expr(body);
-                        self.loop_start.pop();
-                        self.loop_continue.pop();
-                        let jumps = self.loop_end_jumps.pop().unwrap();
-
-                        // __i += 1
-                        let one = self.add_const(Value::Int(1));
-                        self.emit_op(Opcode::LoadLocal(idx_slot));
-                        self.emit_op(Opcode::LoadConst(one));
-                        self.emit_op(Opcode::Add);
-                        self.emit_op(Opcode::StoreLocal(idx_slot));
-                        self.emit_op(Opcode::Loop(loop_start as u16));
-
-                        for j in &jumps {
-                            self.patch_jump(*j);
-                        }
                         self.exit_scope();
-                        self.none();
                     }
                 }
             }
@@ -1042,12 +1148,25 @@ impl<'a> FunctionCompiler<'a> {
                             end_jumps.push(j);
                             self.patch_jump(next);
                         }
-                        Pattern::EnumVariant { variant_name, bindings } => {
-                            let tag: u16 = self.symbols.lookup(variant_name)
+                        Pattern::EnumVariant {
+                            variant_name,
+                            bindings,
+                        } => {
+                            let tag: u16 = self
+                                .symbols
+                                .lookup(variant_name)
                                 .and_then(|entry| {
-                                    if let SymKind::EnumConstructor { enum_name: _, variant_name: _, tag, fields: _ } = &entry.kind {
+                                    if let SymKind::EnumConstructor {
+                                        enum_name: _,
+                                        variant_name: _,
+                                        tag,
+                                        fields: _,
+                                    } = &entry.kind
+                                    {
                                         Some(*tag)
-                                    } else { None }
+                                    } else {
+                                        None
+                                    }
                                 })
                                 .unwrap_or(0);
                             self.emit_op(Opcode::LoadEnumTag);
@@ -1111,7 +1230,11 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Return);
             }
 
-            Expr::StructLit { name, fields, spread } => {
+            Expr::StructLit {
+                name,
+                fields,
+                spread,
+            } => {
                 if let Some(spread_expr) = spread {
                     // Compile spread base, then override with explicit fields via StoreField
                     self.compile_expr(spread_expr);
@@ -1140,7 +1263,11 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::MakeArray(elems.len() as u16));
             }
 
-            Expr::Range { start, end, inclusive } => {
+            Expr::Range {
+                start,
+                end,
+                inclusive,
+            } => {
                 self.compile_expr(start);
                 self.compile_expr(end);
                 self.load_const(Value::Bool(*inclusive));
@@ -1208,7 +1335,10 @@ impl<'a> FunctionCompiler<'a> {
         self.lambda_fns.borrow_mut().push(lambda_fc.finalize());
 
         // Emit NewClosure with function index and upvalue count
-        self.emit_op(Opcode::NewClosure(fn_idx as u16, upvalue_names.len() as u16));
+        self.emit_op(Opcode::NewClosure(
+            fn_idx as u16,
+            upvalue_names.len() as u16,
+        ));
     }
 
     fn compile_assignment(&mut self, target: &Expr, value: &Expr) {
@@ -1282,9 +1412,13 @@ fn const_hash(val: &Value) -> u64 {
             h
         }
         Value::Function(idx) => 5 ^ (*idx as u64),
-        Value::Array(_) | Value::Struct(..) | Value::Enum { .. }
-        | Value::NativeFunction(_) | Value::Foreign(_)
-        | Value::Closure(_) | Value::Range(..) => {
+        Value::Array(_)
+        | Value::Struct(..)
+        | Value::Enum { .. }
+        | Value::NativeFunction(_)
+        | Value::Foreign(_)
+        | Value::Closure(_)
+        | Value::Range(..) => {
             // These types use pointer identity, hash is not stable;
             // fall back to linear scan (handled in add_const)
             6

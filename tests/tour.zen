@@ -236,5 +236,20 @@ fn main() {
     for ri in 0..=3 { rsum = rsum + ri; }
     assert(rsum == 6);
 
+    // 26. Iterators
+    let mut isum = 0;
+    for iv in [1, 2, 3] { isum = isum + iv; }
+    assert(isum == 6);
+
+    let ir = 0..3;
+    let mut irsum = 0;
+    for iv in ir { irsum = irsum + iv; }
+    assert(irsum == 3);
+
+    let it = iter([7, 8]);
+    assert(it.next() == Some(7));
+    assert(it.next() == Some(8));
+    assert(it.next() == None);
+
     print("Zenlang tour complete!");
 }
