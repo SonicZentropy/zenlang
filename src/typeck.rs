@@ -142,9 +142,8 @@ impl<'a> TypeChecker<'a> {
                 }
                 for param in params {
                     let ty = param.type_ann.clone().unwrap_or(Type::Unit);
-                    if self.symbols.lookup(&param.name).is_none() {
-                        let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
-                    }
+                    self.symbols.remove_from_current_scope(&param.name);
+                    let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
                 }
                 let expected_ret = return_type.as_ref();
                 for stmt in body {
@@ -546,8 +545,6 @@ impl<'a> TypeChecker<'a> {
             Expr::Match { expr, arms } => {
                 let mt = self.check_expr(expr);
                 let mut arm_types = Vec::new();
-                // Look up enum definition from scrutinee type for enum variant validation
-                // Also extract type params from generic types (Result<T,E>, Option<T>)
                 let enum_def: Option<EnumDef> = match &mt {
                     Type::Named(n) => {
                         if let Some(entry) = self.symbols.lookup(n) {

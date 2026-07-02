@@ -253,7 +253,6 @@ impl Resolver {
                     }
                 }
                 for param in params {
-                    // Infer type for now (will be refined by type checker)
                     let ty = param.type_ann.clone().unwrap_or(Type::Unit);
                     if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty)) {
                         self.error(e);

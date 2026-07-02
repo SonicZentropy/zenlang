@@ -969,7 +969,7 @@ impl<'a> Parser<'a> {
             TokenKind::Bool(b) => { self.advance(); Ok(Pattern::Bool(b)) }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
-                // Check if this is an enum variant pattern: Ident ( args... )
+                // Enum variant with data: Ident ( args... )
                 if self.r#match(TokenKind::OpenParen) {
                     let mut bindings = Vec::new();
                     while !self.check(&TokenKind::CloseParen) && !self.is_at_end() {
@@ -984,7 +984,11 @@ impl<'a> Parser<'a> {
                     }
                     self.expect(TokenKind::CloseParen)?;
                     Ok(Pattern::EnumVariant { variant_name: name.into(), bindings })
+                } else if name.starts_with(|c: char| c.is_uppercase()) {
+                    // Uppercase ident without parens = unit enum variant
+                    Ok(Pattern::EnumVariant { variant_name: name.into(), bindings: vec![] })
                 } else {
+                    // Lowercase ident = variable binding (catch-all)
                     Ok(Pattern::Ident(name.into()))
                 }
             }
