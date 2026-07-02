@@ -739,15 +739,16 @@ impl VM {
                         Value::Foreign(fv) => Some(fv.borrow().type_id),
                         _ => None,
                     };
+                    let result_val = val.clone();
                     match &mut obj {
                         Value::Struct(map, _) => {
                             map.borrow_mut().insert(field_name, val);
-                            self.stack.push(obj);
+                            self.stack.push(result_val);
                         }
                         Value::Foreign(_) => {
                             let type_id = foreign_type_id.unwrap();
                             match self.foreign_registry.set_field(&type_id, &field_name, &mut obj, val) {
-                                Some(Ok(())) => self.stack.push(obj),
+                                Some(Ok(())) => self.stack.push(result_val),
                                 Some(Err(e)) => return Err(e),
                                 None => {
                                     return Err(self.runtime_error(format!("foreign type has no field '{}'", field_name)));
@@ -784,11 +785,12 @@ impl VM {
                     let val = self.stack.pop().unwrap();
                     let index = self.stack.pop().unwrap();
                     let obj = self.stack.pop().unwrap();
+                    let result_val = val.clone();
                     match (&obj, &index) {
                         (Value::Array(arr), Value::Int(i)) => {
                             let idx = *i as usize;
                             arr.borrow_mut()[idx] = val;
-                            self.stack.push(obj);
+                            self.stack.push(result_val);
                         }
                         _ => {
                             return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));

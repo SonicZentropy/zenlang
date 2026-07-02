@@ -975,6 +975,7 @@ impl<'a> FunctionCompiler<'a> {
                     match &arm.pattern {
                         Pattern::Wildcard => {
                             self.emit_op(Opcode::Pop);
+                            self.emit_op(Opcode::Pop);
                             self.compile_expr(&arm.body);
                             let j = self.current_offset();
                             self.emit_op(Opcode::Jump(0));
@@ -985,6 +986,7 @@ impl<'a> FunctionCompiler<'a> {
                             self.enter_scope();
                             let slot = self.add_local(name);
                             self.emit_op(Opcode::StoreLocal(slot));
+                            self.emit_op(Opcode::Pop);
                             self.compile_expr(&arm.body);
                             self.exit_scope();
                             let j = self.current_offset();
@@ -1114,9 +1116,11 @@ impl<'a> FunctionCompiler<'a> {
                     // Compile spread base, then override with explicit fields via StoreField
                     self.compile_expr(spread_expr);
                     for (field_name, val) in fields {
+                        self.emit_op(Opcode::Dup);
                         self.compile_expr(val);
                         let idx = self.chunk.add_field_name(field_name);
                         self.emit_op(Opcode::StoreField(idx));
+                        self.emit_op(Opcode::Pop);
                     }
                 } else {
                     // Push field names then values; MakeStruct pops in reverse order
