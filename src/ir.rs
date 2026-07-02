@@ -48,6 +48,7 @@ pub enum Opcode {
     BitNot,
     LoadEnumTag,
     LoadEnumField(u16),
+    MakeRange,
     Halt,
 }
 
@@ -100,6 +101,7 @@ impl Opcode {
             BitNot => 42,
             LoadEnumTag => 43,
             LoadEnumField(_) => 44,
+            MakeRange => 46,
             Halt => 45,
         }
     }
@@ -152,6 +154,7 @@ impl Opcode {
             42 => BitNot,
             43 => LoadEnumTag,
             44 => LoadEnumField(0),
+            46 => MakeRange,
             45 => Halt,
             _ => return None,
         })
@@ -167,6 +170,7 @@ impl Opcode {
             | Opcode::LoadEnumField(_)
             | Opcode::NewClosure(_, _) => 1,
             Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::MakeStruct(_, _) => 2,
+            Opcode::MakeRange => 0,
             _ => 0,
         }
     }
@@ -238,7 +242,7 @@ impl Chunk {
             | Opcode::LoadField(v) | Opcode::StoreField(v)
             | Opcode::LoadEnumField(v) => self.emit_u16(v, line),
             Opcode::And | Opcode::Or | Opcode::BitAnd | Opcode::BitOr | Opcode::BitXor
-            | Opcode::Shl | Opcode::Shr | Opcode::BitNot | Opcode::LoadEnumTag => {}
+            | Opcode::Shl | Opcode::Shr | Opcode::BitNot | Opcode::LoadEnumTag | Opcode::MakeRange => {}
             Opcode::MakeEnum(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
             Opcode::MakeStruct(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
             Opcode::CallMethod(m, a) => { self.emit_u16(m, line); self.emit_u16(a, line); }
@@ -289,6 +293,7 @@ impl Chunk {
             | Opcode::LoadEnumField(_) => {
                 off += 2;
             }
+            Opcode::MakeRange => {}
             _ => {}
         }
         Some((op, off))
@@ -396,6 +401,7 @@ impl Chunk {
                 Opcode::Shr => println!("Shr"),
                 Opcode::BitNot => println!("BitNot"),
                 Opcode::LoadEnumTag => println!("LoadEnumTag"),
+                Opcode::MakeRange => println!("MakeRange"),
                 Opcode::Halt => println!("Halt"),
             }
             offset = next;
@@ -413,6 +419,7 @@ fn format_val(val: &Value) -> String {
         Value::Str(s) => format!("\"{s}\""),
         Value::Function(idx) => format!("fn<{idx}>"),
         Value::NativeFunction(_) => "<native>".into(),
+        Value::Range(s, e, inc) => format!("Range({}, {}, {})", s, e, inc),
         _ => "{..}".into(),
     }
 }

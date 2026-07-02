@@ -1140,9 +1140,11 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::MakeArray(elems.len() as u16));
             }
 
-            Expr::Range { start, end, inclusive: _ } => {
+            Expr::Range { start, end, inclusive } => {
                 self.compile_expr(start);
                 self.compile_expr(end);
+                self.load_const(Value::Bool(*inclusive));
+                self.emit_op(Opcode::MakeRange);
             }
 
             Expr::Lambda { params, body, .. } => {
@@ -1282,7 +1284,7 @@ fn const_hash(val: &Value) -> u64 {
         Value::Function(idx) => 5 ^ (*idx as u64),
         Value::Array(_) | Value::Struct(..) | Value::Enum { .. }
         | Value::NativeFunction(_) | Value::Foreign(_)
-        | Value::Closure(_) => {
+        | Value::Closure(_) | Value::Range(..) => {
             // These types use pointer identity, hash is not stable;
             // fall back to linear scan (handled in add_const)
             6

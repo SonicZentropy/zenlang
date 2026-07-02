@@ -140,6 +140,10 @@ fn len_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
         Some(Value::Str(s)) => Ok(Value::Int(s.len() as i64)),
         Some(Value::Array(arr)) => Ok(Value::Int(arr.borrow().len() as i64)),
+        Some(Value::Range(start, end, inclusive)) => {
+            let len = if *inclusive { *end - *start + 1 } else { *end - *start };
+            Ok(Value::Int(len.max(0)))
+        }
         _ => Ok(Value::Int(0)),
     }
 }

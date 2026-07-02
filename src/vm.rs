@@ -685,6 +685,23 @@ impl VM {
                     self.stack.push(Value::Array(Rc::new(RefCell::new(elems))));
                 }
 
+                Opcode::MakeRange => {
+                    let inclusive = self.stack.pop().unwrap();
+                    let end = self.stack.pop().unwrap();
+                    let start = self.stack.pop().unwrap();
+                    match (&start, &end, &inclusive) {
+                        (Value::Int(s), Value::Int(e), Value::Bool(inc)) => {
+                            self.stack.push(Value::Range(*s, *e, *inc));
+                        }
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "range requires integer bounds, got {} and {}",
+                                start.type_name(), end.type_name()
+                            )));
+                        }
+                    }
+                }
+
                 Opcode::MakeEnum(_, _) => {
                     let _tag = self.read_u16();
                     let _data_count = self.read_u16() as usize;
@@ -775,6 +792,13 @@ impl VM {
                             let c = s.chars().nth(idx).map(|c| c.to_string()).unwrap_or_default();
                             self.stack.push(Value::Str(c.into()));
                         }
+                        (Value::Range(start, end, inclusive), Value::Int(i)) => {
+                            let val = start + i;
+                            if (!*inclusive && val >= *end) || (*inclusive && val > *end) || val < *start.min(end) {
+                                return Err(self.runtime_error("index out of range bounds"));
+                            }
+                            self.stack.push(Value::Int(val));
+                        }
                         _ => {
                             return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name())));
                         }
@@ -803,6 +827,10 @@ impl VM {
                     match val {
                         Value::Str(s) => self.stack.push(Value::Int(s.len() as i64)),
                         Value::Array(arr) => self.stack.push(Value::Int(arr.borrow().len() as i64)),
+                        Value::Range(start, end, inclusive) => {
+                            let len = if inclusive { end - start + 1 } else { end - start };
+                            self.stack.push(Value::Int(len.max(0)));
+                        }
                         _ => return Err(self.runtime_error(format!("cannot get length of {}", val.type_name()))),
                     }
                 }

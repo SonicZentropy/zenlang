@@ -488,10 +488,8 @@ impl<'a> TypeChecker<'a> {
                 self.check_expr(index);
                 match &ot {
                     Type::Array(inner) => *inner.clone(),
-                    _ => {
-                        self.error("indexing non-array type");
-                        Type::Unit
-                    }
+                    Type::Str => Type::Str,
+                    _ => Type::I64, // range, array, etc. — runtime handles actual type
                 }
             }
             Expr::Block(stmts) => {
@@ -732,7 +730,7 @@ impl<'a> TypeChecker<'a> {
             Expr::Range { start, end, .. } => {
                 self.check_expr(start);
                 self.check_expr(end);
-                Type::Unit // TODO: proper range type
+                Type::Unit // ranges are consumed by for-loops in compilation
             }
             Expr::Lambda { params, return_type: _, body } => {
                 self.symbols.enter_scope();

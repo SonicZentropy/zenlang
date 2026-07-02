@@ -119,6 +119,8 @@ pub enum Value {
     Foreign(Rc<RefCell<ForeignObject>>),
     /// A closure with captured upvalues.
     Closure(Rc<RefCell<ClosureData>>),
+    /// A range `start..end` (exclusive) or `start..=end` (inclusive).
+    Range(i64, i64, bool),
 }
 
 impl fmt::Debug for Value {
@@ -136,6 +138,7 @@ impl fmt::Debug for Value {
             Value::NativeFunction(_) => write!(f, "NativeFunction(...)"),
             Value::Foreign(obj) => write!(f, "{:?}", obj.borrow()),
             Value::Closure(c) => write!(f, "Closure(fn={}, up_count={})", c.borrow().fn_idx, c.borrow().upvalues.len()),
+            Value::Range(s, e, inc) => write!(f, "Range({}, {}, {})", s, e, inc),
         }
     }
 }
@@ -155,6 +158,7 @@ impl Clone for Value {
             Value::NativeFunction(f) => Value::NativeFunction(f.clone()),
             Value::Foreign(r) => Value::Foreign(r.clone()),
             Value::Closure(c) => Value::Closure(c.clone()),
+            Value::Range(s, e, inc) => Value::Range(*s, *e, *inc),
         }
     }
 }
@@ -179,6 +183,7 @@ impl PartialEq for Value {
                 let cb = b.borrow();
                 ca.fn_idx == cb.fn_idx && ca.upvalues == cb.upvalues
             }
+            (Value::Range(a, b, c), Value::Range(d, e, f)) => a == d && b == e && c == f,
             _ => false,
         }
     }
@@ -200,6 +205,7 @@ impl Value {
             Value::NativeFunction(_) => "native_function",
             Value::Foreign(obj) => obj.borrow().type_name,
             Value::Closure(_) => "closure",
+            Value::Range(..) => "range",
         }
     }
 
