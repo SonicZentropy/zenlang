@@ -1201,8 +1201,10 @@ impl<'a> FunctionCompiler<'a> {
             Expr::Ident(name) => {
                 self.compile_expr(value);
                 if let Some(idx) = self.resolve_local(name) {
+                    self.emit_op(Opcode::Dup);
                     self.emit_op(Opcode::StoreLocal(idx));
                 } else if let Some(idx) = self.resolve_global(name) {
+                    self.emit_op(Opcode::Dup);
                     self.emit_op(Opcode::StoreGlobal(idx));
                 } else {
                     self.error(format!("cannot assign to undefined variable '{}'", name));

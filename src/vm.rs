@@ -19,11 +19,12 @@ struct CallFrame {
     ip: usize,
     bp: usize,
     is_method: bool,
+    is_closure: bool,
 }
 
 impl CallFrame {
     fn new(function_idx: usize, bp: usize) -> Self {
-        Self { function_idx, ip: 0, bp, is_method: false }
+        Self { function_idx, ip: 0, bp, is_method: false, is_closure: false }
     }
 }
 
@@ -535,9 +536,10 @@ impl VM {
                             for arg in &args {
                                 self.stack.push(arg.clone());
                             }
-                            // bp points to the first upvalue
+                            // bp points to the first upvalue (callee was already popped)
                             let bp = self.stack.len() - up_count - args.len();
-                            let frame = CallFrame::new(fn_idx, bp);
+                            let mut frame = CallFrame::new(fn_idx, bp);
+                            frame.is_closure = true;
                             self.frames.push(frame);
 
                             let fn_def = &self.functions[fn_idx];
@@ -635,9 +637,9 @@ impl VM {
                     let result = self.stack.pop().unwrap_or(Value::Nil);
                     let frame = self.frames.pop().unwrap();
 
-                    if frame.is_method {
-                        // Struct method: bp points to receiver. Trim stack at bp
-                        // (removing receiver + args) and keep values below.
+                    if frame.is_method || frame.is_closure {
+                        // Method/closure: bp points to receiver/first-upvalue.
+                        // Trim at bp (callee already removed) to keep below values.
                         self.stack.truncate(frame.bp);
                     } else if frame.bp > 0 {
                         // Regular call: bp points past the callee. Trim at bp-1

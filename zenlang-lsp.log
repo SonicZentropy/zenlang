@@ -374,3 +374,57 @@
 2026-07-02T04:06:59.544550Z  INFO zenlang::lsp: didClose: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour_t3.zen", query: None, fragment: None })
 2026-07-02T04:06:59.544743Z DEBUG zenlang::lsp: received notification: textDocument/didClose
 2026-07-02T04:06:59.544903Z  INFO zenlang::lsp: didClose: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour_q2.zen", query: None, fragment: None })
+2026-07-02T04:34:06.968961Z DEBUG zenlang::lsp: received request: textDocument/definition (id=RequestId(I32(26)))
+2026-07-02T04:34:06.969051Z DEBUG zenlang::lsp: handling request: textDocument/definition for file:///Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen
+2026-07-02T04:44:10.686371Z DEBUG zenlang::lsp: received notification: textDocument/didClose
+2026-07-02T04:44:10.688047Z  INFO zenlang::lsp: didClose: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen", query: None, fragment: None })
+2026-07-02T04:44:10.919232Z DEBUG zenlang::lsp: received request: shutdown (id=RequestId(I32(27)))
+2026-07-02T04:44:10.919783Z  INFO zenlang::lsp: received shutdown request
+2026-07-02T04:44:10.919830Z  INFO zenlang::lsp: LSP server shutting down
+2026-07-02T05:24:58.212086Z  INFO zenlang::lsp: LSP server starting
+2026-07-02T05:24:58.292690Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-07-02T05:24:58.300335Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:24:58.300407Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:24:58.300598Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-07-02T05:24:58.300762Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen", query: None, fragment: None })
+2026-07-02T05:24:58.307946Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen", query: None, fragment: None })
+2026-07-02T05:24:58.367629Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-07-02T05:24:58.367690Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen
+2026-07-02T05:24:58.648758Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:24:58.648813Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:02.793174Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:02.793227Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:03.436872Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:03.436937Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:03.587160Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:03.587216Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:05.535738Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:05.535780Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:09.813737Z DEBUG zenlang::lsp: received notification: textDocument/didClose
+2026-07-02T05:25:09.814083Z  INFO zenlang::lsp: didClose: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen", query: None, fragment: None })
+2026-07-02T05:25:09.896094Z DEBUG zenlang::lsp: received request: shutdown (id=RequestId(I32(3)))
+2026-07-02T05:25:09.896674Z  INFO zenlang::lsp: received shutdown request
+2026-07-02T05:25:09.896801Z  INFO zenlang::lsp: LSP server shutting down
+2026-07-02T05:25:41.103568Z  INFO zenlang::lsp: LSP server starting
+2026-07-02T05:25:41.106901Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-07-02T05:25:41.106992Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:41.107145Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:41.107523Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-07-02T05:25:41.107856Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen", query: None, fragment: None })
+2026-07-02T05:25:41.117236Z DEBUG zenlang::lsp: send_diagnostics: 0 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen", query: None, fragment: None })
+2026-07-02T05:25:41.160432Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-07-02T05:25:41.160746Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/tests/tour.zen
+2026-07-02T05:25:41.296462Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:41.296498Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:41.593451Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:41.593493Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:45.544994Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:45.545046Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:46.072360Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:46.072400Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:46.146285Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:46.146333Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:25:48.485220Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:25:48.485290Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-02T05:26:30.561426Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-02T05:26:30.561471Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration

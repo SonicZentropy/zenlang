@@ -1,0 +1,2 @@
+// Direct assert — no closures
+assert(1 == 1);

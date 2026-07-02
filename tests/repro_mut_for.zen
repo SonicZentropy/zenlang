@@ -1,0 +1,6 @@
+// let mut reassignment before for loop
+let mut x = 10;
+x = x + 1;
+for i in 0..5 {
+    let y = i;
+}
