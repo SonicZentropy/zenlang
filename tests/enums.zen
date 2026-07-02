@@ -9,17 +9,59 @@ enum Shape {
     Rect(int, int),
 }
 
+// Mixed unit and data variants
+enum Status {
+    Active,
+    Inactive,
+    Error(str),
+}
+
+fn color_name(c: Color) -> str {
+    match c {
+        Red => "red",
+        Green => "green",
+        Blue => "blue",
+    }
+}
+
+fn status_msg(s: Status) -> str {
+    match s {
+        Active => "active",
+        Inactive => "inactive",
+        Error(msg) => msg,
+    }
+}
+
 fn main() {
     let r = Red;
     let g = Green;
     let b = Blue;
 
+    // Exhaustive match on all unit variants
     match r {
         Red => assert(true),
         Green => assert(false),
         Blue => assert(false),
     }
 
+    match g {
+        Red => assert(false),
+        Green => assert(true),
+        Blue => assert(false),
+    }
+
+    match b {
+        Red => assert(false),
+        Green => assert(false),
+        Blue => assert(true),
+    }
+
+    // Unit variant matching via function
+    assert(color_name(Red) == "red");
+    assert(color_name(Green) == "green");
+    assert(color_name(Blue) == "blue");
+
+    // Data variant matching
     let c = Circle(10);
     match c {
         Circle(radius) => assert(radius == 10),
@@ -31,4 +73,32 @@ fn main() {
         Circle(_) => assert(false),
         Rect(w, h) => assert(w == 5 && h == 3),
     }
+
+    // Mixed unit and data variant matching
+    let active = Active;
+    match active {
+        Active => assert(true),
+        Inactive => assert(false),
+        Error(_) => assert(false),
+    }
+
+    let err = Error("oops");
+    match err {
+        Active => assert(false),
+        Inactive => assert(false),
+        Error(msg) => assert(msg == "oops"),
+    }
+
+    // Unit variant matching with return values
+    let label = match r {
+        Red => "hot",
+        Green => "go",
+        Blue => "cold",
+    };
+    assert(label == "hot");
+
+    // Function with mixed unit/data variants
+    assert(status_msg(Active) == "active");
+    assert(status_msg(Inactive) == "inactive");
+    assert(status_msg(Error("fail")) == "fail");
 }

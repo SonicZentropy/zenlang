@@ -212,6 +212,142 @@ fn test_enum_variant_construction_and_match() {
     typeck::check(&prog, &mut symbols).expect("typecheck failed");
 }
 
+#[test]
+fn test_unit_variant_exhaustiveness_check() {
+    // Non-exhaustive match on unit-variant enum should fail type checking
+    let source = r#"
+        enum Color { Red, Green, Blue }
+        fn main() {
+            let r = Red;
+            match r {
+                Red => true,
+            }
+        }
+    "#;
+    let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+    let parser = crate::parser::Parser::new(source, &tokens);
+    let mut program = parser.parse().unwrap();
+    let native_names = crate::stdlib::native_names();
+    let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+    let result = typeck::check(&program, &mut symbols);
+    assert!(result.is_err(), "expected type error for non-exhaustive match");
+    let err_msg = match result {
+        Err(crate::error::Error::ParseMultiple { errors }) => {
+            errors.iter().map(|e| format!("{}", e)).collect::<Vec<_>>().join(", ")
+        }
+        Err(e) => format!("{}", e),
+        Ok(_) => unreachable!(),
+    };
+    assert!(err_msg.contains("non-exhaustive"), "expected non-exhaustive error, got: {}", err_msg);
+}
+
+#[test]
+fn test_unit_variant_pattern_matching_compiles_and_runs() {
+    use crate::compiler;
+    use crate::vm::VM;
+    use crate::value::Value;
+
+    fn run(source: &str) -> Value {
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let parser = crate::parser::Parser::new(source, &tokens);
+        let mut program = parser.parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.run_main().unwrap()
+    }
+
+    // Test 1: match on unit variant returns correct int
+    let r = run(r#"
+        enum Color { Red, Green, Blue }
+        let r = Red;
+        let result = match r {
+            Red => 1,
+            Green => 2,
+            Blue => 3,
+        };
+        result
+    "#);
+    assert_eq!(r, Value::Int(1));
+
+    // Test 2: match on unit variant returns correct string
+    let r = run(r#"
+        enum Color { Red, Green, Blue }
+        let r = Red;
+        let label = match r {
+            Red => "hot",
+            Green => "go",
+            Blue => "cold",
+        };
+        label
+    "#);
+    assert_eq!(r, Value::Str("hot".into()));
+
+    // Test 3: match on unit variant via function call
+    let r = run(r#"
+        enum Color { Red, Green, Blue }
+        fn pick(c: Color) -> int {
+            match c {
+                Red => 1,
+                Green => 2,
+                Blue => 3,
+            }
+        }
+        pick(Red)
+    "#);
+    assert_eq!(r, Value::Int(1));
+
+    // Test 4: wildcard match
+    let r = run(r#"
+        enum Color { Red, Green, Blue }
+        match Red {
+            Red => 1,
+            _ => 0,
+        }
+    "#);
+    assert_eq!(r, Value::Int(1));
+
+    // Test 5: match on data variant with binding
+    let r = run(r#"
+        enum Maybe { Just(int), Empty }
+        let x = Just(42);
+        match x {
+            Just(v) => v,
+            Empty => 0,
+        }
+    "#);
+    assert_eq!(r, Value::Int(42));
+
+    // Test 6: mixed unit and data variant match
+    let r = run(r#"
+        enum Status { Active, Inactive, Error(str) }
+        let s = Active;
+        match s {
+            Active => "yes",
+            Inactive => "no",
+            Error(_) => "error",
+        }
+    "#);
+    assert_eq!(r, Value::Str("yes".into()));
+
+    // Test 7: match returning enum value
+    let r = run(r#"
+        enum Color { Red, Green, Blue }
+        enum Priority { Low, Medium, High }
+        let c = Green;
+        match c {
+            Red => High,
+            Green => Medium,
+            Blue => Low,
+        }
+    "#);
+    assert!(matches!(r, Value::Enum { tag: 1, .. }));
+}
+
 // Full integration test: generic function compiles and runs with type erasure
 #[test]
 fn test_generic_fn_full_pipeline() {

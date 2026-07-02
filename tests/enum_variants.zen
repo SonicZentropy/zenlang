@@ -14,7 +14,7 @@ enum MyResult<T, E> {
 fn my_unwrap_or(opt: MyOption<i64>, default: i64) -> i64 {
     match opt {
         MySome(value) => value,
-        _ => default
+        MyNone => default
     }
 }
 
@@ -31,27 +31,27 @@ fn main() {
     let x = MySome(42);
     match x {
         MySome(v) => assert(v == 42),
-        _ => assert(false),
+        MyNone => assert(false),
     }
 
-    // Unit variant: construct (match only via wildcard fallthrough)
+    // Unit variant: construct and match directly
     let y = MyNone;
     match y {
         MySome(_) => assert(false),
-        _ => assert(true),
+        MyNone => assert(true),
     }
 
     // Test inline match on enum constructor call
     let has_value = match (MySome(10)) {
         MySome(_) => true,
-        _ => false
+        MyNone => false
     };
     assert(has_value == true);
 
     // Test inline match on unit variant directly
     let no_value_flag = match MyNone {
         MySome(_) => true,
-        _ => false
+        MyNone => false
     };
     assert(no_value_flag == false);
 

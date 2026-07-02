@@ -62,14 +62,8 @@ pub fn compile(
     }
 
     // Pre-register built-in enum constructor names as globals
-    for name in &["Some", "None", "Ok", "Err"] {
-        let mut g = globals.borrow_mut();
-        if !g.contains_key(*name) {
-            let idx = g.len() as u16;
-            g.insert(name.to_string(), idx);
-            global_order.push(name.to_string());
-        }
-    }
+    // NOTE: Enum constructors are compiled via MakeEnum, not LoadGlobal.
+    // They don't need global slots.
 
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
@@ -450,15 +444,7 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 global_order.push(name.to_string());
             }
         }
-        Stmt::Enum { variants, .. } => {
-            for v in variants {
-                if !globals.contains_key(v.name.as_str()) {
-                    let idx = globals.len() as u16;
-                    globals.insert(v.name.to_string(), idx);
-                    global_order.push(v.name.to_string());
-                }
-            }
-        }
+        Stmt::Enum { .. } => {}
         Stmt::Trait { .. } => {}
         _ => {}
     }
