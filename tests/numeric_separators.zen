@@ -1,0 +1,55 @@
+// Tests for numeric separators (underscores in number literals)
+
+fn check_value(x: int) -> bool {
+    x == 42_000
+}
+
+fn main() {
+    // Decimal integers with separators
+    assert(1_000 == 1000);
+    assert(1_000_000 == 1000000);
+    assert(1_2_3_4 == 1234);
+    assert(999_999_999 == 999999999);
+
+    // Decimal integers without separators (baseline)
+    assert(42 == 42);
+    assert(0 == 0);
+
+    // Separators in arithmetic
+    let a = 1_000 + 2_000;
+    assert(a == 3000);
+
+    let b = 10_000 - 1;
+    assert(b == 9999);
+
+    let c = 1_000 * 1_000;
+    assert(c == 1000000);
+
+    // Hexadecimal with separators
+    assert(0xFF_FF == 0xFFFF);
+    assert(0x1_0000 == 0x10000);
+    assert(0xDEAD_BEEF == 0xDEADBEEF);
+
+    // Octal with separators
+    assert(0o77_77 == 0o7777);
+    assert(0o1_234 == 0o1234);
+
+    // Binary with separators
+    assert(0b1010_0101 == 0b10100101);
+    assert(0b1111_0000_1111 == 0b111100001111);
+    assert(0b1_0000_0000 == 0b100000000);
+
+    // Separators in comparisons
+    assert(1_000 > 999);
+    assert(999_999 < 1_000_000);
+    assert(1_000_000 == 1000000);
+
+    // Separators in function calls
+    assert(check_value(42000));
+
+    // Separators in let bindings
+    let million = 1_000_000;
+    let hex_dead = 0xDEAD;
+    assert(million == 1000000);
+    assert(hex_dead == 57005);
+}

@@ -1,0 +1,67 @@
+// Tests for compound assignment operators
+
+fn double_in_place(x: int) -> int {
+    x *= 2;
+    x
+}
+
+fn main() {
+    // += (plus assign)
+    let a = 10;
+    a += 5;
+    assert(a == 15);
+
+    // -= (minus assign)
+    let b = 20;
+    b -= 7;
+    assert(b == 13);
+
+    // *= (star assign)
+    let c = 4;
+    c *= 3;
+    assert(c == 12);
+
+    // /= (slash assign)
+    let d = 15;
+    d /= 3;
+    assert(d == 5);
+
+    // %= (percent assign)
+    let e = 17;
+    e %= 5;
+    assert(e == 2);
+
+    // ^= (xor assign)
+    let f = 12;
+    f ^= 10;
+    assert(f == 6);
+
+    // <<= (shl assign)
+    let g = 3;
+    g <<= 2;
+    assert(g == 12);
+
+    // >>= (shr assign)
+    let h = 16;
+    h >>= 2;
+    assert(h == 4);
+
+    // Compound assignment in a loop
+    let sum = 0;
+    let i = 1;
+    while i <= 10 {
+        sum += i;
+        i += 1;
+    }
+    assert(sum == 55);
+
+    // Compound assignment on function parameters (mutable copy)
+    assert(double_in_place(5) == 10);
+
+    // Multiple compound assignments in sequence
+    let j = 100;
+    j -= 10;
+    j /= 2;
+    j += 5;
+    assert(j == 50);
+}

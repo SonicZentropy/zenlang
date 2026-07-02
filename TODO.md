@@ -4,9 +4,9 @@
 2. ~~Fix the enum_variants test to not use a workaround any longer~~ **DONE**
 
 ## Missing Tests
-3. **No tests for compound assignment** (`+=`, `-=`, etc.)
-4. **No tests for bitwise operators** (`&`, `|`, `^`, `~`, `<<`, `>>`)
-5. **No tests for numeric separators** (`1_000_000`)
+3. ~~**No tests for compound assignment** (`+=`, `-=`, etc.)~~ **DONE** - `tests/compound_assignment.zen`
+4. ~~**No tests for bitwise operators** (`&`, `|`, `^`, `~`, `<<`, `>>`)~~ **DONE** - `tests/bitwise.zen`
+5. ~~**No tests for numeric separators** (`1_000_000`)~~ **DONE** - `tests/numeric_separators.zen`
 
 Missing Features
 6. **`const` declarations** — token defined, not implemented
