@@ -6,7 +6,9 @@ and a tight bytecode VM.
 
 ## Features
 
-- **Rust-like syntax**: `let`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls, `?` try operator.
+- **Rust-like syntax**: `let`, `const`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls, `?` try operator.
+- **Type aliases**: `type Name = ExistingType;` — create shorthand names for complex types.
+- **Pub visibility**: `pub fn`, `pub struct`, `pub enum`, `pub const`, `pub type`, `pub use`, `pub mod` — tracked in the AST (enforcement coming in a future module system).
 - **Generics (type-erased)**: generic functions, structs, enums, and impl blocks with `<T>` syntax — no monomorphization, compiles once.
 - **Struct sugar**: named field shorthand (`Point { x, y }`), spread operator (`Point { x: 1, ..base }`).
 - **Expression-oriented**: blocks (`{ ... }`) return values; `if`/`match` are expressions.
@@ -90,18 +92,30 @@ $ zenlang lsp
 
 ## Language Tour
 
+The file [`tests/tour.zen`](tests/tour.zen) is a comprehensive, runnable tour of every
+supported language feature. Run it with:
+
+```
+cargo run -- test tests/tour.zen
+```
+
+Below are the key features with short examples.
+
 ### Bindings
 
 ```rust
 let x = 42;
 let mut y = 10;
 y = y + 1;
+
+const MAX_SPEED = 100;       // immutable constant (runtime check)
+const PI: f64 = 3.14159;     // with explicit type annotation
 ```
 
 ### Functions
 
 ```rust
-fn add(a, b) -> a + b
+fn add(a, b) { a + b }       // expression body — last expression is the return value
 fn greet(name: str) {
     print("Hello, " + name + "!");
 }
@@ -110,13 +124,9 @@ fn greet(name: str) {
 Closures capture by reference:
 
 ```rust
-fn make_counter(start) {
-    let count = start;
-    fn inc() -> count = count + 1;  // assignment returns the value
-    inc
-}
-let c = make_counter(0);
-print(c()); // 1
+let base = 10;
+let adder = |x| x + base;
+print(adder(5)); // 15
 ```
 
 ### Control Flow
@@ -201,18 +211,44 @@ struct Option<T> { Some(T), None }
 enum Result<T, E> { Ok(T), Err(E) }
 ```
 
+### Type Aliases
+
+Create shorthand names for complex types:
+
+```rust
+type MyInt = i64;
+
+let n: MyInt = 42;
+```
+
+### Pub Visibility
+
+Visibility is tracked in the AST — items are private by default, `pub` makes them
+public (enforcement for module-level access is pending):
+
+```rust
+pub fn visible_everywhere() -> i64 { 42 }
+fn private_by_default() -> i64 { 0 }
+
+pub struct Point { x: i64, y: i64 }
+pub enum Color { Red, Green, Blue }
+pub const NAME: str = "zen";
+pub type MyResult = Result<i64, str>;
+```
+
 ### Arrays & Strings
+
+Arrays and strings use built-in function syntax (method-call sugar is planned):
 
 ```rust
 let arr = [1, 2, 3];
-arr.push(4);
-print(arr.len());     // 4
-print(arr.contains(2)); // true
+push(arr, 4);
+print(len(arr));       // 4
 
 let s = "hello";
-print(s.len());       // 5
-print(s.to_upper());  // "HELLO"
-print(s.substring(0, 2)); // "he"
+print(len(s));         // 5
+print(to_upper(s));    // "HELLO"
+print(substring(s, 0, 2)); // "he"
 ```
 
 ## Architecture
