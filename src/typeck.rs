@@ -107,6 +107,20 @@ impl<'a> TypeChecker<'a> {
                     self.symbols.insert_into_current_scope(name, SymKind::Variable(init_ty.clone()));
                 }
             }
+            Stmt::Const { name, type_ann, init, .. } => {
+                let declared = type_ann.as_ref();
+                let ty = self.check_expr(init);
+                if let Some(dt) = declared {
+                    if !self.types_compatible(&ty, dt) {
+                        self.error(format!(
+                            "type mismatch: expected '{}', got '{}'",
+                            self.type_display(dt),
+                            self.type_display(&ty),
+                        ));
+                    }
+                }
+                self.symbols.insert_into_current_scope(name, SymKind::Variable(ty));
+            }
             Stmt::Expr(expr) => {
                 self.check_expr(expr);
             }
@@ -214,7 +228,7 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } | Stmt::Trait { .. } => {}
+            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Use { .. } | Stmt::Trait { .. } | Stmt::Type { .. } => {}
             Stmt::Mod { body, .. } => {
                 self.symbols.enter_scope();
                 for stmt in body {
@@ -777,12 +791,16 @@ impl<'a> TypeChecker<'a> {
             Type::Named(s) if s == "bool" => Type::Bool,
             Type::Named(s) if s == "str" => Type::Str,
             Type::Named(s) => {
-                // Check if this name is a generic type parameter in scope
-                if self.symbols.lookup(s).is_some_and(|e| matches!(e.kind, SymKind::TypeParam(_))) {
-                    Type::Generic(s.clone())
-                } else {
-                    ty.clone()
+                // Check if this name is a type alias
+                if let Some(entry) = self.symbols.lookup(s) {
+                    if let SymKind::TypeAlias { alias, .. } = &entry.kind {
+                        return alias.clone();
+                    }
+                    if matches!(entry.kind, SymKind::TypeParam(_)) {
+                        return Type::Generic(s.clone());
+                    }
                 }
+                ty.clone()
             }
             _ => ty.clone(),
         }

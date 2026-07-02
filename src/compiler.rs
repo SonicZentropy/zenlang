@@ -232,12 +232,14 @@ fn count_lambdas_in_stmts(stmts: &[Spanned<Stmt>]) -> usize {
 
 fn count_lambdas_in_stmt(stmt: &Stmt) -> usize {
     match stmt {
-        Stmt::Fn { body, .. } => count_lambdas_in_stmts(body),
-        Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
-        Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
+            Stmt::Fn { body, .. } => count_lambdas_in_stmts(body),
+            Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
+            Stmt::Const { init, .. } => count_lambdas_in_expr(init),
+            Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
         Stmt::Impl { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
         Stmt::Trait { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
         Stmt::Mod { body, .. } => count_lambdas_in_stmts(body),
+        Stmt::Type { .. } => 0,
         _ => 0,
     }
 }
@@ -381,6 +383,10 @@ fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result:
                 }
                 local_own.insert(name.to_string());
             }
+            Stmt::Const { name, init, .. } => {
+                collect_free_vars_inner(init, &local_own, result);
+                local_own.insert(name.to_string());
+            }
             Stmt::Expr(expr) | Stmt::Return(Some(expr)) => {
                 collect_free_vars_inner(expr, &local_own, result);
             }
@@ -401,6 +407,7 @@ fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result:
                 }
             }
             Stmt::Trait { .. } => {}
+            Stmt::Type { .. } => {}
             Stmt::Return(None) => {}
             Stmt::Mod { body, .. } => {
                 collect_free_in_stmts(body, &local_own, result);
@@ -412,7 +419,7 @@ fn collect_free_in_stmts(stmts: &[Spanned<Stmt>], own: &HashSet<String>, result:
 
 fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_order: &mut Vec<String>) {
     match stmt {
-        Stmt::Fn { name, .. } | Stmt::Let { name, .. } => {
+        Stmt::Fn { name, .. } | Stmt::Let { name, .. } | Stmt::Const { name, .. } => {
             if !globals.contains_key(name.as_str()) {
                 let idx = globals.len() as u16;
                 globals.insert(name.to_string(), idx);
@@ -436,7 +443,7 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
                 register_global_stmt(&stmt.node, globals, global_order);
             }
         }
-        Stmt::Use { path } => {
+        Stmt::Use { path, .. } => {
             let name = &path[path.len() - 1];
             if !globals.contains_key(name.as_str()) {
                 let idx = globals.len() as u16;
@@ -445,6 +452,7 @@ fn register_global_stmt(stmt: &Stmt, globals: &mut HashMap<String, u16>, global_
             }
         }
         Stmt::Enum { .. } => {}
+        Stmt::Type { .. } => {}
         Stmt::Trait { .. } => {}
         _ => {}
     }
@@ -634,6 +642,25 @@ impl<'a> FunctionCompiler<'a> {
                     self.emit_op(Opcode::StoreLocal(slot));
                 }
             }
+            Stmt::Const { name, init, .. } => {
+                self.compile_expr(init);
+                if self.scope_depth == 0 {
+                    if let Some(idx) = self.resolve_global(name) {
+                        self.emit_op(Opcode::StoreGlobal(idx));
+                    } else {
+                        let idx = self.globals.borrow().len() as u16;
+                        self.globals.borrow_mut().insert(name.to_string(), idx);
+                        self.emit_op(Opcode::StoreGlobal(idx));
+                    }
+                } else {
+                    if self.resolve_local(name).is_some() {
+                        self.error(format!("variable '{}' already defined", name));
+                        return;
+                    }
+                    let slot = self.add_local(name);
+                    self.emit_op(Opcode::StoreLocal(slot));
+                }
+            }
             Stmt::Expr(expr) => {
                 self.compile_expr(expr);
                 self.emit_op(Opcode::Pop);
@@ -646,7 +673,7 @@ impl<'a> FunctionCompiler<'a> {
                 self.none();
                 self.emit_op(Opcode::Return);
             }
-            Stmt::Fn { .. } | Stmt::Struct { .. } | Stmt::Enum { .. } => {}
+            Stmt::Fn { .. } | Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Type { .. } => {}
         Stmt::Impl { methods, .. } => {
             for m in methods {
                 self.compile_stmt(&m.node);

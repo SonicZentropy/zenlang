@@ -910,7 +910,7 @@ impl VM {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::compiler;
     use crate::interop;
@@ -930,6 +930,20 @@ mod tests {
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
         vm.run_main().unwrap()
+    }
+
+    pub fn run_program(source: &str) -> crate::error::Result<Value> {
+        let tokens = Lexer::new(source).tokenize()?;
+        let parser = Parser::new(source, &tokens);
+        let mut program = parser.parse()?;
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
+        let types = crate::typeck::check(&program, &mut symbols)?;
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source)?;
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.run_main()
     }
 
     #[test]

@@ -109,23 +109,30 @@ impl<'a> Parser<'a> {
     // ---------- Declarations (top-level items) ----------
 
     fn declaration(&mut self) -> Result<Spanned<Stmt>> {
+        self.declaration_with_vis(Vis::Private)
+    }
+
+    fn declaration_with_vis(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         if self.r#match(TokenKind::Fn) {
-            self.function_decl()
+            self.function_decl(vis)
         } else if self.r#match(TokenKind::Struct) {
-            self.struct_decl()
+            self.struct_decl(vis)
         } else if self.r#match(TokenKind::Enum) {
-            self.enum_decl()
+            self.enum_decl(vis)
         } else if self.r#match(TokenKind::Impl) {
             self.impl_decl()
         } else if self.r#match(TokenKind::Trait) {
-            self.trait_decl()
+            self.trait_decl(vis)
         } else if self.r#match(TokenKind::Use) {
-            self.use_decl()
+            self.use_decl(vis)
         } else if self.r#match(TokenKind::Mod) {
-            self.mod_decl()
+            self.mod_decl(vis)
+        } else if self.r#match(TokenKind::Const) {
+            self.const_decl(vis)
+        } else if self.r#match(TokenKind::Type) {
+            self.type_decl(vis)
         } else if self.r#match(TokenKind::Pub) {
-            // TODO: visibility tracking not yet implemented - parse the declaration but ignore `pub`
-            self.declaration()
+            self.declaration_with_vis(Vis::Public)
         } else {
             self.statement()
         }
@@ -133,7 +140,7 @@ impl<'a> Parser<'a> {
 
     // ---------- Use and Mod declarations ----------
 
-    fn use_decl(&mut self) -> Result<Spanned<Stmt>> {
+    fn use_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let mut path = vec![self.expect_ident()?.into()];
         while self.r#match(TokenKind::ColonColon) {
@@ -141,10 +148,10 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::Semi)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Use { path }, span))
+        Ok(Spanned::new(Stmt::Use { vis, path }, span))
     }
 
-    fn mod_decl(&mut self) -> Result<Spanned<Stmt>> {
+    fn mod_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?.into();
         // `mod name;` — file-backed module (body will be loaded by mod_resolver)
@@ -155,28 +162,36 @@ impl<'a> Parser<'a> {
             self.block_stmts()?
         };
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Mod { name, body }, span))
+        Ok(Spanned::new(Stmt::Mod { vis, name, body }, span))
     }
 
     // ---------- Statements (inside blocks) ----------
 
     fn statement(&mut self) -> Result<Spanned<Stmt>> {
-        if self.r#match(TokenKind::Pub) {
-            self.statement()
-        } else if self.r#match(TokenKind::Fn) {
-            self.function_decl()
+        self.statement_with_vis(Vis::Private)
+    }
+
+    fn statement_with_vis(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
+        if self.r#match(TokenKind::Fn) {
+            self.function_decl(vis)
         } else if self.r#match(TokenKind::Struct) {
-            self.struct_decl()
+            self.struct_decl(vis)
         } else if self.r#match(TokenKind::Enum) {
-            self.enum_decl()
+            self.enum_decl(vis)
         } else if self.r#match(TokenKind::Impl) {
             self.impl_decl()
         } else if self.r#match(TokenKind::Trait) {
-            self.trait_decl()
+            self.trait_decl(vis)
         } else if self.r#match(TokenKind::Use) {
-            self.use_decl()
+            self.use_decl(vis)
         } else if self.r#match(TokenKind::Mod) {
-            self.mod_decl()
+            self.mod_decl(vis)
+        } else if self.r#match(TokenKind::Const) {
+            self.const_decl(vis)
+        } else if self.r#match(TokenKind::Type) {
+            self.type_decl(vis)
+        } else if self.r#match(TokenKind::Pub) {
+            self.statement_with_vis(Vis::Public)
         } else if self.r#match(TokenKind::Let) {
             self.let_stmt()
         } else if self.check(&TokenKind::If) {
@@ -224,6 +239,32 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn const_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
+        let start = self.prev_span();
+        let name = self.expect_ident()?;
+        let type_ann = if self.r#match(TokenKind::Colon) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::Eq)?;
+        let init = self.expression(Precedence::Lowest)?;
+        self.expect(TokenKind::Semi)?;
+        let span = start.merge(&self.prev_span());
+        Ok(Spanned::new(Stmt::Const { vis, name: name.into(), type_ann, init }, span))
+    }
+
+    fn type_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
+        let start = self.prev_span();
+        let name = self.expect_ident()?;
+        let type_params = self.parse_type_params()?;
+        self.expect(TokenKind::Eq)?;
+        let alias = self.parse_type()?;
+        self.expect(TokenKind::Semi)?;
+        let span = start.merge(&self.prev_span());
+        Ok(Spanned::new(Stmt::Type { vis, name: name.into(), type_params, alias }, span))
+    }
+
     fn let_stmt(&mut self) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let mutable = self.r#match(TokenKind::Mut);
@@ -269,7 +310,7 @@ impl<'a> Parser<'a> {
 
     // ---------- Function declarations ----------
 
-    fn function_decl(&mut self) -> Result<Spanned<Stmt>> {
+    fn function_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
         let type_params = self.parse_type_params()?;
@@ -286,7 +327,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block_stmts()?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Fn { name: name.into(), type_params, params, return_type, body }, span))
+        Ok(Spanned::new(Stmt::Fn { vis, name: name.into(), type_params, params, return_type, body }, span))
     }
 
     fn parse_type_params(&mut self) -> Result<Vec<TypeParam>> {
@@ -336,7 +377,7 @@ impl<'a> Parser<'a> {
 
     // ---------- Struct declarations ----------
 
-    fn struct_decl(&mut self) -> Result<Spanned<Stmt>> {
+    fn struct_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
         let type_params = self.parse_type_params()?;
@@ -352,12 +393,12 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Struct { name: name.into(), type_params, fields }, span))
+        Ok(Spanned::new(Stmt::Struct { vis, name: name.into(), type_params, fields }, span))
     }
 
     // ---------- Enum declarations ----------
 
-    fn enum_decl(&mut self) -> Result<Spanned<Stmt>> {
+    fn enum_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
         let type_params = self.parse_type_params()?;
@@ -382,7 +423,7 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Enum { name: name.into(), type_params, variants }, span))
+        Ok(Spanned::new(Stmt::Enum { vis, name: name.into(), type_params, variants }, span))
     }
 
     // ---------- Impl blocks ----------
@@ -401,7 +442,7 @@ impl<'a> Parser<'a> {
         let mut methods = Vec::new();
         while !self.check(&TokenKind::CloseBrace) && !self.is_at_end() {
             if self.r#match(TokenKind::Fn) {
-                let method = self.function_decl()?;
+                let method = self.function_decl(Vis::Private)?;
                 methods.push(method);
             } else {
                 return Err(self.error("expected method declaration inside impl block"));
@@ -412,7 +453,7 @@ impl<'a> Parser<'a> {
         Ok(Spanned::new(Stmt::Impl { type_params, type_name, trait_name, methods }, span))
     }
 
-    fn trait_decl(&mut self) -> Result<Spanned<Stmt>> {
+    fn trait_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let type_params = self.parse_type_params()?;
         let name = self.expect_ident()?;
@@ -436,6 +477,7 @@ impl<'a> Parser<'a> {
                 let span = start.merge(&self.prev_span());
                 methods.push(Spanned::new(
                     Stmt::Fn {
+                        vis: Vis::Private,
                         name: fn_name,
                         type_params: method_type_params,
                         params,
@@ -450,7 +492,7 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Trait { name: name.into(), type_params, methods: methods }, span))
+        Ok(Spanned::new(Stmt::Trait { vis, name: name.into(), type_params, methods: methods }, span))
     }
 
     // ---------- Expressions (Pratt parser) ----------
@@ -1200,7 +1242,8 @@ impl<'a> Parser<'a> {
             match self.peek().node.kind {
                 TokenKind::Fn | TokenKind::Let | TokenKind::Struct
                 | TokenKind::Enum | TokenKind::Impl | TokenKind::Trait
-                | TokenKind::Pub | TokenKind::Use | TokenKind::Mod => return,
+                | TokenKind::Pub | TokenKind::Use | TokenKind::Mod
+                | TokenKind::Const | TokenKind::Type => return,
                 _ => {}
             }
             self.advance();

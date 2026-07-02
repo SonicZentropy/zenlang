@@ -48,6 +48,8 @@ pub enum SymKind {
     Module(usize),
     /// A trait declaration with its method signatures.
     Trait(TraitDef),
+    /// A type alias: `type Foo = Bar;`
+    TypeAlias { type_params: Vec<TypeParam>, alias: Type },
 }
 
 #[derive(Debug, Clone)]

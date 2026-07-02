@@ -768,6 +768,7 @@ fn completion(state: &DocumentState, _pos: &Position) -> Option<CompletionRespon
             SymKind::TypeParam(_) => CompletionItemKind::TYPE_PARAMETER,
             SymKind::Trait(_) => CompletionItemKind::INTERFACE,
             SymKind::Module(_) => CompletionItemKind::MODULE,
+            SymKind::TypeAlias { .. } => CompletionItemKind::TYPE_PARAMETER,
         };
         items.push(CompletionItem {
             label: name.clone(),
@@ -863,6 +864,12 @@ fn find_definition_in_stmt(
                 None
             }
         }
+        Stmt::Const { name: const_name, init, .. } => {
+            if const_name.as_str() == name {
+                return Some(name_span_in_source(source, stmt.span, name)?);
+            }
+            find_definition_in_expr(init, source, name)
+        }
         Stmt::Struct { name: struct_name, .. }
         | Stmt::Enum { name: struct_name, .. } => {
             if struct_name.as_str() == name {
@@ -893,6 +900,12 @@ fn find_definition_in_stmt(
         Stmt::Return(Some(expr)) => find_definition_in_expr(expr, source, name),
         Stmt::Return(None) => None,
         Stmt::Use { .. } => None,
+        Stmt::Type { name: type_name, .. } => {
+            if type_name.as_str() == name {
+                return Some(name_span_in_source(source, stmt.span, name)?);
+            }
+            None
+        }
         Stmt::Mod { body, .. } => find_definition_in_stmts(body, source, name),
     }
 }
@@ -1280,7 +1293,8 @@ fn emit_expr_semantic_tokens(
                         | SymKind::EnumConstructor { .. }
                         | SymKind::TypeParam(_)
                         | SymKind::Module(_)
-                        | SymKind::Trait(_) => SemanticTokenType::TYPE,
+                        | SymKind::Trait(_)
+                        | SymKind::TypeAlias { .. } => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1428,7 +1442,7 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     match &entry.kind {
                         SymKind::Function(_) => SemanticTokenType::FUNCTION,
                         SymKind::Variable(_) => SemanticTokenType::VARIABLE,
-                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::TypeParam(_) | SymKind::Module(_) | SymKind::Trait(_) => SemanticTokenType::TYPE,
+                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::TypeParam(_) | SymKind::Module(_) | SymKind::Trait(_) | SymKind::TypeAlias { .. } => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1574,6 +1588,7 @@ fn symkind_display(kind: &SymKind) -> String {
             format!("{}{} (enum {})", variant_name, fields_str, enum_name)
         }
         SymKind::TypeParam(name) => format!("type param '{}'", name),
+        SymKind::TypeAlias { alias, .. } => format!("type alias = {}", type_display(alias)),
     }
 }
 

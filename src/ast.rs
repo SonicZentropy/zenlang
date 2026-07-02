@@ -6,6 +6,19 @@ use crate::token::TokenKind;
 
 // ---------- Types ----------
 
+/// Visibility of a declaration.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Vis {
+    Public,
+    Private,
+}
+
+impl Vis {
+    pub fn is_pub(&self) -> bool {
+        matches!(self, Vis::Public)
+    }
+}
+
 /// A generic type parameter declaration, e.g. `<T>` or `<T: SomeTrait>`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeParam {
@@ -127,26 +140,43 @@ pub enum Stmt {
         type_ann: Option<Type>,
         init: Option<Expr>,
     },
+    /// `[pub] const name [: type] = expr;`
+    Const {
+        vis: Vis,
+        name: CompactString,
+        type_ann: Option<Type>,
+        init: Expr,
+    },
+    /// `[pub] type Name<T> = AliasType;`
+    Type {
+        vis: Vis,
+        name: CompactString,
+        type_params: Vec<TypeParam>,
+        alias: Type,
+    },
     /// A standalone expression statement.
     Expr(Expr),
     /// `return [expr];`
     Return(Option<Expr>),
-    /// `fn name<T, U>(params) [: ret_type] { body }`
+    /// `[pub] fn name<T, U>(params) [: ret_type] { body }`
     Fn {
+        vis: Vis,
         name: CompactString,
         type_params: Vec<TypeParam>,
         params: Vec<Param>,
         return_type: Option<Type>,
         body: Vec<Spanned<Stmt>>,
     },
-    /// `struct Name<T> { field: type, ... }`
+    /// `[pub] struct Name<T> { field: type, ... }`
     Struct {
+        vis: Vis,
         name: CompactString,
         type_params: Vec<TypeParam>,
         fields: Vec<StructField>,
     },
-    /// `enum Name<T> { Variant(fields...), ... }`
+    /// `[pub] enum Name<T> { Variant(fields...), ... }`
     Enum {
+        vis: Vis,
         name: CompactString,
         type_params: Vec<TypeParam>,
         variants: Vec<EnumVariant>,
@@ -158,19 +188,22 @@ pub enum Stmt {
         trait_name: Option<CompactString>,
         methods: Vec<Spanned<Stmt>>,
     },
-    /// `trait Name<T> { fn method(...) -> Type; ... }`
+    /// `[pub] trait Name<T> { fn method(...) -> Type; ... }`
     /// Method bodies are empty (`vec![]`) — trait methods are signatures only.
     Trait {
+        vis: Vis,
         name: CompactString,
         type_params: Vec<TypeParam>,
         methods: Vec<Spanned<Stmt>>,
     },
-    /// `use path::to::item;`
+    /// `[pub] use path::to::item;`
     Use {
+        vis: Vis,
         path: Vec<CompactString>,
     },
-    /// `mod name { ... }`
+    /// `[pub] mod name { ... }`
     Mod {
+        vis: Vis,
         name: CompactString,
         body: Vec<Spanned<Stmt>>,
     },

@@ -120,7 +120,7 @@ impl Resolver {
 
     fn register_top_level(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Fn { name, type_params, params, return_type, body: _ } => {
+            Stmt::Fn { name, type_params, params, return_type, body: _, .. } => {
                 let sig = FnSignature {
                     name: name.to_string(),
                     type_params: type_params.clone(),
@@ -192,10 +192,10 @@ impl Resolver {
                     }
                 }
             }
-            Stmt::Trait { name, type_params, methods } => {
+            Stmt::Trait { name, type_params, methods, .. } => {
                 let mut method_sigs = Vec::new();
                 for method in methods {
-                    if let Stmt::Fn { name: fn_name, type_params: fn_type_params, params, return_type, body: _ } = &method.node {
+                    if let Stmt::Fn { name: fn_name, type_params: fn_type_params, params, return_type, body: _, .. } = &method.node {
                         let combined_type_params: Vec<TypeParam> = type_params.iter().chain(fn_type_params.iter()).cloned().collect();
                         let sig = FnSignature {
                             name: fn_name.to_string(),
@@ -214,7 +214,16 @@ impl Resolver {
                     self.error(e);
                 }
             }
-            Stmt::Mod { name, body } => {
+            Stmt::Type { name, type_params, alias, .. } => {
+                let resolved_alias = self.resolve_type(alias, type_params);
+                if let Err(e) = self.symbols.define(name, SymKind::TypeAlias {
+                    type_params: type_params.clone(),
+                    alias: resolved_alias,
+                }) {
+                    self.error(e);
+                }
+            }
+            Stmt::Mod { name, body, .. } => {
                 // Enter scope for the module
                 self.symbols.enter_scope();
                 let module_scope = self.symbols.current_scope;
@@ -327,6 +336,13 @@ impl Resolver {
                     self.error(e);
                 }
             }
+            Stmt::Const { name, type_ann, init, .. } => {
+                self.resolve_expr(init);
+                let ty = type_ann.clone().unwrap_or(Type::Unit);
+                if let Err(e) = self.symbols.define(name, SymKind::Variable(ty)) {
+                    self.error(e);
+                }
+            }
             Stmt::Expr(expr) => {
                 self.resolve_expr(expr);
             }
@@ -334,10 +350,10 @@ impl Resolver {
                 self.resolve_expr(expr);
             }
             Stmt::Return(None) => {}
-            Stmt::Struct { .. } | Stmt::Enum { .. } => {
+            Stmt::Struct { .. } | Stmt::Enum { .. } | Stmt::Type { .. } => {
                 // Already registered, nothing to resolve
             }
-            Stmt::Use { path } => {
+            Stmt::Use { path, .. } => {
                 if path.len() == 1 {
                     // Single-name import: verify it exists
                     if self.symbols.lookup(&path[0]).is_none() {
@@ -365,7 +381,7 @@ impl Resolver {
                     }
                 }
             }
-            Stmt::Mod { name, body } => {
+            Stmt::Mod { name, body, .. } => {
                 // Find the module's scope
                 let entry = self.symbols.lookup(name).cloned();
                 if let Some(SymEntry { kind: SymKind::Module(scope_idx), .. }) = entry {
