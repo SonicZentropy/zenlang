@@ -47,7 +47,9 @@ impl ForeignObject {
     pub fn downcast_mut<T: 'static>(&self) -> Option<std::cell::RefMut<'_, T>> {
         let r = self.data.borrow_mut();
         if (*r).is::<T>() {
-            Some(std::cell::RefMut::map(r, |d| d.downcast_mut::<T>().unwrap()))
+            Some(std::cell::RefMut::map(r, |d| {
+                d.downcast_mut::<T>().unwrap()
+            }))
         } else {
             None
         }
@@ -74,6 +76,37 @@ impl Clone for ForeignObject {
 impl PartialEq for ForeignObject {
     fn eq(&self, other: &Self) -> bool {
         self.type_id == other.type_id && Rc::ptr_eq(&self.data, &other.data)
+    }
+}
+
+/// A hashable key for `Value::Map`. Only a subset of `Value` variants can be
+/// used as map keys (ints, strings, bools) — floats, arrays, structs, etc.
+/// don't have stable hashing/equality suitable for map keys.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MapKey {
+    Int(i64),
+    Str(Rc<str>),
+    Bool(bool),
+}
+
+impl MapKey {
+    /// Convert a `Value` into a `MapKey`, if it's a supported key type.
+    pub fn from_value(v: &Value) -> Option<MapKey> {
+        match v {
+            Value::Int(n) => Some(MapKey::Int(*n)),
+            Value::Str(s) => Some(MapKey::Str(s.clone())),
+            Value::Bool(b) => Some(MapKey::Bool(*b)),
+            _ => None,
+        }
+    }
+
+    /// Convert this key back into a `Value` (e.g. for `map_keys`/iteration).
+    pub fn to_value(&self) -> Value {
+        match self {
+            MapKey::Int(n) => Value::Int(*n),
+            MapKey::Str(s) => Value::Str(s.clone()),
+            MapKey::Bool(b) => Value::Bool(*b),
+        }
     }
 }
 
@@ -110,7 +143,10 @@ pub enum Value {
     /// A struct with named fields. The `String` holds the struct type name for method dispatch.
     Struct(Rc<RefCell<HashMap<String, Value>>>, String),
     /// An enum value with a tag (variant index) and field data.
-    Enum { tag: u16, data: Rc<RefCell<Vec<Value>>> },
+    Enum {
+        tag: u16,
+        data: Rc<RefCell<Vec<Value>>>,
+    },
     /// A compiled script function identified by its index into the VM's function table.
     Function(usize),
     /// A native Rust function registered via the interop system.
@@ -121,6 +157,10 @@ pub enum Value {
     Closure(Rc<RefCell<ClosureData>>),
     /// A range `start..end` (exclusive) or `start..=end` (inclusive).
     Range(i64, i64, bool),
+    /// A mutable key-value map. Keys are restricted to `int`, `str`, and
+    /// `bool` (see `MapKey`) since `float`/`array`/`struct` etc. don't have
+    /// stable hashing/equality suitable for map keys.
+    Map(Rc<RefCell<HashMap<MapKey, Value>>>),
 }
 
 impl fmt::Debug for Value {
@@ -137,8 +177,14 @@ impl fmt::Debug for Value {
             Value::Function(idx) => write!(f, "Function({})", idx),
             Value::NativeFunction(_) => write!(f, "NativeFunction(...)"),
             Value::Foreign(obj) => write!(f, "{:?}", obj.borrow()),
-            Value::Closure(c) => write!(f, "Closure(fn={}, up_count={})", c.borrow().fn_idx, c.borrow().upvalues.len()),
+            Value::Closure(c) => write!(
+                f,
+                "Closure(fn={}, up_count={})",
+                c.borrow().fn_idx,
+                c.borrow().upvalues.len()
+            ),
             Value::Range(s, e, inc) => write!(f, "Range({}, {}, {})", s, e, inc),
+            Value::Map(m) => write!(f, "Map({} entries)", m.borrow().len()),
         }
     }
 }
@@ -153,12 +199,16 @@ impl Clone for Value {
             Value::Str(s) => Value::Str(s.clone()),
             Value::Array(a) => Value::Array(a.clone()),
             Value::Struct(s, name) => Value::Struct(s.clone(), name.clone()),
-            Value::Enum { tag, data } => Value::Enum { tag: *tag, data: data.clone() },
+            Value::Enum { tag, data } => Value::Enum {
+                tag: *tag,
+                data: data.clone(),
+            },
             Value::Function(idx) => Value::Function(*idx),
             Value::NativeFunction(f) => Value::NativeFunction(f.clone()),
             Value::Foreign(r) => Value::Foreign(r.clone()),
             Value::Closure(c) => Value::Closure(c.clone()),
             Value::Range(s, e, inc) => Value::Range(*s, *e, *inc),
+            Value::Map(m) => Value::Map(m.clone()),
         }
     }
 }
@@ -184,6 +234,7 @@ impl PartialEq for Value {
                 ca.fn_idx == cb.fn_idx && ca.upvalues == cb.upvalues
             }
             (Value::Range(a, b, c), Value::Range(d, e, f)) => a == d && b == e && c == f,
+            (Value::Map(a), Value::Map(b)) => *a.borrow() == *b.borrow(),
             _ => false,
         }
     }
@@ -206,6 +257,7 @@ impl Value {
             Value::Foreign(obj) => obj.borrow().type_name,
             Value::Closure(_) => "closure",
             Value::Range(..) => "range",
+            Value::Map(_) => "map",
         }
     }
 

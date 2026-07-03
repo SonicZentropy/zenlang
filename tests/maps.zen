@@ -1,0 +1,47 @@
+fn main() {
+    let m = map_new();
+    assert(len(m) == 0);
+
+    map_set(m, "hp", 100);
+    map_set(m, "mp", 50);
+    map_set(m, 1, "one");
+    map_set(m, true, "yes");
+
+    assert(len(m) == 4);
+    assert(map_len(m) == 4);
+    assert(map_has(m, "hp"));
+    assert(!map_has(m, "missing"));
+
+    assert(map_get(m, "hp") == Some(100));
+    assert(map_get(m, "missing") == None);
+    assert(map_get(m, 1) == Some("one"));
+    assert(map_get(m, true) == Some("yes"));
+
+    map_set(m, "hp", 80);
+    assert(map_get(m, "hp") == Some(80));
+
+    let removed = map_remove(m, "mp");
+    assert(removed == Some(50));
+    assert(!map_has(m, "mp"));
+    assert(map_remove(m, "mp") == None);
+
+    let keys = map_keys(m);
+    assert(len(keys) == 3);
+    let values = map_values(m);
+    assert(len(values) == 3);
+
+    // Iterating a map yields [key, value] pairs
+    let mut found_hp = false;
+    for kv in m {
+        if kv[0] == "hp" {
+            found_hp = true;
+            assert(kv[1] == 80);
+        }
+    }
+    assert(found_hp);
+
+    map_clear(m);
+    assert(len(m) == 0);
+
+    print("Map tests complete!");
+}

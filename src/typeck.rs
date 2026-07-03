@@ -480,6 +480,18 @@ impl<'a> TypeChecker<'a> {
                         }
                         *ret.clone()
                     }
+                    // Type-erased value (e.g. an untyped function
+                    // parameter used as a callback, like `f` in
+                    // `fn map(iterable, f) { ... f(v) ... }`). We can't
+                    // statically validate the call, so let it through —
+                    // the VM will raise a runtime error if it's genuinely
+                    // not callable.
+                    Type::Unit => {
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        Type::Unit
+                    }
                     _ => {
                         for arg in args {
                             self.check_expr(arg);
@@ -613,7 +625,11 @@ impl<'a> TypeChecker<'a> {
                 match &ot {
                     Type::Array(inner) => *inner.clone(),
                     Type::Str => Type::Str,
-                    _ => Type::I64, // range, array, etc. — runtime handles actual type
+                    // Ranges, maps, and other type-erased (`Type::Unit`)
+                    // values are indexable at runtime but their element type
+                    // can't be known statically here; `Type::Unit` is the
+                    // codebase's "compatible with anything" placeholder.
+                    _ => Type::Unit,
                 }
             }
             Expr::Block(stmts) => {
@@ -634,7 +650,10 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::If { cond, then, else_ } => {
                 let ct = self.check_expr(cond);
-                if !matches!(ct, Type::Bool) {
+                // `Type::Unit` covers type-erased values (e.g. the result of
+                // calling an untyped callback parameter) that can't be
+                // statically proven boolean; let the VM enforce it at runtime.
+                if !matches!(ct, Type::Bool | Type::Unit) {
                     self.error("if condition must be bool");
                 }
                 let tt = self.check_expr(then);
@@ -650,7 +669,7 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::While { cond, body } => {
                 let ct = self.check_expr(cond);
-                if !matches!(ct, Type::Bool) {
+                if !matches!(ct, Type::Bool | Type::Unit) {
                     self.error("while condition must be bool");
                 }
                 self.check_expr(body);
@@ -664,7 +683,14 @@ impl<'a> TypeChecker<'a> {
                     _ => match &iter_ty {
                         Type::Array(inner) => *inner.clone(),
                         Type::Str => Type::Str,
-                        _ => Type::I64,
+                        // Ranges (as a value, not an inline literal), maps,
+                        // custom struct/foreign iterators, and anything else
+                        // type-erased (`Type::Unit`) can't have their element
+                        // type known statically here — `Type::Unit` is the
+                        // codebase's "compatible with anything" placeholder,
+                        // so uses of the loop variable aren't spuriously
+                        // rejected by later type checks.
+                        _ => Type::Unit,
                     },
                 };
                 // Remove any existing binding (from resolver) and re-insert
@@ -776,6 +802,24 @@ impl<'a> TypeChecker<'a> {
                                         "'{}' is not a variant of this enum",
                                         variant_name
                                     ));
+                                }
+                            } else if matches!(mt, Type::Unit) {
+                                // The matched value's type is type-erased
+                                // (e.g. the result of a method call on a
+                                // generically-typed receiver, like
+                                // `it.next()` on an iterator). We can't
+                                // statically validate the variant/bindings,
+                                // so bind each capture as `Type::Unit` and
+                                // let the runtime handle the actual dispatch
+                                // — consistent with the rest of the
+                                // type-erased-generics design.
+                                for binding in bindings {
+                                    if binding.is_empty() {
+                                        continue;
+                                    }
+                                    self.symbols.remove_from_current_scope(binding);
+                                    let _ =
+                                        self.symbols.define(binding, SymKind::Variable(Type::Unit));
                                 }
                             } else {
                                 self.error("cannot match enum variant on non-enum type");

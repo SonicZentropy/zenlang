@@ -1,6 +1,6 @@
 use std::io::BufRead;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use clap::{Parser, Subcommand};
 
@@ -64,18 +64,20 @@ fn main() -> zenlang::Result<()> {
 fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     tracing::info!("running script: {}", path);
 
-    let source = std::fs::read_to_string(path.as_std_path())
-        .map_err(|e| Error::Io { source: e })?;
+    let source =
+        std::fs::read_to_string(path.as_std_path()).map_err(|e| Error::Io { source: e })?;
 
     // Initial compile
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
     zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
+    zenlang::prelude::inject(&mut program)?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;
-    let (fns, global_names) = zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
+    let (fns, global_names) =
+        zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
 
     let mut vm = VM::new();
     zenlang::stdlib::register_builtins(&mut vm);
@@ -90,7 +92,8 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     let r = running.clone();
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
-    }).ok();
+    })
+    .ok();
 
     while running.load(Ordering::SeqCst) {
         if reloader.tick()? {
@@ -146,10 +149,12 @@ fn run_tests(paths: &[camino::Utf8PathBuf]) -> zenlang::Result<()> {
             let parser = zenlang::parser::Parser::new(&source, &tokens);
             let mut program = parser.parse()?;
             zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
+            zenlang::prelude::inject(&mut program)?;
             let native_names = zenlang::stdlib::native_names();
             let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
             let types = zenlang::typeck::check(&program, &mut symbols)?;
-            let (fns, global_names) = zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
+            let (fns, global_names) =
+                zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
             let mut vm = VM::new();
             zenlang::stdlib::register_builtins(&mut vm);
             vm.load_bytecode(fns, global_names);
@@ -177,17 +182,19 @@ fn run_tests(paths: &[camino::Utf8PathBuf]) -> zenlang::Result<()> {
 }
 
 fn run_disasm(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
-    let source = std::fs::read_to_string(path.as_std_path())
-        .map_err(|e| Error::Io { source: e })?;
+    let source =
+        std::fs::read_to_string(path.as_std_path()).map_err(|e| Error::Io { source: e })?;
 
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
     zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
+    zenlang::prelude::inject(&mut program)?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;
-    let (fns, _global_names) = zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
+    let (fns, _global_names) =
+        zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
 
     for func in &fns {
         func.disassemble();
@@ -196,13 +203,14 @@ fn run_disasm(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
 }
 
 fn run_check(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
-    let source = std::fs::read_to_string(path.as_std_path())
-        .map_err(|e| Error::Io { source: e })?;
+    let source =
+        std::fs::read_to_string(path.as_std_path()).map_err(|e| Error::Io { source: e })?;
 
     let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
     let parser = zenlang::parser::Parser::new(&source, &tokens);
     let mut program = parser.parse()?;
     zenlang::mod_resolver::resolve_modules(&mut program, path.as_std_path())?;
+    zenlang::prelude::inject(&mut program)?;
     let native_names = zenlang::stdlib::native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
     let _types = zenlang::typeck::check(&program, &mut symbols)?;
@@ -247,7 +255,11 @@ fn run_repl() -> zenlang::Result<()> {
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
         let mut line = String::new();
-        if reader.read_line(&mut line).map_err(|e| Error::Io { source: e })? == 0 {
+        if reader
+            .read_line(&mut line)
+            .map_err(|e| Error::Io { source: e })?
+            == 0
+        {
             break;
         }
         source_buf.push_str(&line);
@@ -271,7 +283,7 @@ fn run_repl() -> zenlang::Result<()> {
                 continue;
             }
         };
-    let parser = zenlang::parser::Parser::new(&source, &tokens);
+        let parser = zenlang::parser::Parser::new(&source, &tokens);
         let mut program = match parser.parse() {
             Ok(p) => p,
             Err(e) => {
@@ -282,7 +294,8 @@ fn run_repl() -> zenlang::Result<()> {
         // REPL input has no backing file, so pass "." as path — module loading won't apply
         let _ = zenlang::mod_resolver::resolve_modules(&mut program, std::path::Path::new("."));
         let native_names = zenlang::stdlib::native_names();
-        let mut symbols = match zenlang::resolver::resolve_with_natives(&mut program, &native_names) {
+        let mut symbols = match zenlang::resolver::resolve_with_natives(&mut program, &native_names)
+        {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("error: {e}");
@@ -296,13 +309,14 @@ fn run_repl() -> zenlang::Result<()> {
                 continue;
             }
         };
-        let (fns, global_names) = match zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("compile error: {e}");
-                continue;
-            }
-        };
+        let (fns, global_names) =
+            match zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("compile error: {e}");
+                    continue;
+                }
+            };
 
         // Reload VM bytecode preserving globals
         if let Err(e) = vm.reload_functions(fns, global_names) {

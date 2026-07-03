@@ -5,6 +5,8 @@ use crate::Result;
 use crate::value::{ForeignObject, Value};
 use crate::vm::{VM, VMContext};
 
+use super::{option_none, option_some};
+
 struct ArrayIterState {
     data: Rc<RefCell<Vec<Value>>>,
     idx: usize,
@@ -21,18 +23,19 @@ struct StrIterState {
     idx: usize,
 }
 
+struct MapIterState {
+    // Snapshotted at `iter()` time so mutating the map mid-iteration can't
+    // invalidate the cursor.
+    entries: Vec<(Value, Value)>,
+    idx: usize,
+}
+
 fn some_val(v: Value) -> Value {
-    Value::Enum {
-        tag: 0,
-        data: Rc::new(RefCell::new(vec![v])),
-    }
+    option_some(v)
 }
 
 fn none_val() -> Value {
-    Value::Enum {
-        tag: 1,
-        data: Rc::new(RefCell::new(Vec::new())),
-    }
+    option_none()
 }
 
 fn array_iter_next(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
@@ -117,6 +120,32 @@ fn str_iter_next(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     }
 }
 
+fn map_iter_next(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    match args.first() {
+        Some(Value::Foreign(fv)) => {
+            let obj = fv.borrow();
+            match obj.downcast_mut::<MapIterState>() {
+                Some(mut state) => {
+                    let item = state.entries.get(state.idx).cloned();
+                    match item {
+                        Some((k, v)) => {
+                            state.idx += 1;
+                            Ok(some_val(Value::Array(Rc::new(RefCell::new(vec![k, v])))))
+                        }
+                        None => Ok(none_val()),
+                    }
+                }
+                None => Err(crate::error::Error::Script {
+                    msg: "MapIter.next called on wrong foreign type".into(),
+                }),
+            }
+        }
+        _ => Err(crate::error::Error::Script {
+            msg: "MapIter.next called without a receiver".into(),
+        }),
+    }
+}
+
 /// The native `iter(x)` function: normalizes any iterable value into an
 /// iterator that responds to `.next() -> Option<T>`.
 ///
@@ -151,6 +180,17 @@ pub fn iter_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
                 idx: 0,
             },
         ))))),
+        Some(Value::Map(m)) => {
+            let entries: Vec<(Value, Value)> = m
+                .borrow()
+                .iter()
+                .map(|(k, v)| (k.to_value(), v.clone()))
+                .collect();
+            Ok(Value::Foreign(Rc::new(RefCell::new(ForeignObject::new(
+                "MapIter",
+                MapIterState { entries, idx: 0 },
+            )))))
+        }
         Some(v @ Value::Struct(..)) => Ok(v.clone()),
         Some(v @ Value::Foreign(_)) => Ok(v.clone()),
         Some(other) => Err(crate::error::Error::Script {
@@ -171,4 +211,6 @@ pub fn register(vm: &mut VM) {
         .method("next", Rc::new(range_iter_next));
     vm.register_type::<StrIterState>("StrIter")
         .method("next", Rc::new(str_iter_next));
+    vm.register_type::<MapIterState>("MapIter")
+        .method("next", Rc::new(map_iter_next));
 }

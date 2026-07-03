@@ -1,0 +1,51 @@
+fn main() {
+    let arr = [1, 2, 3, 4, 5];
+
+    // map
+    let doubled = map(arr, |x| x * 2);
+    assert(len(doubled) == 5);
+    assert(doubled[0] == 2);
+    assert(doubled[4] == 10);
+
+    // filter
+    let evens = filter(arr, |x| x % 2 == 0);
+    assert(len(evens) == 2);
+    assert(evens[0] == 2);
+    assert(evens[1] == 4);
+
+    // fold
+    let total = fold(arr, 0, |acc, x| acc + x);
+    assert(total == 15);
+
+    // enumerate
+    let pairs = enumerate(["a", "b", "c"]);
+    assert(len(pairs) == 3);
+    assert(pairs[0][0] == 0);
+    assert(pairs[0][1] == "a");
+    assert(pairs[2][0] == 2);
+    assert(pairs[2][1] == "c");
+
+    // take
+    let first3 = take(0..100, 3);
+    assert(len(first3) == 3);
+    assert(first3[0] == 0);
+    assert(first3[2] == 2);
+
+    // zip
+    let zipped = zip([1, 2, 3], ["a", "b", "c"]);
+    assert(len(zipped) == 3);
+    assert(zipped[0][0] == 1);
+    assert(zipped[0][1] == "a");
+
+    // collect
+    let collected = collect(2..5);
+    assert(len(collected) == 3);
+    assert(collected[0] == 2);
+    assert(collected[2] == 4);
+
+    // chaining: sum of squares of even numbers
+    let result = fold(filter(arr, |x| x % 2 == 0), 0, |acc, x| acc + x * x);
+    assert(result == 20); // 2*2 + 4*4
+
+    print("Prelude iterator adapter tests complete!");
+}

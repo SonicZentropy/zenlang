@@ -202,6 +202,20 @@ impl VM {
         self.functions = fns;
         self.global_names = new_global_names;
 
+        // Rebuild the qualified-name map used for struct method dispatch
+        // ("Type::method" -> fn idx). This is separate from `old_name_to_idx`
+        // / `new_name_to_idx` above (which are locals used only for
+        // remapping `Value::Function` references in global values) —
+        // without this, `CallMethod` on a `Value::Struct` would keep
+        // resolving to stale (or entirely wrong, if indices shifted)
+        // function indices after every hot reload.
+        self.function_name_map = self
+            .functions
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.clone(), i))
+            .collect();
+
         // Re-populate globals (native fns get Value::NativeFunction, user globals get Nil)
         self.populate_globals();
 
@@ -216,6 +230,33 @@ impl VM {
         self.frames.clear();
 
         Ok(())
+    }
+
+    /// Call a zero-argument top-level function by plain name, if one is
+    /// defined in the currently-loaded bytecode. Returns `Ok(None)` (without
+    /// error) if no such function exists, so callers can use this for
+    /// optional "hook" conventions without forcing every script to define
+    /// one.
+    ///
+    /// Used by [`HotReloader`](crate::hotreload::HotReloader) to call an
+    /// optional `fn on_reload()` after every successful hot reload, so
+    /// scripts can re-derive cached/computed state (e.g. re-populate a
+    /// lookup map, reset a timer) that a plain global-value snapshot can't
+    /// meaningfully migrate on its own.
+    pub fn call_if_exists(&mut self, name: &str) -> Result<Option<Value>> {
+        let Some(&idx) = self.function_name_map.get(name) else {
+            return Ok(None);
+        };
+        let fn_def = &self.functions[idx];
+        let bp = self.stack.len();
+        let frame = CallFrame::new(idx, bp);
+        self.frames.push(frame);
+        let slot_count = fn_def.chunk.locals as usize;
+        while self.stack.len() < bp + slot_count {
+            self.stack.push(Value::Nil);
+        }
+        self.execute()?;
+        Ok(Some(self.stack.pop().unwrap_or(Value::Nil)))
     }
 
     /// Run the main function.
@@ -1077,7 +1118,9 @@ impl VM {
                     match val {
                         Value::Enum { tag, data: _ } => self.stack.push(Value::Int(tag as i64)),
                         _ => {
-                            return Err(self.runtime_error(format!("LoadEnumTag on non-enum value")));
+                            return Err(
+                                self.runtime_error(format!("LoadEnumTag on non-enum value"))
+                            );
                         }
                     }
                 }
@@ -1704,6 +1747,66 @@ pub mod tests {
         vm.reload_functions(fns, global_names).unwrap();
         let result = vm.run_main().unwrap();
         assert_eq!(result, Value::Int(1));
+    }
+
+    #[test]
+    fn test_reload_functions_preserves_struct_method_dispatch() {
+        // Struct method calls (`CallMethod` on `Value::Struct`) resolve via
+        // the qualified-name `function_name_map` ("Type::method" -> fn idx),
+        // which is separate from the plain-name maps `reload_functions`
+        // already updates. If it isn't refreshed too, method calls break
+        // (or silently call stale bytecode) after every hot reload.
+        let source1 = r#"
+            struct Counter { value: i64 }
+            impl Counter {
+                fn get(&self) -> i64 { self.value }
+            }
+            fn main() -> i64 {
+                let c = Counter { value: 1 };
+                c.get()
+            }
+        "#;
+
+        let tokens = Lexer::new(source1).tokenize().unwrap();
+        let parser = Parser::new(source1, &tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source1).unwrap();
+
+        let mut vm = VM::new();
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(1));
+
+        // Reload with a change: add a new function ahead of the struct's
+        // impl block (shifting every subsequent function index), and
+        // change what the method returns — simulating an edit-and-save
+        // during a live hot-reload session.
+        let source2 = r#"
+            fn unrelated() -> i64 { 999 }
+            struct Counter { value: i64 }
+            impl Counter {
+                fn get(&self) -> i64 { self.value + 41 }
+            }
+            fn main() -> i64 {
+                let c = Counter { value: 1 };
+                c.get()
+            }
+        "#;
+
+        let tokens = Lexer::new(source2).tokenize().unwrap();
+        let parser = Parser::new(source2, &tokens);
+        let mut program = parser.parse().unwrap();
+        let mut symbols = crate::resolver::resolve(&mut program).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &[], source2).unwrap();
+
+        vm.reload_functions(fns, global_names).unwrap();
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(42));
     }
 
     // --- Stdlib tests ---

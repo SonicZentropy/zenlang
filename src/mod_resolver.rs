@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::ast::*;
 use crate::error::{Error, Result};
@@ -11,21 +11,39 @@ use crate::span::Spanned;
 /// and replaces their bodies with the parsed statements from `<name>.zen` located in the
 /// same directory as `source_path`. Recursively resolves modules within loaded files.
 pub fn resolve_modules(program: &mut Program, source_path: &Path) -> Result<()> {
-    let parent_dir = source_path
-        .parent()
-        .unwrap_or_else(|| Path::new("."));
+    resolve_modules_with_paths(program, source_path).map(|_| ())
+}
+
+/// Like [`resolve_modules`], but also returns the list of file-backed module
+/// paths that were loaded (in load order, not including `source_path` itself).
+///
+/// Used by the hot reloader to discover the full set of files that make up a
+/// project so it can watch all of them, not just the entry script.
+pub fn resolve_modules_with_paths(
+    program: &mut Program,
+    source_path: &Path,
+) -> Result<Vec<PathBuf>> {
+    let parent_dir = source_path.parent().unwrap_or_else(|| Path::new("."));
     let mut loaded = HashSet::new();
     // Prevent the main file from being loaded as a module of itself
     if let Some(stem) = source_path.file_stem() {
         loaded.insert(stem.to_string_lossy().into_owned());
     }
-    resolve_stmts(&mut program.stmts, parent_dir, &mut loaded)
+    let mut loaded_paths = Vec::new();
+    resolve_stmts(
+        &mut program.stmts,
+        parent_dir,
+        &mut loaded,
+        &mut loaded_paths,
+    )?;
+    Ok(loaded_paths)
 }
 
 fn resolve_stmts(
     stmts: &mut Vec<Spanned<Stmt>>,
     parent_dir: &Path,
     loaded: &mut HashSet<String>,
+    loaded_paths: &mut Vec<PathBuf>,
 ) -> Result<()> {
     let mut i = 0;
     while i < stmts.len() {
@@ -45,23 +63,24 @@ fn resolve_stmts(
                     i += 1;
                     continue;
                 }
-                let source = std::fs::read_to_string(&module_path)
-                    .map_err(|e| Error::Io { source: e })?;
-                let tokens = crate::lexer::Lexer::new(&source)
-                    .tokenize()
-                    .map_err(|e| Error::ModResolution {
+                let source =
+                    std::fs::read_to_string(&module_path).map_err(|e| Error::Io { source: e })?;
+                let tokens = crate::lexer::Lexer::new(&source).tokenize().map_err(|e| {
+                    Error::ModResolution {
                         module: name.to_string(),
                         source: Box::new(e),
-                    })?;
+                    }
+                })?;
                 let mut module_program = crate::parser::Parser::new(&source, &tokens)
                     .parse()
                     .map_err(|e| Error::ModResolution {
                         module: name.to_string(),
                         source: Box::new(e),
                     })?;
+                loaded_paths.push(module_path.clone());
                 // Resolve nested file-backed modules within the loaded file
                 let module_dir = module_path.parent().unwrap_or(parent_dir);
-                resolve_stmts(&mut module_program.stmts, module_dir, loaded)?;
+                resolve_stmts(&mut module_program.stmts, module_dir, loaded, loaded_paths)?;
                 // Replace the empty Mod body with the loaded stmts
                 if let Stmt::Mod { body, .. } = &mut stmts[i].node {
                     *body = module_program.stmts;
@@ -72,7 +91,7 @@ fn resolve_stmts(
                     Stmt::Mod { body, .. } => body,
                     _ => unreachable!(),
                 };
-                resolve_stmts(body, parent_dir, loaded)?;
+                resolve_stmts(body, parent_dir, loaded, loaded_paths)?;
             }
         }
         i += 1;
@@ -93,13 +112,15 @@ mod tests {
 
     #[test]
     fn test_inline_mod_resolved() {
-        let mut program = parse(r#"
+        let mut program = parse(
+            r#"
             mod math {
                 fn add(a: i64, b: i64) -> i64 { a + b }
             }
             use math::add;
             add(2, 3)
-        "#);
+        "#,
+        );
         // Inline modules have non-empty bodies; resolve_modules should pass through
         resolve_modules(&mut program, Path::new("test.zen")).unwrap();
         // Verify the inline mod survived

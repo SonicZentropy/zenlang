@@ -1,0 +1,59 @@
+// Stress-test the two originally-reported top-level bugs with much larger
+// iteration counts / more complex closures, to rule out a slow-accumulating
+// issue that only manifests after many iterations.
+
+// Bug 1: "let mut reassignment before a for/loop at top level causes a
+// stack overflow" — repeat many times, with nested loops too.
+let mut counter = 0;
+counter = counter + 1;
+for i in 0..2000 {
+    counter = counter + i;
+}
+assert(counter == 1999001);
+
+let mut nested_sum = 0;
+nested_sum = nested_sum + 1;
+for i in 0..50 {
+    for j in 0..50 {
+        nested_sum = nested_sum + 1;
+    }
+}
+assert(nested_sum == 2501);
+
+let mut loop_count = 0;
+loop_count = loop_count + 1;
+let mut k = 0;
+loop {
+    k = k + 1;
+    if k >= 1000 {
+        break;
+    }
+}
+assert(k == 1000);
+
+// Bug 2: "Closures with upvalue capture crash at top level" — many
+// closures capturing top-level state, called repeatedly.
+let base = 100;
+let mut adders = [];
+for i in 0..20 {
+    push(adders, |x| x + base + i);
+}
+// Each closure must have captured its *own* loop-iteration value of `i`,
+// not all share the final value (a classic closure-in-loop capture bug).
+assert(adders[0](1) == 101);  // 1 + 100 + 0
+assert(adders[5](1) == 106);  // 1 + 100 + 5
+assert(adders[19](1) == 120); // 1 + 100 + 19
+let mut total = 0;
+for f in adders {
+    total = total + f(1);
+}
+assert(total == 2210); // 20*101 + (0+1+...+19) = 2020 + 190
+
+let mut acc = 0;
+let step = |x| x * 2;
+for i in 0..500 {
+    acc = acc + step(i);
+}
+assert(acc == 249500);
+
+print("Top-level closure/loop stress test complete!");

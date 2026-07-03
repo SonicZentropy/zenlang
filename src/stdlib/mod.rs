@@ -9,6 +9,8 @@ use crate::vm::{VM, VMContext};
 mod fs;
 mod iter;
 mod log;
+mod map;
+mod math;
 
 /// Register all built-in stdlib functions with the given VM.
 pub fn register_builtins(vm: &mut VM) {
@@ -41,6 +43,12 @@ pub fn register_builtins(vm: &mut VM) {
     // Iterators
     vm.register_native("iter", Rc::new(iter::iter_impl));
     iter::register(vm);
+
+    // Maps / dictionaries
+    map::register(vm);
+
+    // Vector/scalar math for games (Vec2/Vec3, lerp/clamp, trig, RNG)
+    math::register(vm);
 
     // Array operations
     vm.register_native("push", Rc::new(push_impl));
@@ -257,6 +265,8 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
     ];
     sigs.extend(fs::signatures());
     sigs.extend(log::signatures());
+    sigs.extend(map::signatures());
+    sigs.extend(math::signatures());
     sigs
 }
 
@@ -312,6 +322,7 @@ fn len_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             };
             Ok(Value::Int(len.max(0)))
         }
+        Some(Value::Map(m)) => Ok(Value::Int(m.borrow().len() as i64)),
         _ => Ok(Value::Int(0)),
     }
 }
@@ -496,6 +507,24 @@ fn to_str_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 }
 
 // --- Option/Result helpers ---
+
+/// Build a `Some(v)` value using the built-in `Option` enum's convention
+/// (tag 0 = Some). Shared by any stdlib module that needs to hand a
+/// script-visible `Option<T>` back (iterators, map lookups, etc).
+pub(crate) fn option_some(v: Value) -> Value {
+    Value::Enum {
+        tag: 0,
+        data: std::rc::Rc::new(std::cell::RefCell::new(vec![v])),
+    }
+}
+
+/// Build a `None` value using the built-in `Option` enum's convention (tag 1 = None).
+pub(crate) fn option_none() -> Value {
+    Value::Enum {
+        tag: 1,
+        data: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+    }
+}
 
 fn enum_tag(val: &Value) -> Option<u16> {
     match val {

@@ -1,21 +1,21 @@
-use compact_str::CompactString;
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::span::{SourceLocation, Span, Spanned};
 use crate::token::{Token, TokenKind};
+use compact_str::CompactString;
 
 /// Precedence levels for Pratt parsing.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 enum Precedence {
     Lowest,
-    Assign,   // =
-    Or,       // ||
-    And,      // &&
-    Compare,  // == != < > <= >=
-    Term,     // + -
-    Factor,   // * / %
-    Unary,    // ! -
-    Call,     // . () []
+    Assign,  // =
+    Or,      // ||
+    And,     // &&
+    Compare, // == != < > <= >=
+    Term,    // + -
+    Factor,  // * / %
+    Unary,   // ! -
+    Call,    // . () []
     Primary,
 }
 
@@ -41,13 +41,23 @@ impl Precedence {
             TokenKind::DotDot | TokenKind::DotDotEq => Precedence::Assign,
             TokenKind::OrOr => Precedence::Or,
             TokenKind::AndAnd => Precedence::And,
-            TokenKind::EqEq | TokenKind::Ne | TokenKind::Lt | TokenKind::Le
-                | TokenKind::Gt | TokenKind::Ge => Precedence::Compare,
+            TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::Lt
+            | TokenKind::Le
+            | TokenKind::Gt
+            | TokenKind::Ge => Precedence::Compare,
             TokenKind::Plus | TokenKind::Minus => Precedence::Term,
-            TokenKind::Star | TokenKind::Slash | TokenKind::Percent
-                | TokenKind::Shl | TokenKind::Shr => Precedence::Factor,
+            TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::Percent
+            | TokenKind::Shl
+            | TokenKind::Shr => Precedence::Factor,
             TokenKind::And | TokenKind::Or | TokenKind::Caret => Precedence::Term,
-            TokenKind::OpenParen | TokenKind::Dot | TokenKind::OpenBracket | TokenKind::Question => Precedence::Call,
+            TokenKind::OpenParen
+            | TokenKind::Dot
+            | TokenKind::OpenBracket
+            | TokenKind::Question => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }
@@ -68,7 +78,12 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     /// Create a new parser from source text and tokenized output of the lexer.
     pub fn new(source: &'a str, tokens: &'a [Spanned<Token>]) -> Self {
-        Self { tokens, current: 0, errors: Vec::new(), source }
+        Self {
+            tokens,
+            current: 0,
+            errors: Vec::new(),
+            source,
+        }
     }
 
     fn byte_offset_to_line_col(&self, offset: usize) -> (usize, usize) {
@@ -102,7 +117,9 @@ impl<'a> Parser<'a> {
         if self.errors.is_empty() {
             Ok(Program { stmts })
         } else {
-            Err(Error::ParseMultiple { errors: std::mem::take(&mut self.errors) })
+            Err(Error::ParseMultiple {
+                errors: std::mem::take(&mut self.errors),
+            })
         }
     }
 
@@ -251,7 +268,15 @@ impl<'a> Parser<'a> {
         let init = self.expression(Precedence::Lowest)?;
         self.expect(TokenKind::Semi)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Const { vis, name: name.into(), type_ann, init }, span))
+        Ok(Spanned::new(
+            Stmt::Const {
+                vis,
+                name: name.into(),
+                type_ann,
+                init,
+            },
+            span,
+        ))
     }
 
     fn type_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
@@ -262,7 +287,15 @@ impl<'a> Parser<'a> {
         let alias = self.parse_type()?;
         self.expect(TokenKind::Semi)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Type { vis, name: name.into(), type_params, alias }, span))
+        Ok(Spanned::new(
+            Stmt::Type {
+                vis,
+                name: name.into(),
+                type_params,
+                alias,
+            },
+            span,
+        ))
     }
 
     fn let_stmt(&mut self) -> Result<Spanned<Stmt>> {
@@ -284,7 +317,15 @@ impl<'a> Parser<'a> {
 
         self.expect(TokenKind::Semi)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Let { mutable, name: name.into(), type_ann, init }, span))
+        Ok(Spanned::new(
+            Stmt::Let {
+                mutable,
+                name: name.into(),
+                type_ann,
+                init,
+            },
+            span,
+        ))
     }
 
     fn expr_stmt(&mut self) -> Result<Spanned<Stmt>> {
@@ -327,7 +368,17 @@ impl<'a> Parser<'a> {
 
         let body = self.block_stmts()?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Fn { vis, name: name.into(), type_params, params, return_type, body }, span))
+        Ok(Spanned::new(
+            Stmt::Fn {
+                vis,
+                name: name.into(),
+                type_params,
+                params,
+                return_type,
+                body,
+            },
+            span,
+        ))
     }
 
     fn parse_type_params(&mut self) -> Result<Vec<TypeParam>> {
@@ -338,7 +389,10 @@ impl<'a> Parser<'a> {
         loop {
             let name = self.expect_ident()?;
             let bounds = Vec::new();
-            params.push(TypeParam { name: name.into(), bounds });
+            params.push(TypeParam {
+                name: name.into(),
+                bounds,
+            });
             if !self.r#match(TokenKind::Comma) {
                 break;
             }
@@ -367,7 +421,10 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-            params.push(Param { name: name.into(), type_ann });
+            params.push(Param {
+                name: name.into(),
+                type_ann,
+            });
             if !self.r#match(TokenKind::Comma) {
                 break;
             }
@@ -388,12 +445,23 @@ impl<'a> Parser<'a> {
             let fname = self.expect_ident()?;
             self.expect(TokenKind::Colon)?;
             let ftype = self.parse_type()?;
-            fields.push(StructField { name: fname.into(), type_ann: ftype });
+            fields.push(StructField {
+                name: fname.into(),
+                type_ann: ftype,
+            });
             self.r#match(TokenKind::Comma); // optional trailing comma
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Struct { vis, name: name.into(), type_params, fields }, span))
+        Ok(Spanned::new(
+            Stmt::Struct {
+                vis,
+                name: name.into(),
+                type_params,
+                fields,
+            },
+            span,
+        ))
     }
 
     // ---------- Enum declarations ----------
@@ -418,12 +486,23 @@ impl<'a> Parser<'a> {
             } else {
                 Vec::new()
             };
-            variants.push(EnumVariant { name: vname.into(), fields });
+            variants.push(EnumVariant {
+                name: vname.into(),
+                fields,
+            });
             self.r#match(TokenKind::Comma);
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Enum { vis, name: name.into(), type_params, variants }, span))
+        Ok(Spanned::new(
+            Stmt::Enum {
+                vis,
+                name: name.into(),
+                type_params,
+                variants,
+            },
+            span,
+        ))
     }
 
     // ---------- Impl blocks ----------
@@ -450,7 +529,15 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Impl { type_params, type_name, trait_name, methods }, span))
+        Ok(Spanned::new(
+            Stmt::Impl {
+                type_params,
+                type_name,
+                trait_name,
+                methods,
+            },
+            span,
+        ))
     }
 
     fn trait_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
@@ -492,7 +579,15 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         let span = start.merge(&self.prev_span());
-        Ok(Spanned::new(Stmt::Trait { vis, name: name.into(), type_params, methods: methods }, span))
+        Ok(Spanned::new(
+            Stmt::Trait {
+                vis,
+                name: name.into(),
+                type_params,
+                methods: methods,
+            },
+            span,
+        ))
     }
 
     // ---------- Expressions (Pratt parser) ----------
@@ -506,22 +601,49 @@ impl<'a> Parser<'a> {
             if op_prec < precedence {
                 break;
             }
-            if matches!(tok, TokenKind::Eq | TokenKind::OrOr | TokenKind::AndAnd
-                | TokenKind::EqEq | TokenKind::Ne | TokenKind::Lt | TokenKind::Le
-                | TokenKind::Gt | TokenKind::Ge | TokenKind::Plus | TokenKind::Minus
-                | TokenKind::Star | TokenKind::Slash | TokenKind::Percent
-                | TokenKind::And | TokenKind::Or | TokenKind::Caret
-                | TokenKind::Shl | TokenKind::Shr)
-            {
+            if matches!(
+                tok,
+                TokenKind::Eq
+                    | TokenKind::OrOr
+                    | TokenKind::AndAnd
+                    | TokenKind::EqEq
+                    | TokenKind::Ne
+                    | TokenKind::Lt
+                    | TokenKind::Le
+                    | TokenKind::Gt
+                    | TokenKind::Ge
+                    | TokenKind::Plus
+                    | TokenKind::Minus
+                    | TokenKind::Star
+                    | TokenKind::Slash
+                    | TokenKind::Percent
+                    | TokenKind::And
+                    | TokenKind::Or
+                    | TokenKind::Caret
+                    | TokenKind::Shl
+                    | TokenKind::Shr
+            ) {
                 self.advance();
                 let op = BinOp::from_token(&tok).unwrap();
                 let rhs = self.expression(Precedence::of(&tok).next());
-                expr = Expr::Binary { op, lhs: Box::new(expr), rhs: Box::new(rhs?) };
-            } else if matches!(tok, TokenKind::PlusEq | TokenKind::MinusEq
-                | TokenKind::StarEq | TokenKind::SlashEq | TokenKind::PercentEq
-                | TokenKind::AndEq | TokenKind::OrEq
-                | TokenKind::CaretEq | TokenKind::ShlEq | TokenKind::ShrEq)
-            {
+                expr = Expr::Binary {
+                    op,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs?),
+                };
+            } else if matches!(
+                tok,
+                TokenKind::PlusEq
+                    | TokenKind::MinusEq
+                    | TokenKind::StarEq
+                    | TokenKind::SlashEq
+                    | TokenKind::PercentEq
+                    | TokenKind::AndEq
+                    | TokenKind::OrEq
+                    | TokenKind::CaretEq
+                    | TokenKind::ShlEq
+                    | TokenKind::ShrEq
+            ) {
                 self.advance();
                 let compound_op = compound_to_binop(&tok);
                 let rhs = self.expression(Precedence::of(&tok).next());
@@ -539,27 +661,44 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let args = self.arg_list()?;
                 self.expect(TokenKind::CloseParen)?;
-                expr = Expr::Call { func: Box::new(expr), args };
+                expr = Expr::Call {
+                    func: Box::new(expr),
+                    args,
+                };
             } else if matches!(tok, TokenKind::DotDot | TokenKind::DotDotEq) {
                 self.advance();
                 let inclusive = matches!(tok, TokenKind::DotDotEq);
                 let end = self.expression(Precedence::of(&tok).next());
-                expr = Expr::Range { start: Box::new(expr), end: Box::new(end?), inclusive };
+                expr = Expr::Range {
+                    start: Box::new(expr),
+                    end: Box::new(end?),
+                    inclusive,
+                };
             } else if matches!(tok, TokenKind::Dot) {
                 self.advance();
                 let field = self.expect_ident()?;
                 if self.r#match(TokenKind::OpenParen) {
                     let args = self.arg_list()?;
                     self.expect(TokenKind::CloseParen)?;
-                    expr = Expr::MethodCall { obj: Box::new(expr), method: field.into(), args };
+                    expr = Expr::MethodCall {
+                        obj: Box::new(expr),
+                        method: field.into(),
+                        args,
+                    };
                 } else {
-                    expr = Expr::Field { obj: Box::new(expr), field: field.into() };
+                    expr = Expr::Field {
+                        obj: Box::new(expr),
+                        field: field.into(),
+                    };
                 }
             } else if matches!(tok, TokenKind::OpenBracket) {
                 self.advance();
                 let index = self.expression(Precedence::Lowest)?;
                 self.expect(TokenKind::CloseBracket)?;
-                expr = Expr::Index { obj: Box::new(expr), index: Box::new(index) };
+                expr = Expr::Index {
+                    obj: Box::new(expr),
+                    index: Box::new(index),
+                };
             } else if matches!(tok, TokenKind::Question) {
                 self.advance();
                 // Desugar expr?  →  match expr { Ok(val) => val, Err(e) => return Err(e) }
@@ -567,12 +706,18 @@ impl<'a> Parser<'a> {
                 let err_binding = "e";
                 let arms = vec![
                     MatchArm {
-                        pattern: Pattern::EnumVariant { variant_name: "Ok".into(), bindings: vec![val_binding.into()] },
+                        pattern: Pattern::EnumVariant {
+                            variant_name: "Ok".into(),
+                            bindings: vec![val_binding.into()],
+                        },
                         guard: None,
                         body: Box::new(Expr::Ident(val_binding.into())),
                     },
                     MatchArm {
-                        pattern: Pattern::EnumVariant { variant_name: "Err".into(), bindings: vec![err_binding.into()] },
+                        pattern: Pattern::EnumVariant {
+                            variant_name: "Err".into(),
+                            bindings: vec![err_binding.into()],
+                        },
                         guard: None,
                         body: Box::new(Expr::Return(Some(Box::new(Expr::Call {
                             func: Box::new(Expr::Ident("Err".into())),
@@ -580,7 +725,10 @@ impl<'a> Parser<'a> {
                         })))),
                     },
                 ];
-                expr = Expr::Match { expr: Box::new(expr), arms };
+                expr = Expr::Match {
+                    expr: Box::new(expr),
+                    arms,
+                };
             } else {
                 break;
             }
@@ -590,21 +738,39 @@ impl<'a> Parser<'a> {
     }
 
     fn prefix(&mut self) -> Result<Expr> {
-         let tok = self.peek().node.kind.clone();
+        let tok = self.peek().node.kind.clone();
         match tok {
             // Literals
-            TokenKind::Int(n) => { self.advance(); Ok(Expr::Int(n)) }
-            TokenKind::Float(n) => { self.advance(); Ok(Expr::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); self.interpolated_string(s) }
-            TokenKind::Bool(b) => { self.advance(); Ok(Expr::Bool(b)) }
-            TokenKind::Underscore => { self.advance(); Ok(Expr::Unit) }
+            TokenKind::Int(n) => {
+                self.advance();
+                Ok(Expr::Int(n))
+            }
+            TokenKind::Float(n) => {
+                self.advance();
+                Ok(Expr::Float(n))
+            }
+            TokenKind::Str(s) => {
+                self.advance();
+                self.interpolated_string(s)
+            }
+            TokenKind::Bool(b) => {
+                self.advance();
+                Ok(Expr::Bool(b))
+            }
+            TokenKind::Underscore => {
+                self.advance();
+                Ok(Expr::Unit)
+            }
 
             // Unary operators
             TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde => {
                 self.advance();
                 let op = UnOp::from_token(&tok).unwrap();
                 let expr = self.expression(Precedence::Unary)?;
-                Ok(Expr::Unary { op, expr: Box::new(expr) })
+                Ok(Expr::Unary {
+                    op,
+                    expr: Box::new(expr),
+                })
             }
 
             // Grouping / Block / Unit
@@ -660,7 +826,11 @@ impl<'a> Parser<'a> {
                         self.r#match(TokenKind::Comma);
                     }
                     self.expect(TokenKind::CloseBrace)?;
-                    Ok(Expr::StructLit { name: name.into(), fields, spread })
+                    Ok(Expr::StructLit {
+                        name: name.into(),
+                        fields,
+                        spread,
+                    })
                 } else {
                     Ok(Expr::Ident(name.into()))
                 }
@@ -685,14 +855,22 @@ impl<'a> Parser<'a> {
                 // ..expr or ..=expr
                 let start = Box::new(Expr::Int(0)); // default start
                 let end = Box::new(self.expression(Precedence::Lowest)?);
-                Ok(Expr::Range { start, end, inclusive })
+                Ok(Expr::Range {
+                    start,
+                    end,
+                    inclusive,
+                })
             }
 
             // Lambda: || expr (no params)
             TokenKind::OrOr => {
                 self.advance();
                 let body = self.expression(Precedence::Lowest)?;
-                Ok(Expr::Lambda { params: vec![], return_type: None, body: Box::new(body) })
+                Ok(Expr::Lambda {
+                    params: vec![],
+                    return_type: None,
+                    body: Box::new(body),
+                })
             }
 
             // Lambda: |params| expr
@@ -701,10 +879,14 @@ impl<'a> Parser<'a> {
                 let params = self.lambda_param_list()?;
                 self.expect(TokenKind::Or)?;
                 let body = self.expression(Precedence::Lowest)?;
-                Ok(Expr::Lambda { params, return_type: None, body: Box::new(body) })
+                Ok(Expr::Lambda {
+                    params,
+                    return_type: None,
+                    body: Box::new(body),
+                })
             }
 
-            _ => Err(self.error(&format!("unexpected token '{}'", self.peek().node.lexeme)))
+            _ => Err(self.error(&format!("unexpected token '{}'", self.peek().node.lexeme))),
         }
     }
 
@@ -737,8 +919,11 @@ impl<'a> Parser<'a> {
                 let expr_start = pos;
                 let mut depth: u32 = 1;
                 while depth > 0 && pos < len {
-                    if bytes[pos] == b'{' { depth += 1; }
-                    else if bytes[pos] == b'}' { depth -= 1; }
+                    if bytes[pos] == b'{' {
+                        depth += 1;
+                    } else if bytes[pos] == b'}' {
+                        depth -= 1;
+                    }
                     pos += 1;
                 }
                 if depth > 0 {
@@ -788,7 +973,10 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-            params.push(Param { name: name.into(), type_ann });
+            params.push(Param {
+                name: name.into(),
+                type_ann,
+            });
             if !self.r#match(TokenKind::Comma) {
                 break;
             }
@@ -796,15 +984,30 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    /// Parse a primary expression (without struct literal interpretation for ident {).  
+    /// Parse a primary expression (without struct literal interpretation for ident {).
     fn primary_expr(&mut self) -> Result<Expr> {
         let tok = self.peek().node.kind.clone();
         match tok {
-            TokenKind::Int(n) => { self.advance(); Ok(Expr::Int(n)) }
-            TokenKind::Float(n) => { self.advance(); Ok(Expr::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); Ok(Expr::Str(s)) }
-            TokenKind::Bool(b) => { self.advance(); Ok(Expr::Bool(b)) }
-            TokenKind::Underscore => { self.advance(); Ok(Expr::Unit) }
+            TokenKind::Int(n) => {
+                self.advance();
+                Ok(Expr::Int(n))
+            }
+            TokenKind::Float(n) => {
+                self.advance();
+                Ok(Expr::Float(n))
+            }
+            TokenKind::Str(s) => {
+                self.advance();
+                Ok(Expr::Str(s))
+            }
+            TokenKind::Bool(b) => {
+                self.advance();
+                Ok(Expr::Bool(b))
+            }
+            TokenKind::Underscore => {
+                self.advance();
+                Ok(Expr::Unit)
+            }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
                 Ok(Expr::Ident(name.into()))
@@ -838,7 +1041,11 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        Ok(Expr::If { cond: Box::new(cond), then: Box::new(then), else_ })
+        Ok(Expr::If {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            else_,
+        })
     }
 
     /// Parse `if let pattern = expr { then } else { else_ }` desugared to:
@@ -886,7 +1093,10 @@ impl<'a> Parser<'a> {
         }
         let cond = self.expression(Precedence::Lowest)?;
         let body = self.block()?;
-        Ok(Expr::While { cond: Box::new(cond), body: Box::new(body) })
+        Ok(Expr::While {
+            cond: Box::new(cond),
+            body: Box::new(body),
+        })
     }
 
     /// Parse `while let pattern = expr { body }` desugared to:
@@ -911,9 +1121,10 @@ impl<'a> Parser<'a> {
             expr: Box::new(value),
             arms: vec![match_arm, break_arm],
         };
-        Ok(Expr::Loop(Box::new(Expr::Block(vec![
-            Spanned { node: Stmt::Expr(match_expr), span: Span::new(0, 0) },
-        ]))))
+        Ok(Expr::Loop(Box::new(Expr::Block(vec![Spanned {
+            node: Stmt::Expr(match_expr),
+            span: Span::new(0, 0),
+        }]))))
     }
 
     fn for_stmt(&mut self) -> Result<Expr> {
@@ -922,7 +1133,11 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::In)?; // "for var in iter"
         let iter = self.expression(Precedence::Lowest)?;
         let body = self.block()?;
-        Ok(Expr::For { var: var.into(), iter: Box::new(iter), body: Box::new(body) })
+        Ok(Expr::For {
+            var: var.into(),
+            iter: Box::new(iter),
+            body: Box::new(body),
+        })
     }
 
     fn loop_stmt(&mut self) -> Result<Expr> {
@@ -957,25 +1172,61 @@ impl<'a> Parser<'a> {
     /// Parse the target expression of a `match`, stopping at `{`.
     /// This avoids the ambiguity where `Ident { ... }` would be parsed as a struct literal.
     fn match_target(&mut self) -> Result<Expr> {
-        if self.check(&TokenKind::OpenParen) {
+        let mut expr = if self.check(&TokenKind::OpenParen) {
             self.advance();
-            let expr = self.expression(Precedence::Lowest)?;
+            let inner = self.expression(Precedence::Lowest)?;
             self.expect(TokenKind::CloseParen)?;
-            Ok(expr)
+            inner
         } else if matches!(self.peek().node.kind, TokenKind::Ident(_)) {
             let name = self.expect_ident()?;
-            let mut expr = Expr::Ident(name.into());
-            // Allow continued field access: match x.y { ... }
-            while self.r#match(TokenKind::Dot) {
-                let field = self.expect_ident()?;
-                expr = Expr::Field { obj: Box::new(expr), field: field.into() };
-            }
-            Ok(expr)
+            Expr::Ident(name.into())
         } else {
             // Fall back to a primary expression (literals, parens, etc.)
             // but avoid struct-literal parsing.
-            self.primary_expr()
+            self.primary_expr()?
+        };
+        // Allow the usual postfix chain — field access, method/function calls,
+        // indexing — on the match target (e.g. `match it.next() { ... }` or
+        // `match arr[0] { ... }`). This mirrors the postfix loop in
+        // `expression()`, but deliberately excludes struct-literal parsing
+        // (which only happens in `prefix()`) and stops cleanly at the `{`
+        // that starts the match arms, since `{` isn't a postfix operator.
+        loop {
+            if self.r#match(TokenKind::Dot) {
+                let field = self.expect_ident()?;
+                if self.r#match(TokenKind::OpenParen) {
+                    let args = self.arg_list()?;
+                    self.expect(TokenKind::CloseParen)?;
+                    expr = Expr::MethodCall {
+                        obj: Box::new(expr),
+                        method: field.into(),
+                        args,
+                    };
+                } else {
+                    expr = Expr::Field {
+                        obj: Box::new(expr),
+                        field: field.into(),
+                    };
+                }
+            } else if self.r#match(TokenKind::OpenParen) {
+                let args = self.arg_list()?;
+                self.expect(TokenKind::CloseParen)?;
+                expr = Expr::Call {
+                    func: Box::new(expr),
+                    args,
+                };
+            } else if self.r#match(TokenKind::OpenBracket) {
+                let index = self.expression(Precedence::Lowest)?;
+                self.expect(TokenKind::CloseBracket)?;
+                expr = Expr::Index {
+                    obj: Box::new(expr),
+                    index: Box::new(index),
+                };
+            } else {
+                break;
+            }
         }
+        Ok(expr)
     }
 
     fn match_expr(&mut self) -> Result<Expr> {
@@ -995,20 +1246,42 @@ impl<'a> Parser<'a> {
             self.expect(TokenKind::FatArrow)?;
             let body = self.expression(Precedence::Lowest)?;
             self.r#match(TokenKind::Comma);
-            arms.push(MatchArm { pattern, guard, body: Box::new(body) });
+            arms.push(MatchArm {
+                pattern,
+                guard,
+                body: Box::new(body),
+            });
         }
         self.expect(TokenKind::CloseBrace)?;
-        Ok(Expr::Match { expr: Box::new(expr), arms })
+        Ok(Expr::Match {
+            expr: Box::new(expr),
+            arms,
+        })
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern> {
         let tok = self.peek().node.kind.clone();
         match tok {
-            TokenKind::Underscore => { self.advance(); Ok(Pattern::Wildcard) }
-            TokenKind::Int(n) => { self.advance(); Ok(Pattern::Int(n)) }
-            TokenKind::Float(n) => { self.advance(); Ok(Pattern::Float(n)) }
-            TokenKind::Str(s) => { self.advance(); Ok(Pattern::Str(s)) }
-            TokenKind::Bool(b) => { self.advance(); Ok(Pattern::Bool(b)) }
+            TokenKind::Underscore => {
+                self.advance();
+                Ok(Pattern::Wildcard)
+            }
+            TokenKind::Int(n) => {
+                self.advance();
+                Ok(Pattern::Int(n))
+            }
+            TokenKind::Float(n) => {
+                self.advance();
+                Ok(Pattern::Float(n))
+            }
+            TokenKind::Str(s) => {
+                self.advance();
+                Ok(Pattern::Str(s))
+            }
+            TokenKind::Bool(b) => {
+                self.advance();
+                Ok(Pattern::Bool(b))
+            }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
                 // Enum variant with data: Ident ( args... )
@@ -1025,16 +1298,22 @@ impl<'a> Parser<'a> {
                         self.r#match(TokenKind::Comma);
                     }
                     self.expect(TokenKind::CloseParen)?;
-                    Ok(Pattern::EnumVariant { variant_name: name.into(), bindings })
+                    Ok(Pattern::EnumVariant {
+                        variant_name: name.into(),
+                        bindings,
+                    })
                 } else if name.starts_with(|c: char| c.is_uppercase()) {
                     // Uppercase ident without parens = unit enum variant
-                    Ok(Pattern::EnumVariant { variant_name: name.into(), bindings: vec![] })
+                    Ok(Pattern::EnumVariant {
+                        variant_name: name.into(),
+                        bindings: vec![],
+                    })
                 } else {
                     // Lowercase ident = variable binding (catch-all)
                     Ok(Pattern::Ident(name.into()))
                 }
             }
-            _ => Err(self.error("expected pattern"))
+            _ => Err(self.error("expected pattern")),
         }
     }
 
@@ -1043,12 +1322,30 @@ impl<'a> Parser<'a> {
     fn parse_type(&mut self) -> Result<Type> {
         let tok = self.peek().node.kind.clone();
         match tok {
-            TokenKind::Ident(s) if s == "i32" || s == "i64" => { self.advance(); Ok(Type::I64) }
-            TokenKind::Ident(s) if s == "f32" => { self.advance(); Ok(Type::F32) }
-            TokenKind::Ident(s) if s == "f64" => { self.advance(); Ok(Type::F64) }
-            TokenKind::Ident(s) if s == "bool" => { self.advance(); Ok(Type::Bool) }
-            TokenKind::Ident(s) if s == "str" => { self.advance(); Ok(Type::Str) }
-            TokenKind::Ident(s) if s == "void" => { self.advance(); Ok(Type::Unit) }
+            TokenKind::Ident(s) if s == "i32" || s == "i64" => {
+                self.advance();
+                Ok(Type::I64)
+            }
+            TokenKind::Ident(s) if s == "f32" => {
+                self.advance();
+                Ok(Type::F32)
+            }
+            TokenKind::Ident(s) if s == "f64" => {
+                self.advance();
+                Ok(Type::F64)
+            }
+            TokenKind::Ident(s) if s == "bool" => {
+                self.advance();
+                Ok(Type::Bool)
+            }
+            TokenKind::Ident(s) if s == "str" => {
+                self.advance();
+                Ok(Type::Str)
+            }
+            TokenKind::Ident(s) if s == "void" => {
+                self.advance();
+                Ok(Type::Unit)
+            }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
                 // Check for generic type arguments: Type<T, U>
@@ -1064,7 +1361,9 @@ impl<'a> Parser<'a> {
                     // Map known generic types
                     if args.len() == 1 {
                         match name.as_str() {
-                            "Option" => return Ok(Type::Option(Box::new(args.into_iter().next().unwrap()))),
+                            "Option" => {
+                                return Ok(Type::Option(Box::new(args.into_iter().next().unwrap())));
+                            }
                             _ => {}
                         }
                     } else if args.len() == 2 {
@@ -1098,14 +1397,17 @@ impl<'a> Parser<'a> {
                 self.expect(TokenKind::CloseParen)?;
                 if self.r#match(TokenKind::Arrow) {
                     let ret = self.parse_type()?;
-                    Ok(Type::Fn { params, ret: Box::new(ret) })
+                    Ok(Type::Fn {
+                        params,
+                        ret: Box::new(ret),
+                    })
                 } else if params.len() == 1 {
                     Ok(params.into_iter().next().unwrap())
                 } else {
                     Ok(Type::Unit) // () is unit
                 }
             }
-            _ => Err(self.error("expected type"))
+            _ => Err(self.error("expected type")),
         }
     }
 
@@ -1177,7 +1479,10 @@ impl<'a> Parser<'a> {
         if matches!(after_brace, TokenKind::Ident(_)) {
             if i + 2 < self.tokens.len() {
                 let after_ident = &self.tokens[i + 2].node.kind;
-                return matches!(after_ident, TokenKind::Colon | TokenKind::Comma | TokenKind::CloseBrace);
+                return matches!(
+                    after_ident,
+                    TokenKind::Colon | TokenKind::Comma | TokenKind::CloseBrace
+                );
             }
         }
         // Spread struct: Foo { ..expr }
@@ -1240,10 +1545,17 @@ impl<'a> Parser<'a> {
                 return;
             }
             match self.peek().node.kind {
-                TokenKind::Fn | TokenKind::Let | TokenKind::Struct
-                | TokenKind::Enum | TokenKind::Impl | TokenKind::Trait
-                | TokenKind::Pub | TokenKind::Use | TokenKind::Mod
-                | TokenKind::Const | TokenKind::Type => return,
+                TokenKind::Fn
+                | TokenKind::Let
+                | TokenKind::Struct
+                | TokenKind::Enum
+                | TokenKind::Impl
+                | TokenKind::Trait
+                | TokenKind::Pub
+                | TokenKind::Use
+                | TokenKind::Mod
+                | TokenKind::Const
+                | TokenKind::Type => return,
                 _ => {}
             }
             self.advance();
@@ -1259,7 +1571,6 @@ impl<'a> Parser<'a> {
             self.advance();
         }
     }
-
 }
 
 fn compound_to_binop(tok: &TokenKind) -> BinOp {
@@ -1281,7 +1592,12 @@ fn compound_to_binop(tok: &TokenKind) -> BinOp {
 fn parse_interpolated_expr(source: &str) -> Result<Expr> {
     use crate::lexer::Lexer;
     let tokens = Lexer::new(source).tokenize().map_err(|e| Error::Parse {
-        location: crate::span::SourceLocation::new(None, crate::span::Span::new(0, source.len()), 1, 1),
+        location: crate::span::SourceLocation::new(
+            None,
+            crate::span::Span::new(0, source.len()),
+            1,
+            1,
+        ),
         msg: format!("invalid interpolation expression: {e}"),
     })?;
     let mut parser = Parser::new(source, &tokens);
@@ -1297,10 +1613,10 @@ mod tests {
     use super::*;
     use crate::lexer::Lexer;
 
-pub fn parse(source: &str) -> Result<Program> {
-    let tokens = Lexer::new(source).tokenize()?;
-    Parser::new(source, &tokens).parse()
-}
+    pub fn parse(source: &str) -> Result<Program> {
+        let tokens = Lexer::new(source).tokenize()?;
+        Parser::new(source, &tokens).parse()
+    }
 
     #[test]
     fn test_empty_program() {
@@ -1313,7 +1629,12 @@ pub fn parse(source: &str) -> Result<Program> {
         let prog = parse("let x = 42;").unwrap();
         assert_eq!(prog.stmts.len(), 1);
         match &prog.stmts[0].node {
-            Stmt::Let { mutable, name, type_ann: _, init: _ } => {
+            Stmt::Let {
+                mutable,
+                name,
+                type_ann: _,
+                init: _,
+            } => {
                 assert!(!mutable);
                 assert_eq!(name, "x");
             }
@@ -1338,7 +1659,13 @@ pub fn parse(source: &str) -> Result<Program> {
         let prog = parse("fn add(a: i32, b: i32) -> i32 { a + b }").unwrap();
         assert_eq!(prog.stmts.len(), 1);
         match &prog.stmts[0].node {
-            Stmt::Fn { name, params, return_type, body, .. } => {
+            Stmt::Fn {
+                name,
+                params,
+                return_type,
+                body,
+                ..
+            } => {
                 assert_eq!(name, "add");
                 assert_eq!(params.len(), 2);
                 assert_eq!(params[0].name, "a");
@@ -1353,7 +1680,10 @@ pub fn parse(source: &str) -> Result<Program> {
     fn test_if_expr() {
         let prog = parse("let x = if true { 1 } else { 2 };").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::If { cond, then, else_ }), .. } => {
+            Stmt::Let {
+                init: Some(Expr::If { cond, then, else_ }),
+                ..
+            } => {
                 assert!(matches!(cond.as_ref(), Expr::Bool(true)));
                 assert!(matches!(then.as_ref(), Expr::Block(_)));
                 assert!(else_.is_some());
@@ -1382,7 +1712,15 @@ pub fn parse(source: &str) -> Result<Program> {
         // field access should work inside binary expression RHS
         let prog = parse("let x = a + e.vx;").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::Binary { op: BinOp::Add, lhs, rhs }), .. } => {
+            Stmt::Let {
+                init:
+                    Some(Expr::Binary {
+                        op: BinOp::Add,
+                        lhs,
+                        rhs,
+                    }),
+                ..
+            } => {
                 assert!(matches!(lhs.as_ref(), Expr::Ident(_)));
                 assert!(matches!(rhs.as_ref(), Expr::Field { .. }));
             }
@@ -1395,7 +1733,15 @@ pub fn parse(source: &str) -> Result<Program> {
         // function call should work inside binary expression RHS
         let prog = parse("let x = a + foo(1);").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::Binary { op: BinOp::Add, lhs, rhs }), .. } => {
+            Stmt::Let {
+                init:
+                    Some(Expr::Binary {
+                        op: BinOp::Add,
+                        lhs,
+                        rhs,
+                    }),
+                ..
+            } => {
                 assert!(matches!(lhs.as_ref(), Expr::Ident(_)));
                 assert!(matches!(rhs.as_ref(), Expr::Call { .. }));
             }
@@ -1405,7 +1751,8 @@ pub fn parse(source: &str) -> Result<Program> {
 
     #[test]
     fn test_full_script_parse() {
-        parse(r#"
+        parse(
+            r#"
 fn update() {
     let i = 0;
     while i < entity_count() {
@@ -1432,7 +1779,9 @@ if is_key_pressed("space") {
 }
 
 update();
-"#).unwrap();
+"#,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1502,7 +1851,10 @@ update();
     fn test_block_expr() {
         let prog = parse("let x = { let y = 1; y + 2 };").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::Block(stmts)), .. } => {
+            Stmt::Let {
+                init: Some(Expr::Block(stmts)),
+                ..
+            } => {
                 assert_eq!(stmts.len(), 2);
             }
             _ => panic!("expected let with block init"),
@@ -1514,7 +1866,9 @@ update();
         let prog = parse("impl Vec2 { fn length(&self) -> f64 { 0.0 } }").unwrap();
         assert_eq!(prog.stmts.len(), 1);
         match &prog.stmts[0].node {
-            Stmt::Impl { type_name, methods, .. } => {
+            Stmt::Impl {
+                type_name, methods, ..
+            } => {
                 assert_eq!(type_name, "Vec2");
                 assert_eq!(methods.len(), 1);
             }
@@ -1551,7 +1905,10 @@ update();
     fn test_array_literal() {
         let prog = parse("let arr = [1, 2, 3];").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::Array(elems)), .. } => {
+            Stmt::Let {
+                init: Some(Expr::Array(elems)),
+                ..
+            } => {
                 assert_eq!(elems.len(), 3);
             }
             _ => panic!("expected array literal"),
@@ -1562,7 +1919,10 @@ update();
     fn test_struct_literal() {
         let prog = parse("let v = Vec2 { x: 1.0, y: 2.0 };").unwrap();
         match &prog.stmts[0].node {
-            Stmt::Let { init: Some(Expr::StructLit { name, fields, .. }), .. } => {
+            Stmt::Let {
+                init: Some(Expr::StructLit { name, fields, .. }),
+                ..
+            } => {
                 assert_eq!(name, "Vec2");
                 assert_eq!(fields.len(), 2);
             }

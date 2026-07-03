@@ -1,9 +1,121 @@
-# TODO - Please mark each as completed and make a git commit after each is done.  "Done" in this case means fully tested and documented as well as implemented.
+## Bugs that directly undermine "hot-reloadable" as a selling point
 
-Known Bug Found (not fixed)
+- [x] 1. **`HotReloader::read_source` only ever reads `script_paths.first()`** (`src/hotreload.rs`). You can pass it multiple watched files, but only the first is ever re-parsed/recompiled on change — edits to the others are silently ignored. For any real game project (multiple `.zen` files per entity/system), this needs to become "reload whichever file changed" or "reload the whole project graph." — **Fixed**: `HotReloader` now treats the first path as the project root and auto-discovers every file-backed `mod` it pulls in via `mod_resolver::resolve_modules_with_paths`, watching all of them. Changing any file in the module graph triggers a full project recompile. See `src/hotreload.rs`, tests `test_reload_picks_up_submodule_change` / `test_reload_discovers_new_module_file`.
+- [x] 2. **Hot reload doesn't resolve `mod` declarations at all.** `main.rs`'s normal run/test path calls `mod_resolver::resolve_modules(...)` before compiling, but `HotReloader::do_reload` doesn't. So the moment a project splits logic across files with `mod foo;`, hot reload breaks (or silently doesn't pick up submodule changes) even though the initial load works. — **Fixed** as part of #1 above; `do_reload` now calls `mod_resolver::resolve_modules` every reload.
+- [x] 3. **Known bugs already flagged in `TODO.md`** that will bite hardest in exactly the "poke a value while the game is running" workflows hot-reload is for:
+   - Closures with upvalue capture crash at top level (`__main__`).
+   - `let mut` reassignment before a `for`/`loop` at top level causes a stack overflow.
+   These being "top-level only" bugs is suspicious — it smells like top-level (`__main__`) code reuses locals/scope handling differently than function bodies, and hot-reloaded scripts often *are* top-level-heavy (config, entity registries, event wiring). Worth root-causing before building more on top. — **Investigated, found already fixed** (by an earlier, unrelated compiler fix — see the "Bug 2 fix" `compile_assignment` `Dup`-before-store change already in git history — the existing `tests/repro_closure*.zen` and `tests/repro_mut_for.zen` regression tests already cover the originally-reported cases and pass). To be sure this wasn't just "small cases happen to work," added `tests/repro_stress.zen`: 2000-iteration top-level `for` loops after a `let mut` reassignment, nested top-level loops, a 1000-iteration top-level `loop`, and 20 top-level closures created inside a `for` loop each capturing a *different* value of the loop variable (verified individually, not just "didn't crash" — classic closure-in-loop capture bugs return the same value for every closure). All pass correctly.
+- [ ] 4. **No reload hook for scripts.** When a struct's shape changes across a reload (e.g. you add a field to `Player`), existing live `Value::Struct` instances (`Rc<RefCell<HashMap<String,Value>>>`) simply keep their old field set — new code accessing the new field gets a runtime error instead of a sane default. A `fn on_reload(old)` convention (or auto-filling missing fields with a declared default) would make iteration much less painful.
+
+## Stdlib/language gaps that matter specifically for games
+
+- [x] **No map/dictionary type.** `Value` has `Array` and `Struct`, but no `HashMap`-like keyed collection. Games constantly need id→entity, name→asset, tag→list lookups. This is probably the single highest-value addition. — **Added**: `Value::Map(Rc<RefCell<HashMap<MapKey, Value>>>)` (`src/value.rs`), with `MapKey` supporting `int`/`str`/`bool` keys. Stdlib in `src/stdlib/map.rs`: `map_new`, `map_set`, `map_get`/`map_has`/`map_remove` (using the `Option<T>` protocol), `map_keys`, `map_values`, `map_len` (`len()` also works generically), `map_clear`. Maps are iterable via `for kv in my_map { ... }`, yielding `[key, value]` pairs (see `MapIterState` in `src/stdlib/iter.rs`). Tests: `tests/maps.zen`.
+- [x] **No vector/math library.** Only `abs/min/max/sqrt` exist. No `Vec2`/`Vec3`, no `lerp`, `clamp`, `sin/cos/atan2`, no RNG (`rand`, `rand_range`). Every game script ends up hand-rolling these or bridging back to Rust constantly — defeats the point of scripting for gameplay tuning. — **Added** `src/stdlib/math.rs`: `sin/cos/tan/atan2`, `lerp`, `clamp`, a seeded xorshift64* RNG (`rand`, `rand_range`, `rand_seed`), and `Vec2`/`Vec3` helpers (`vec2`, `vec3`, `vec_add`, `vec_sub`, `vec_scale`, `vec_dot`, `vec_len`, `vec_normalize`) built on plain arrays so they interop with existing array ops. Tests: `tests/math.zen`.
+- [x] **Iterator adapters.** Now that the `next()`/`Option<T>` protocol exists, `map`/`filter`/`fold`/`enumerate`/`zip`/`take`/`collect` are a natural, cheap follow-up (they can literally be written as native functions that just loop calling `.next()`), and hugely improve ergonomics for the kind of data-wrangling gameplay code does. — **Added, but as *Zenlang* functions, not native Rust ones**: native functions have no way to call back into a script-provided closure (`VMContext` doesn't hold a VM handle), so `map`/`filter`/`fold` couldn't be implemented in Rust without a bigger VM refactor. Instead, added `src/prelude.zen` (embedded via `include_str!`, injected into every compiled program right after module resolution — see `src/prelude.rs`, wired into `main.rs`'s `run`/`test`/`check`/`disasm` and `hotreload.rs`) with `map`, `filter`, `fold`, `enumerate`, `take`, `zip`, `collect`, all written in Zenlang itself using the iterator protocol. Doubles as a real-world exercise of that protocol. Tests: `tests/prelude_iterators.zen`.
+- [ ] **No coroutines/generators.** This is a big one for games specifically — cutscenes, tweens, ability cooldowns, dialogue trees are all naturally expressed as "run some steps, yield until next frame, resume." Lua's coroutines are the classic reference. Doesn't need to be full async; a `yield` keyword + a VM-level "resume with N instructions until yield/return" mode would go a long way and is very idiomatic for a bytecode VM you already have.
+- [ ] **No delta-time/scheduling primitives** if you want scripts to register timers/callbacks (`after(seconds, fn)`, `every_frame(fn)`) rather than the host driving everything — depends on how tightly you want scripts embedded in your loop.
+
+## Performance, since "fast iteration" presumably also means "fast enough at runtime"
+
+- [ ] **`Value::Struct` is `Rc<RefCell<HashMap<String, Value>>>`.** Every field access is a hash lookup, and every instance carries full hashmap overhead. For thousands of live entities/components (typical in games) this is meaningfully slower and heavier than a fixed-slot layout. A `Vec<Value>` with compile-time-resolved field→index (falling back to a name lookup only when the shape doesn't match, to preserve hot-reload flexibility) would keep the dynamic-friendliness while being much faster for the common case.
+- [ ] **Rc reference cycles leak.** Everything is `Rc<RefCell<...>>`, no cycle collector. Long-running game sessions with cyclic references (parent/child entities, observer patterns) will leak memory slowly. At minimum, a `Weak`-reference value type would let scripters break cycles intentionally.
+- [ ] **No script step/time budget.** An infinite loop in a hot-reloaded script currently just hangs the game (and blocks the editor tooling too). A configurable instruction-count or wall-clock budget with a catchable "script timeout" error is standard in embedded scripting VMs and saves a lot of debugging pain.
+
+## Tooling/dev-experience (this is where "not waiting on Rust" really gets won or lost)
+
+- [ ] **The LSP comment in `lsp.rs` literally says Zed isn't sending `didChange`/`didSave` and the root cause looks client-side.** If true, that's worth escalating/filing upstream — live diagnostics-while-typing is a big part of the fast-iteration pitch, and right now it may not be working at all in Zed.
+- [ ] **No debugger (DAP) integration** — breakpoints, step-over/into, variable inspection while the game is running. This is probably the biggest "quality of life at scale" investment for a game-scripting workflow, but is also the most expensive to build.
+- [ ] **Runtime errors report line/col but not a source snippet or "did you mean" suggestions** — small thing, but it's what you'll be staring at dozens of times a day during iteration.
+- [ ] **`register_type`/`ForeignTypeDef` binding boilerplate is verbose per Rust type** (see `examples/foreign_types.rs` — every field/method is a hand-written closure pair). A small derive macro (`#[zen_type]` on a struct + `#[zen_method]` on impl blocks) would cut a lot of ceremony for engine integrators, which matters a lot since your use case is "embed this in an engine."
+
+## If I had to pick a short list to actually implement next
+
+- [x] 1. Fix the two `hotreload.rs` gaps (multi-file watch + `mod` resolution) — directly serves your stated goal and is a small, contained fix.
+- [x] 2. Add a `Map`/`Dict` value type + stdlib functions.
+- [x] 3. Add iterator adapters (`map`/`filter`/`fold`/`enumerate`) — cheap now that the protocol exists. (Delivered as a Zenlang-language prelude — see above.)
+- [x] 4. Add a small math/vector stdlib module (`Vec2`/`Vec3`, lerp/clamp, trig, RNG).
+- [x] 5. Investigate and fix the two known top-level closure/loop bugs, since they'll surface constantly in hot-reloaded top-level game config code. (Found already fixed; added `tests/repro_stress.zen` to lock it in.)
+
+### Bonus fixes made along the way (not originally listed)
+
+- [x] Two related typeck bugs found while adding maps/iterators: `Expr::For`'s loop-variable type inference and `Expr::Index`'s element-type inference both defaulted to `Type::I64` for any non-array/non-str value instead of the type-erased `Type::Unit` placeholder — this silently broke type checking for `for`-loops and indexing over ranges-as-values, maps, and custom iterators. Fixed both to default to `Type::Unit`.
+- [x] `Expr::MethodCall`, `Expr::Match` (enum-variant patterns), `Expr::Call`, `Expr::If`, and `Expr::While` in `typeck.rs` all unconditionally rejected `Type::Unit` (the codebase's established "type-erased/generic" placeholder) operands — meaning calling a method on, matching an enum out of, calling, or branching on any type-erased value (e.g. an untyped closure parameter, or the result of a native function like `iter()`) was a hard type error. Fixed all five to treat `Type::Unit` as passthrough/compatible, consistent with `types_compatible`'s existing rule. This was required for the Zenlang-native prelude (`map`/`filter`/etc.) to type-check at all.
+- [x] Found and fixed a real parser bug in `match_target()` (the restricted expression parser used for `match <target> { ... }` to avoid struct-literal ambiguity): it supported `ident` and `ident.field.field` chains but never applied trailing calls, so `match it.next() { ... }` silently dropped the `()` and failed to parse (previously you had to write `match (it.next()) { ... }`, wrapping in parens, which is still supported). Fixed `match_target` to apply the normal postfix chain (field access, method/function calls, indexing) after the initial struct-literal-safe prefix.
+- [x] Verified via `cargo build`, `cargo test --lib` (169 tests), and `cargo run -- test` (36 `.zen` integration tests) that nothing regressed across all of the above.
 
 
- **Discovered known VM bugs** (documented in tour.zen header):
-   - Closures with upvalue capture crash at top level (`__main__`)
-   - `let mut` reassignment before `for`/`loop` at top level causes stack overflow
-   - These work fine inside `fn main()
+# CURRENTLY DOING:
+The test is failing because `reload_count` stays at 0 after `on_reload` runs, suggesting `run_main()` isn't returning the expected value. I'm checking whether `run_main` might be resetting globals — looking at the resize logic, it only expands the globals array if needed without clearing existing values, so that shouldn't be the issue. But I'm wondering if calling `main()` itself is somehow affecting the reload count.
+
+Actually, I think I've found it: the `__main__` bytecode contains all top-level statements including `let reload_count = 0;`, and if `main()` exists, `__main__` executes the entire top-level program from scratch before calling `main()`. This means every time `run_main()` is invoked, it re-executes that initial `let reload_count = 0;` assignment, resetting the global back to 0 before `main()` even runs — which is why `on_reload` incremented it in a separate frame, but then the full `run_main()` call wiped it out first.
+
+This isn't a bug I introduced; it's how `run_main()` already works and matches the usage pattern in `main.rs` where it's called once per reload, not repeatedly. My test was flawed because it assumed `run_main()` would just invoke `main()` without re-running the top-level initialization. The fix is to verify `on_reload`'s effects differently — by having it set a value that I read through a separate accessor function instead of re-invoking `run_main()`, which triggers the global reset.
+
+This also clarifies the design: `on_reload()` runs after `reload_functions()` restores and re-initializes globals, so it executes in the correct "reloaded" state where old values are preserved where names match. That revealed something about `run_main()`'s semantics (it re-executes the whole top-level program each call, resetting globals) — not a bug, but my test needs to check via a plain accessor instead of re-calling `run_main()`. Let's fix the test:
+
+    let result = reloader.vm_mut().run_main().unwrap();
+    assert_eq!(result, crate::value::Value::Int(99));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// If the script defines `fn on_reload()`, it must be called exactly
+/// once after each successful reload, with the *new* bytecode already
+/// live (so it can call other new functions / see restored globals).
+#[test]
+fn test_reload_calls_on_reload_hook_if_defined() {
+    let dir = std::env::temp_dir().join(format!("zen_hotreload_test3_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let root_path = dir.join("main.zen");
+
+    std::fs::write(
+        &root_path,
+        "let reload_count = 0;\nfn main() { reload_count }\n",
+    )
+    .unwrap();
+
+    let vm = compile_and_run(&root_path);
+    let mut reloader = HotReloader::new([root_path.clone()], vm);
+
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    std::fs::write(
+        &root_path,
+        "let reload_count = 0;\nfn on_reload() { reload_count = reload_count + 1; }\nfn main() { reload_count }\n",
+        "let reload_count = 0;\nfn on_reload() { reload_count = reload_count + 1; }\nfn get_reload_count() -> i64 { reload_count }\nfn main() { reload_count }\n",
+    )
+    .unwrap();
+    assert!(reloader.tick().unwrap());
+    // on_reload ran once as part of this reload.
+    assert_eq!(
+        reloader.vm_mut().run_main().unwrap(),
+        crate::value::Value::Int(1)
+    );
+    // `on_reload` ran once as part of this reload. Check via a plain
+    // accessor function rather than `run_main()`, since `run_main()`
+    // re-executes the whole top-level program (including `let
+    // reload_count = 0;`) each time it's called, which would mask the
+    // hook's effect.
+    let count = reloader
+        .vm_mut()
+        .call_if_exists("get_reload_count")
+        .unwrap();
+    assert_eq!(count, Some(crate::value::Value::Int(1)));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A script with no `on_reload` defined must reload without error —
+/// the hook is entirely optional.
+#[test]
+fn test_reload_without_on_reload_hook_is_fine() {
+    let dir = std::env::temp_dir().join(format!("zen_hotreload_test4_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let root_path = dir.join("main.zen");
+
+    std::fs::write(&root_path, "let x = 1;\nfn main() { x }\n").unwrap();
+    let vm = compile_and_run(&root_path);
+    let mut reloader = HotReloader::new([root_path.clone()], vm);
+
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    std::fs::write(&root_path, "let x = 2;\nfn main() { x }\n").unwrap();

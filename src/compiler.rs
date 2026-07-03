@@ -1418,7 +1418,8 @@ fn const_hash(val: &Value) -> u64 {
         | Value::NativeFunction(_)
         | Value::Foreign(_)
         | Value::Closure(_)
-        | Value::Range(..) => {
+        | Value::Range(..)
+        | Value::Map(_) => {
             // These types use pointer identity, hash is not stable;
             // fall back to linear scan (handled in add_const)
             6
