@@ -68,6 +68,8 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("set_timeout", Rc::new(set_timeout_impl));
     vm.register_native("set_interval", Rc::new(set_interval_impl));
     vm.register_native("clear_timer", Rc::new(clear_timer_impl));
+    vm.register_native("after", Rc::new(after_impl));
+    vm.register_native("every_frame", Rc::new(every_frame_impl));
 
     // Option/Result helpers
     vm.register_native("is_some", Rc::new(is_some_impl));
@@ -298,6 +300,21 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "clear_timer".into(),
             params: vec![("id".into(), Type::I64)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "after".into(),
+            params: vec![
+                ("seconds".into(), Type::Unit),
+                ("callback".into(), Type::Unit),
+            ],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "every_frame".into(),
+            params: vec![("callback".into(), Type::Unit)],
             return_type: Some(Type::Unit),
         },
     ];
@@ -678,6 +695,43 @@ fn clear_timer_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     if let Some(Value::Int(id)) = args.first() {
         ctx.remove_timer(*id as u64);
     }
+    Ok(Value::Nil)
+}
+
+fn after_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    if args.len() < 2 {
+        return Err(crate::error::Error::Script {
+            msg: "after requires a delay in seconds and a callback".into(),
+        });
+    }
+    let seconds = match &args[0] {
+        Value::Float(f) => *f,
+        Value::Int(n) => *n as f64,
+        _ => {
+            return Err(crate::error::Error::Script {
+                msg: "after seconds must be a number".into(),
+            })
+        }
+    };
+    let callback = args[1].clone();
+    if !matches!(callback, Value::Function(_) | Value::Closure(_)) {
+        return Err(crate::error::Error::Script {
+            msg: "after second argument must be a function".into(),
+        });
+    }
+    let id = ctx.register_timer(callback, seconds, None);
+    Ok(Value::Int(id as i64))
+}
+
+fn every_frame_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let callback = args.first().cloned().unwrap_or(Value::Nil);
+    if !matches!(callback, Value::Function(_) | Value::Closure(_)) {
+        return Err(crate::error::Error::Script {
+            msg: "every_frame requires a function argument".into(),
+        });
+    }
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    vm.add_frame_callback(callback);
     Ok(Value::Nil)
 }
 

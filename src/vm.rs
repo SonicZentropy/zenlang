@@ -115,6 +115,8 @@ pub struct VM {
     /// Timers queued by native functions during callback execution.
     /// Flushed into `timers` after each callback returns.
     pending_timers: Vec<TimerEntry>,
+    /// Callbacks to invoke once per `tick()` call (every frame).
+    frame_callbacks: Vec<Value>,
     /// Monotonically increasing timer ID counter.
     timer_id_counter: u64,
 }
@@ -138,6 +140,7 @@ impl VM {
             time: 0.0,
             timers: Vec::new(),
             pending_timers: Vec::new(),
+            frame_callbacks: Vec::new(),
             timer_id_counter: 1,
         }
     }
@@ -160,6 +163,7 @@ impl VM {
             time: 0.0,
             timers: Vec::new(),
             pending_timers: Vec::new(),
+            frame_callbacks: Vec::new(),
             timer_id_counter: 1,
         }
     }
@@ -370,6 +374,16 @@ impl VM {
         self.timers.retain(|t| t.id != id);
     }
 
+    /// Register a callback to be invoked once per `tick()` call (every frame).
+    pub fn add_frame_callback(&mut self, callback: Value) {
+        self.frame_callbacks.push(callback);
+    }
+
+    /// Remove a frame callback by identity (pointer comparison).
+    pub fn remove_frame_callback(&mut self, callback: &Value) {
+        self.frame_callbacks.retain(|c| !std::ptr::eq(c, callback));
+    }
+
     /// Move any timers queued by native functions during callback execution
     /// into the active timer list. Called after each `call_value` in `tick()`.
     fn flush_pending_timers(&mut self) {
@@ -379,13 +393,17 @@ impl VM {
         }
     }
 
-    /// Advance virtual time by `dt` seconds and fire any due timers.
+    /// Advance virtual time by `dt` seconds, fire any due timers,
+    /// and invoke per-frame callbacks.
     ///
     /// Each due timer's callback is invoked as a fresh call (no script may
     /// be running when this is called). Intervals are re-scheduled after
     /// firing, using the original fire time plus the interval to avoid
     /// drift. If a timer's callback registers or cancels other timers,
     /// those changes are visible on subsequent iterations of the loop.
+    ///
+    /// Per-frame callbacks (`every_frame`) are invoked after all due timers
+    /// have fired and re-scheduled, once per `tick()` call.
     pub fn tick(&mut self, dt: f64) -> Result<()> {
         self.time += dt;
         eprintln!("DEBUG tick time={}, timers.len={}, pending.len={}", self.time, self.timers.len(), self.pending_timers.len());
@@ -418,6 +436,16 @@ impl VM {
                 });
             }
         }
+        // Invoke per-frame callbacks
+        let callbacks = std::mem::take(&mut self.frame_callbacks);
+        for cb in &callbacks {
+            if matches!(cb, Value::Function(_) | Value::Closure(_)) {
+                self.call_value(cb, &[])?;
+                self.flush_pending_timers();
+            }
+        }
+        // Re-register any callbacks that want to continue firing every frame.
+        // A callback that wants to continue must re-register itself via every_frame.
         Ok(())
     }
 
