@@ -46,6 +46,10 @@ pub enum Type {
     /// Used as the wildcard for type-erased values, unannotated parameters,
     /// and native function signatures that accept any type.
     Any,
+    /// Local unification variable (used during type inference).
+    /// The `u64` is a unique identifier; the variable is resolved by
+    /// [`crate::typeck::TypeChecker::resolve_var`].
+    Var(u64),
     /// A named type reference, e.g. `MyStruct` or `Option`.
     Named(CompactString),
     /// A generic type parameter, e.g. `T` in `fn foo<T>(x: T)`.

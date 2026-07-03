@@ -10,7 +10,7 @@ Add `Type::Any` variant, replace wildcard `Unit` usages, clean up `types_compati
 - **`opaque type Name = Base`**: creates a nominally isolated type — NOT compatible with `Base` or any other type. Name-matching only. Requires explicit conversion both ways.
 - **Foreign type registration**: Rust foreign structs register their field types in the symbol table so they participate in structural comparison
 
-### Phase 3: Local bidirectional inference (~2-3 weeks)
+### Phase 3: Local bidirectional inference (~2-3 weeks) ✅
 - `Type::Var(u64)` for local unification
 - `unify()` + `resolve()` in the typechecker
 - Expected-type propagation downward from context

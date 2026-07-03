@@ -1626,6 +1626,7 @@ fn type_display(ty: &crate::ast::Type) -> String {
         crate::ast::Type::Str => "str".into(),
         crate::ast::Type::Unit => "()".into(),
         crate::ast::Type::Any => "any".into(),
+        crate::ast::Type::Var(id) => format!("?{}", id),
         crate::ast::Type::Named(n) => n.to_string(),
         crate::ast::Type::Generic(n) => n.to_string(),
         crate::ast::Type::Array(inner) => format!("[{}]", type_display(inner)),

@@ -1803,4 +1803,49 @@ pub mod tests {
         let result = try_run(source);
         assert!(result.is_err(), "should fail: excess property 'z'");
     }
+
+    // ── Phase 3: Type inference with Type::Var ────────────────────────
+
+    #[test]
+    fn test_infer_let_with_type_ann() {
+        // Type annotation constrains the init expression
+        let source = r#"
+            fn identity(x: i64) -> i64 { x }
+            let result: i64 = identity(42);
+            result
+        "#;
+        assert_eq!(run(source), Value::Int(42));
+    }
+
+    #[test]
+    fn test_infer_type_mismatch() {
+        // Type annotation conflicts with init expression
+        let source = r#"
+            let x: str = 42;
+            x
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: type mismatch str vs i64");
+    }
+
+    #[test]
+    fn test_infer_binary_ops() {
+        // Binary operations should infer types
+        let source = r#"
+            let a = 10;
+            let b = 20;
+            a + b
+        "#;
+        assert_eq!(run(source), Value::Int(30));
+    }
+
+    #[test]
+    fn test_infer_function_return() {
+        // Function return type should be inferred
+        let source = r#"
+            fn add(a: i64, b: i64) -> i64 { a + b }
+            add(3, 4)
+        "#;
+        assert_eq!(run(source), Value::Int(7));
+    }
 }

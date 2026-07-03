@@ -46,6 +46,7 @@ pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
         type_map: TypeMap::new(),
         errors: Vec::new(),
         current_span: Span::new(0, 0),
+        type_vars: TypeVarStore::new(),
     };
     for stmt in &program.stmts {
         checker.set_span(stmt.span);
@@ -60,11 +61,54 @@ pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
     }
 }
 
+/// Storage for local unification type variables.
+///
+/// During type inference, unresolved types are represented as `Type::Var(id)`.
+/// The `constraints` map tracks the type each variable has been unified with.
+/// Once a variable is constrained, `resolve_var` returns the concrete type.
+struct TypeVarStore {
+    next_id: u64,
+    constraints: HashMap<u64, Type>,
+}
+
+impl TypeVarStore {
+    fn new() -> Self {
+        Self {
+            next_id: 0,
+            constraints: HashMap::new(),
+        }
+    }
+
+    /// Allocate a fresh unification variable.
+    fn fresh_var(&mut self) -> Type {
+        let id = self.next_id;
+        self.next_id += 1;
+        Type::Var(id)
+    }
+
+    /// Constrain a type variable to a concrete type.
+    /// Returns `false` if the variable was already constrained to a different type.
+    fn constrain(&mut self, id: u64, ty: Type) -> bool {
+        if let Some(existing) = self.constraints.get(&id) {
+            // Already constrained — check compatibility
+            return existing == &ty;
+        }
+        self.constraints.insert(id, ty);
+        true
+    }
+
+    /// Resolve a type variable to its constrained type, if any.
+    fn resolve(&self, id: u64) -> Option<&Type> {
+        self.constraints.get(&id)
+    }
+}
+
 struct TypeChecker<'a> {
     symbols: &'a mut SymbolTable,
     type_map: TypeMap,
     errors: Vec<Error>,
     current_span: Span,
+    type_vars: TypeVarStore,
 }
 
 impl<'a> TypeChecker<'a> {
@@ -86,6 +130,81 @@ impl<'a> TypeChecker<'a> {
         });
     }
 
+    /// Allocate a fresh unification type variable.
+    fn fresh_var(&mut self) -> Type {
+        self.type_vars.fresh_var()
+    }
+
+    /// Resolve a type by following `Type::Var` chains to their constrained type.
+    /// If a variable is unconstrained, it remains as `Type::Var`.
+    fn resolve_var(&self, ty: &Type) -> Type {
+        match ty {
+            Type::Var(id) => {
+                if let Some(resolved) = self.type_vars.resolve(*id) {
+                    // Recurse in case the constraint is itself a variable
+                    self.resolve_var(resolved)
+                } else {
+                    ty.clone()
+                }
+            }
+            _ => ty.clone(),
+        }
+    }
+
+    /// Unify two types: constrain any type variables so that both types become
+    /// equal.  Returns `true` if unification succeeds, `false` on conflict.
+    fn unify(&mut self, a: &Type, b: &Type) -> bool {
+        let a = self.resolve_var(a).clone();
+        let b = self.resolve_var(b).clone();
+        match (&a, &b) {
+            // Same concrete type — always compatible
+            (Type::I64, Type::I64)
+            | (Type::F32, Type::F32)
+            | (Type::F64, Type::F64)
+            | (Type::Bool, Type::Bool)
+            | (Type::Str, Type::Str)
+            | (Type::Unit, Type::Unit)
+            | (Type::Any, _) | (_, Type::Any) => true,
+            // Numeric coercion
+            (Type::I64, Type::F64) | (Type::F64, Type::I64) => true,
+            (Type::I64, Type::F32) | (Type::F32, Type::I64) => true,
+            (Type::F32, Type::F64) | (Type::F64, Type::F32) => true,
+            // Generic type parameters are type-erased
+            (Type::Generic(_), _) | (_, Type::Generic(_)) => true,
+            // Unconstrained variable — constrain to the other type
+            (Type::Var(id), _) => {
+                self.type_vars.constrain(*id, b.clone());
+                true
+            }
+            (_, Type::Var(id)) => {
+                self.type_vars.constrain(*id, a.clone());
+                true
+            }
+            // Named types — delegate to types_compatible
+            (Type::Named(_), _) | (_, Type::Named(_)) => {
+                self.types_compatible(&a, &b)
+            }
+            // Compound types — recurse
+            (Type::Array(ae), Type::Array(be)) => self.unify(ae, be),
+            (Type::Option(ao), Type::Option(bo)) => self.unify(ao, bo),
+            (Type::Result(oka, erra), Type::Result(okb, errb)) => {
+                self.unify(oka, okb) && self.unify(erra, errb)
+            }
+            (Type::Fn { params: pa, ret: ra }, Type::Fn { params: pb, ret: rb }) => {
+                if pa.len() != pb.len() {
+                    return false;
+                }
+                for (a, b) in pa.iter().zip(pb.iter()) {
+                    if !self.unify(a, b) {
+                        return false;
+                    }
+                }
+                self.unify(ra, rb)
+            }
+            _ => false,
+        }
+    }
+
     fn check_stmt(&mut self, stmt: &Stmt, _return_type: Option<&Type>) {
         match stmt {
             Stmt::Let {
@@ -101,15 +220,18 @@ impl<'a> TypeChecker<'a> {
                 let init_ty = if let Some(init_expr) = init {
                     let ty = self.check_expr(init_expr);
                     if let Some(dt) = declared {
-                        if !self.types_compatible(&ty, dt) {
+                        // Unify init type with the declared type annotation
+                        if !self.unify(&ty, dt) {
                             self.error(format!(
                                 "type mismatch: expected '{}', got '{}'",
                                 self.type_display(dt),
                                 self.type_display(&ty),
                             ));
                         }
+                        self.resolve_var(dt)
+                    } else {
+                        ty
                     }
-                    ty
                 } else {
                     Type::Any
                 };
@@ -1040,11 +1162,13 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn types_compatible(&self, a: &Type, b: &Type) -> bool {
-        let a = self.resolve_named(a);
-        let b = self.resolve_named(b);
+        let a = self.resolve_var(&self.resolve_named(a));
+        let b = self.resolve_var(&self.resolve_named(b));
         match (&a, &b) {
             // `any` is compatible with everything — the dynamic type wildcard
             (Type::Any, _) | (_, Type::Any) => true,
+            // Unconstrained type variable — compatible with anything
+            (Type::Var(_), _) | (_, Type::Var(_)) => true,
             // Unit type: only compatible with itself
             (Type::Unit, Type::Unit) => true,
             // Generic type parameters are compatible with any type (type erasure)
@@ -1189,6 +1313,7 @@ impl<'a> TypeChecker<'a> {
             Type::Str => "str".into(),
             Type::Unit => "()".into(),
             Type::Any => "any".into(),
+            Type::Var(id) => format!("?{}", id),
             Type::Named(s) => s.to_string(),
             Type::Generic(s) => s.to_string(),
             Type::Array(inner) => format!("[{}]", self.type_display(inner)),
