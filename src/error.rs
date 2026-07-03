@@ -41,6 +41,9 @@ pub enum Error {
 
     #[snafu(display("error loading module '{module}': {source}"))]
     ModResolution { module: String, source: Box<Error> },
+
+    #[snafu(display("debug break at {location}"))]
+    DebugBreak { location: SourceLocation },
 }
 
 /// Convenience alias for `Result<T, Error>` across the entire codebase.

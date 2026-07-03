@@ -131,6 +131,15 @@ fn error_to_diagnostics(source: &str, err: &Error) -> Vec<Diagnostic> {
                 ..Default::default()
             }];
         }
+        Error::DebugBreak { location } => {
+            return vec![Diagnostic {
+                range: span_to_range(source, location.span),
+                severity: Some(DiagnosticSeverity::INFORMATION),
+                message: format!("debug break at line {}", location.line),
+                source: Some("zenlang".into()),
+                ..Default::default()
+            }];
+        }
         Error::ParseMultiple { errors } | Error::CompileMultiple { errors } => {
             return errors
                 .iter()

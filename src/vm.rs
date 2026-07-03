@@ -45,6 +45,7 @@ impl VMContext {
 }
 
 /// A call frame in the VM.
+#[derive(Debug, Clone)]
 struct CallFrame {
     function_idx: usize,
     ip: usize,
@@ -63,6 +64,61 @@ impl CallFrame {
             is_closure: false,
         }
     }
+}
+
+/// Debug stepping mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebugStepMode {
+    /// No stepping.
+    None,
+    /// Step one instruction.
+    StepInto,
+    /// Step until the current function returns or we reach the next line
+    /// in the same frame.
+    StepOver,
+    /// Step until the current function returns.
+    StepOut,
+}
+
+/// Information about a single call frame for debug inspection.
+#[derive(Debug, Clone)]
+pub struct DebugFrameInfo {
+    /// Frame depth (0 = topmost/innermost).
+    pub depth: usize,
+    /// Function name.
+    pub function: String,
+    /// Source location.
+    pub source_location: crate::span::SourceLocation,
+}
+
+/// Breakpoint target: a specific source line in a named function.
+#[derive(Debug, Clone)]
+pub struct Breakpoint {
+    /// Function name to set the breakpoint in.
+    pub function: String,
+    /// 1-based source line number.
+    pub line: usize,
+}
+
+/// Debugger state for the VM.
+#[derive(Debug, Clone)]
+pub struct DebugState {
+    /// Whether debug checks are active.
+    pub enabled: bool,
+    /// Whether execution is currently paused.
+    pub paused: bool,
+    /// Step mode active during execution.
+    pub step_mode: DebugStepMode,
+    /// Frame depth when stepping started (for StepOver/StepOut).
+    pub step_start_depth: usize,
+    /// List of breakpoints.
+    pub breakpoints: Vec<Breakpoint>,
+    /// Resolved breakpoint bytecode offsets: (function_idx, offset) pairs.
+    /// Rebuilt whenever breakpoints or functions change.
+    pub resolved_breakpoints: Vec<(usize, usize)>,
+    /// Offset to skip once when resuming after a breakpoint pause.
+    /// Prevents immediately re-hitting the same breakpoint.
+    pub skip_offset: Option<(usize, usize)>,
 }
 
 /// The Zenlang virtual machine.
@@ -119,6 +175,8 @@ pub struct VM {
     frame_callbacks: Vec<Value>,
     /// Monotonically increasing timer ID counter.
     timer_id_counter: u64,
+    /// Debugger state (breakpoints, stepping, pause).
+    pub debug_state: DebugState,
 }
 
 impl VM {
@@ -142,6 +200,15 @@ impl VM {
             pending_timers: Vec::new(),
             frame_callbacks: Vec::new(),
             timer_id_counter: 1,
+            debug_state: DebugState {
+                enabled: false,
+                paused: false,
+                step_mode: DebugStepMode::None,
+                step_start_depth: 0,
+                breakpoints: Vec::new(),
+                resolved_breakpoints: Vec::new(),
+                skip_offset: None,
+            },
         }
     }
 
@@ -165,7 +232,234 @@ impl VM {
             pending_timers: Vec::new(),
             frame_callbacks: Vec::new(),
             timer_id_counter: 1,
+            debug_state: DebugState {
+                enabled: false,
+                paused: false,
+                step_mode: DebugStepMode::None,
+                step_start_depth: 0,
+                breakpoints: Vec::new(),
+                resolved_breakpoints: Vec::new(),
+                skip_offset: None,
+            },
         }
+    }
+
+    /// Enable or disable debug mode.
+    pub fn set_debug(&mut self, enabled: bool) {
+        self.debug_state.enabled = enabled;
+        if !enabled {
+            self.debug_state.paused = false;
+            self.debug_state.step_mode = DebugStepMode::None;
+        }
+    }
+
+    /// Add a breakpoint at the given line in the given function.
+    /// Returns `false` if the function name is not found.
+    pub fn set_breakpoint(&mut self, function: &str, line: usize) -> bool {
+        if !self.function_name_map.contains_key(function) {
+            return false;
+        }
+        // Avoid duplicates
+        if self.debug_state.breakpoints.iter().any(|b| b.function == function && b.line == line) {
+            return true;
+        }
+        self.debug_state.breakpoints.push(Breakpoint {
+            function: function.to_string(),
+            line,
+        });
+        self.rebuild_breakpoints();
+        true
+    }
+
+    /// Remove a specific breakpoint.
+    pub fn remove_breakpoint(&mut self, function: &str, line: usize) {
+        self.debug_state.breakpoints.retain(|b| b.function != function || b.line != line);
+        self.rebuild_breakpoints();
+    }
+
+    /// Remove all breakpoints.
+    pub fn clear_breakpoints(&mut self) {
+        self.debug_state.breakpoints.clear();
+        self.debug_state.resolved_breakpoints.clear();
+    }
+
+    /// Re-resolve all breakpoints from function names + line numbers to
+    /// bytecode offsets.
+    fn rebuild_breakpoints(&mut self) {
+        self.debug_state.resolved_breakpoints.clear();
+        for bp in &self.debug_state.breakpoints {
+            let Some(&fn_idx) = self.function_name_map.get(&bp.function) else { continue };
+            let Some(fn_def) = self.functions.get(fn_idx) else { continue };
+            // Find the first bytecode offset at the given source line.
+            // Internal line numbers are 0-based; breakpoints use 1-based.
+            for (offset, &line) in fn_def.chunk.lines.iter().enumerate() {
+                if line + 1 == bp.line {
+                    self.debug_state.resolved_breakpoints.push((fn_idx, offset));
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Continue execution after a breakpoint pause.
+    pub fn debug_continue(&mut self) -> Result<Value> {
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
+        self.debug_state.step_mode = DebugStepMode::None;
+        self.debug_state.paused = false;
+        self.execute_debug()
+    }
+
+    /// Step one instruction.
+    pub fn debug_step_into(&mut self) -> Result<Value> {
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
+        self.debug_state.step_mode = DebugStepMode::StepInto;
+        self.debug_state.step_start_depth = self.frames.len();
+        self.debug_state.paused = false;
+        self.execute_debug()
+    }
+
+    /// Step over the current line.
+    pub fn debug_step_over(&mut self) -> Result<Value> {
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
+        self.debug_state.step_mode = DebugStepMode::StepOver;
+        self.debug_state.step_start_depth = self.frames.len();
+        self.debug_state.paused = false;
+        self.execute_debug()
+    }
+
+    /// Step out of the current function.
+    pub fn debug_step_out(&mut self) -> Result<Value> {
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
+        self.debug_state.step_mode = DebugStepMode::StepOut;
+        self.debug_state.step_start_depth = self.frames.len();
+        self.debug_state.paused = false;
+        self.execute_debug()
+    }
+
+    /// Whether the VM is currently paused at a breakpoint or step.
+    pub fn is_paused(&self) -> bool {
+        self.debug_state.paused
+    }
+
+    /// Get the current source location when paused.
+    pub fn debug_current_location(&self) -> Option<crate::span::SourceLocation> {
+        let frame = self.frames.last()?;
+        let loc = source_loc_from_frame(&self.functions, frame.function_idx, frame.ip);
+        Some(loc)
+    }
+
+    /// Get the current call stack frames as debug info.
+    pub fn debug_stack_frames(&self) -> Vec<DebugFrameInfo> {
+        self.frames
+            .iter()
+            .enumerate()
+            .map(|(depth, frame)| {
+                let loc = source_loc_from_frame(&self.functions, frame.function_idx, frame.ip);
+                let fn_name = self.functions[frame.function_idx].name.clone();
+                DebugFrameInfo {
+                    depth,
+                    function: fn_name,
+                    source_location: loc,
+                }
+            })
+            .collect()
+    }
+
+    /// Get local variable names and values for a given frame depth.
+    /// `depth` 0 = topmost (innermost) frame.
+    pub fn debug_locals(&self, depth: usize) -> Vec<(String, Value)> {
+        if depth >= self.frames.len() {
+            return Vec::new();
+        }
+        let frame = &self.frames[self.frames.len() - 1 - depth];
+        let fn_def = &self.functions[frame.function_idx];
+        let local_count = fn_def.chunk.locals as usize;
+        let mut locals = Vec::with_capacity(local_count);
+        // Parameters have names in the bytecode
+        // For now, just label them as local_0, local_1, ...
+        // A full implementation would use debug info from the compiler
+        for i in 0..local_count {
+            let name = if i < fn_def.arity as usize {
+                format!("param_{}", i)
+            } else {
+                format!("local_{}", i - fn_def.arity as usize)
+            };
+            let stack_idx = frame.bp + i;
+            let val = self.stack.get(stack_idx).cloned().unwrap_or(Value::Nil);
+            locals.push((name, val));
+        }
+        locals
+    }
+
+    fn execute_debug(&mut self) -> Result<Value> {
+        loop {
+            self.execute()?;
+            if self.debug_state.paused {
+                return Ok(Value::Nil);
+            }
+            return Ok(self.stack.pop().unwrap_or(Value::Nil));
+        }
+    }
+
+    /// Check whether the VM should pause at the current instruction.
+    /// Called inside `execute()` before each instruction.
+    fn debug_check(&mut self) -> bool {
+        if !self.debug_state.enabled || self.debug_state.paused {
+            return false;
+        }
+        let Some(frame) = self.frames.last() else { return false };
+        let fn_idx = frame.function_idx;
+        let ip = frame.ip;
+
+        // Check skip_offset (resume past breakpoint)
+        if self.debug_state.skip_offset == Some((fn_idx, ip)) {
+            self.debug_state.skip_offset = None;
+            return false;
+        }
+        self.debug_state.skip_offset = None;
+
+        // Check resolved breakpoints
+        for &(bp_fn, bp_off) in &self.debug_state.resolved_breakpoints {
+            if bp_fn == fn_idx && bp_off == ip {
+                self.debug_state.skip_offset = Some((fn_idx, ip));
+                return true;
+            }
+        }
+
+        // Check step mode
+        match self.debug_state.step_mode {
+            DebugStepMode::None => {}
+            DebugStepMode::StepInto => {
+                self.debug_state.step_mode = DebugStepMode::None;
+                self.debug_state.skip_offset = Some((fn_idx, ip));
+                return true;
+            }
+            DebugStepMode::StepOver => {
+                let current_depth = self.frames.len();
+                if current_depth <= self.debug_state.step_start_depth {
+                    self.debug_state.step_mode = DebugStepMode::None;
+                    self.debug_state.skip_offset = Some((fn_idx, ip));
+                    return true;
+                }
+            }
+            DebugStepMode::StepOut => {
+                let current_depth = self.frames.len();
+                if current_depth < self.debug_state.step_start_depth {
+                    self.debug_state.step_mode = DebugStepMode::None;
+                    self.debug_state.skip_offset = Some((fn_idx, ip));
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Set a maximum number of instructions that can be executed per `run_main` / `call_function`
@@ -519,10 +813,8 @@ impl VM {
             self.stack.push(Value::Nil);
         }
 
-        self.execute()?;
-
-        // Return value is on top of stack
-        Ok(self.stack.pop().unwrap_or(Value::Nil))
+        let result = self.execute_debug()?;
+        Ok(result)
     }
 
     /// Build a runtime error with a stack trace from the current call frames.
@@ -586,6 +878,12 @@ impl VM {
     fn execute(&mut self) -> Result<()> {
         self.instruction_count = 0;
         loop {
+            // Check for breakpoints / stepping before each instruction
+            if self.debug_check() {
+                self.debug_state.paused = true;
+                return Ok(());
+            }
+
             let frame = self.frames.last().unwrap();
             if frame.ip >= self.chunk().code.len() {
                 break;
@@ -1545,13 +1843,16 @@ impl VM {
 
         self.active_generator = Some(state_cell.clone());
         self.generator_base_frame_count = self.frames.len();
-        let result = self.execute();
+        let result_val = self.execute_debug();
         self.active_generator = None;
         self.generator_base_frame_count = 0;
 
-        match result {
-            Ok(()) => {
-                let val = self.stack.pop().unwrap_or(Value::Nil);
+        match result_val {
+            Ok(val) => {
+                // If paused, return None (the caller should check is_paused)
+                if self.debug_state.paused {
+                    return Ok(None);
+                }
                 // Check if generator was exhausted (normal return, not yield)
                 let state = state_cell.borrow();
                 if state.exhausted {
@@ -2916,5 +3217,196 @@ mod module_tests {
             _ => panic!("expected array"),
         };
         assert_eq!(log_len, 2, "expected 2 log entries after second tick");
+    }
+
+    // --- Debug infrastructure tests ---
+
+    fn compile_and_load(source: &str) -> VM {
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm
+    }
+
+    #[test]
+    fn test_debug_disabled_by_default() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        assert!(!vm.debug_state.enabled);
+        assert!(!vm.is_paused());
+    }
+
+    #[test]
+    fn test_debug_set_breakpoint_unknown_function() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        assert!(!vm.set_breakpoint("nonexistent", 1));
+    }
+
+    #[test]
+    fn test_debug_set_breakpoint_known_function() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        assert!(vm.set_breakpoint("main", 1));
+    }
+
+    #[test]
+    fn test_debug_breakpoint_hits_and_pauses() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused(), "expected VM to pause at breakpoint");
+    }
+
+    #[test]
+    fn test_debug_breakpoint_continue() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        let result = vm.debug_continue().unwrap();
+        assert!(!vm.is_paused(), "expected VM to finish after continue");
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_no_breakpoint_runs_normally() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        vm.set_debug(true);
+        let result = vm.run_main().unwrap();
+        assert!(!vm.is_paused(), "expected VM to finish without breakpoint");
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_step_into() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        // After step_into, we advance one instruction and pause again
+        let result = vm.debug_step_into().unwrap();
+        assert!(vm.is_paused(), "expected VM to pause after step_into");
+        // Continue to end
+        let result = vm.debug_continue().unwrap();
+        assert!(!vm.is_paused());
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_stack_frames_when_paused() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        let frames = vm.debug_stack_frames();
+        assert!(!frames.is_empty(), "expected at least one frame");
+        assert_eq!(frames.last().unwrap().function, "main");
+    }
+
+    #[test]
+    fn test_debug_current_location_when_paused() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        let loc = vm.debug_current_location();
+        assert!(loc.is_some(), "expected a source location");
+    }
+
+    #[test]
+    fn test_debug_clear_breakpoints() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.clear_breakpoints();
+        let result = vm.run_main().unwrap();
+        assert!(!vm.is_paused(), "expected VM to finish without breakpoints");
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_set_debug_false_disables_pause() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.set_debug(false); // disable before run
+        let result = vm.run_main().unwrap();
+        assert!(!vm.is_paused(), "expected VM to finish when debug disabled");
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_continue_without_pause_errors() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        let err = vm.debug_continue();
+        assert!(err.is_err(), "expected error when continuing without pause");
+    }
+
+    #[test]
+    fn test_debug_step_over_pauses() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        let result = vm.debug_step_over().unwrap();
+        assert!(vm.is_paused(), "expected VM to pause after step_over");
+        let result = vm.debug_continue().unwrap();
+        assert!(!vm.is_paused());
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_step_out() {
+        let mut vm = compile_and_load("fn main() { let x = 42; x }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        // Step out of main returns to __main__ and pauses
+        let result = vm.debug_step_out().unwrap();
+        assert!(vm.is_paused(), "expected VM to pause after step_out from main");
+        // Continue from __main__ to finish
+        let result = vm.debug_continue().unwrap();
+        assert!(!vm.is_paused());
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_remove_breakpoint() {
+        let mut vm = compile_and_load("fn main() { 42 }");
+        vm.set_debug(true);
+        vm.set_breakpoint("main", 1);
+        vm.remove_breakpoint("main", 1);
+        let result = vm.run_main().unwrap();
+        assert!(!vm.is_paused());
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_debug_locals_populated() {
+        let source = "fn add(a: int, b: int) -> int { a + b }
+fn main() { add(1, 2) }";
+        let mut vm = compile_and_load(source);
+        vm.set_debug(true);
+        vm.set_breakpoint("add", 1);
+        vm.run_main().unwrap();
+        assert!(vm.is_paused());
+        let locals = vm.debug_locals(0); // top frame = add
+        assert!(!locals.is_empty(), "expected locals");
+        // Should have param_0 and param_1
+        let names: Vec<&str> = locals.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"param_0"));
+        assert!(names.contains(&"param_1"));
     }
 }
