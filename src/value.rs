@@ -125,6 +125,50 @@ impl MapKey {
     }
 }
 
+/// A struct value with named fields. Uses a `Vec<Value>` for O(1) indexed
+/// field access (the index is resolved at compile time when the struct type
+/// is known) and a shared `Vec<String>` for name↔index mapping. This is
+/// significantly faster and more memory-efficient than a `HashMap` for the
+/// common case (small-to-medium structs with compile-time-known field access).
+///
+/// When the shape changes across a hot reload, field access falls back to a
+/// linear scan of `field_names` (the `Rc`'d Vec), which is still fast for
+/// the modest number of fields typical in game-entity structs.
+#[derive(Debug, Clone)]
+pub struct StructData {
+    /// Field values, stored in struct-declaration order.
+    pub values: Vec<Value>,
+    /// Shared field-name vector. This `Rc` is typically shared across all
+    /// instances of the same struct type so that name→index resolution (used
+    /// for the dynamic fallback path after hot-reload) doesn't allocate per
+    /// instance.
+    pub field_names: Rc<Vec<String>>,
+}
+
+impl PartialEq for StructData {
+    fn eq(&self, other: &Self) -> bool {
+        self.field_names == other.field_names && self.values == other.values
+    }
+}
+
+impl StructData {
+    /// Look up a field by name, returning its index and a reference to the value.
+    /// Returns `None` if no such field exists.
+    pub fn field_index(&self, name: &str) -> Option<usize> {
+        self.field_names.iter().position(|n| n == name)
+    }
+
+    /// Get a field value by name (dynamic/fallback path).
+    pub fn get_field(&self, name: &str) -> Option<&Value> {
+        self.field_index(name).map(|i| &self.values[i])
+    }
+
+    /// Get a field value by name, mutably (dynamic/fallback path).
+    pub fn get_field_mut(&mut self, name: &str) -> Option<&mut Value> {
+        self.field_index(name).map(move |i| &mut self.values[i])
+    }
+}
+
 /// A runtime value in the Zenlang VM.
 ///
 /// All values are boxed — integers, floats, strings, arrays, structs, enums,
@@ -155,8 +199,10 @@ pub enum Value {
     Str(Rc<str>),
     /// A mutable array of values.
     Array(Rc<RefCell<Vec<Value>>>),
-    /// A struct with named fields. The `String` holds the struct type name for method dispatch.
-    Struct(Rc<RefCell<HashMap<String, Value>>>, String),
+    /// A struct with named fields. Uses `StructData` with a `Vec<Value>` for
+    /// fast indexed access and a shared `Vec<String>` for name↔index mapping.
+    /// The `String` holds the struct type name for method dispatch.
+    Struct(Rc<RefCell<StructData>>, String),
     /// An enum value with a tag (variant index) and field data.
     Enum {
         tag: u16,

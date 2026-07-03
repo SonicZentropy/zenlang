@@ -1097,16 +1097,27 @@ impl VM {
                         Some(Value::Str(s)) => s.to_string(),
                         _ => String::new(),
                     };
-                    let mut map = HashMap::new();
+                    let mut values = Vec::with_capacity(field_count);
+                    let mut field_names_vec = Vec::with_capacity(field_count);
                     for _ in 0..field_count {
                         let val = self.stack.pop().unwrap();
                         let name = self.stack.pop().unwrap();
                         if let Value::Str(s) = name {
-                            map.insert(s.to_string(), val);
+                            field_names_vec.push(s.to_string());
+                            values.push(val);
                         }
                     }
-                    self.stack
-                        .push(Value::Struct(Rc::new(RefCell::new(map)), type_name));
+                    // Reverse because we popped in reverse order
+                    field_names_vec.reverse();
+                    values.reverse();
+                    let field_names: Rc<Vec<String>> = Rc::new(field_names_vec);
+                    self.stack.push(Value::Struct(
+                        Rc::new(RefCell::new(crate::value::StructData {
+                            values,
+                            field_names,
+                        })),
+                        type_name,
+                    ));
                 }
 
                 Opcode::MakeArray(_) => {
@@ -1161,8 +1172,15 @@ impl VM {
                         .unwrap_or_default();
                     let obj = self.stack.pop().unwrap();
                     match &obj {
-                        Value::Struct(map, _) => {
-                            let val = map.borrow().get(&field_name).cloned().unwrap_or(Value::Nil);
+                        Value::Struct(data, _) => {
+                            let d = data.borrow();
+                            // Try direct index first (compile-time resolved field index)
+                            let val = if field_idx < d.values.len() {
+                                d.values[field_idx].clone()
+                            } else {
+                                // Fall back to name-based lookup (hot-reload shape change)
+                                d.get_field(&field_name).cloned().unwrap_or(Value::Nil)
+                            };
                             self.stack.push(val);
                         }
                         Value::Foreign(fv) => {
@@ -1208,8 +1226,14 @@ impl VM {
                     };
                     let result_val = val.clone();
                     match &mut obj {
-                        Value::Struct(map, _) => {
-                            map.borrow_mut().insert(field_name, val);
+                        Value::Struct(data, _) => {
+                            let mut d = data.borrow_mut();
+                            // Try direct index first (compile-time resolved field index)
+                            if field_idx < d.values.len() {
+                                d.values[field_idx] = val;
+                            } else if let Some(field) = d.get_field_mut(&field_name) {
+                                *field = val;
+                            }
                             self.stack.push(result_val);
                         }
                         Value::Foreign(_) => {
@@ -2404,8 +2428,9 @@ fn remap_function_value(
                 remap_function_value(v, old_name_to_idx, new_name_to_idx);
             }
         }
-        Value::Struct(map, _) => {
-            for v in map.borrow_mut().values_mut() {
+        Value::Struct(data, _) => {
+            let mut d = data.borrow_mut();
+            for v in d.values.iter_mut() {
                 remap_function_value(v, old_name_to_idx, new_name_to_idx);
             }
         }

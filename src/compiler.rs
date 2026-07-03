@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+use compact_str::CompactString;
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::ir::*;
@@ -39,7 +40,7 @@ pub fn offset_to_line(offsets: &[usize], byte_offset: usize) -> usize {
 /// [`VM::load_bytecode`](crate::vm::VM::load_bytecode).
 pub fn compile(
     program: &Program,
-    _types: &TypeMap,
+    types: &TypeMap,
     symbols: &SymbolTable,
     native_names: &[String],
     source: &str,
@@ -117,6 +118,7 @@ pub fn compile(
             lambda_counter.clone(),
             lambda_fns.clone(),
             symbols,
+            types,
         );
         let stmt_count = program.stmts.len();
         for (i, stmt) in program.stmts.iter().enumerate() {
@@ -160,6 +162,7 @@ pub fn compile(
         &lambda_counter,
         &lambda_fns,
         symbols,
+        types,
     );
 
     // Helper to compile function declarations from a list of stmts (handles Mod recursion)
@@ -173,6 +176,7 @@ pub fn compile(
         lambda_counter: &Rc<RefCell<usize>>,
         lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>,
         symbols: &SymbolTable,
+        types: &TypeMap,
     ) {
         for stmt in stmts {
             if let Stmt::Fn {
@@ -194,6 +198,7 @@ pub fn compile(
                     lambda_counter.clone(),
                     lambda_fns.clone(),
                     symbols,
+                    types,
                 );
 
                 fc.enter_scope();
@@ -251,6 +256,7 @@ pub fn compile(
                             lambda_counter.clone(),
                             lambda_fns.clone(),
                             symbols,
+                            types,
                         );
                         fc.enter_scope();
                         for param in params {
@@ -289,6 +295,7 @@ pub fn compile(
                     lambda_counter,
                     lambda_fns,
                     symbols,
+                    types,
                 );
             }
         }
@@ -568,6 +575,7 @@ struct FunctionCompiler<'a> {
     lambda_counter: Rc<RefCell<usize>>,
     lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
     symbols: &'a SymbolTable,
+    types: &'a TypeMap,
     is_generator: bool,
 }
 
@@ -588,6 +596,7 @@ impl<'a> FunctionCompiler<'a> {
         lambda_counter: Rc<RefCell<usize>>,
         lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
         symbols: &'a SymbolTable,
+        types: &'a TypeMap,
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.locals = 0;
@@ -609,6 +618,7 @@ impl<'a> FunctionCompiler<'a> {
             lambda_counter,
             lambda_fns,
             symbols,
+            types,
             is_generator: false,
         }
     }
@@ -892,7 +902,20 @@ impl<'a> FunctionCompiler<'a> {
 
             Expr::Field { obj, field } => {
                 self.compile_expr(obj);
-                let idx = self.chunk.add_field_name(field);
+                // Try to resolve the field index from the struct type at compile time
+                let field_idx = self.types.get(obj).and_then(|ty| match ty {
+                    Type::Named(struct_name) => {
+                        self.symbols.lookup(struct_name).and_then(|entry| {
+                            if let SymKind::Struct(def) = &entry.kind {
+                                def.fields.iter().position(|f| f.name == *field)
+                            } else {
+                                None
+                            }
+                        })
+                    }
+                    _ => None,
+                });
+                let idx: u16 = field_idx.map(|i| i as u16).unwrap_or_else(|| self.chunk.add_field_name(field));
                 self.emit_op(Opcode::LoadField(idx));
             }
 
@@ -1258,18 +1281,46 @@ impl<'a> FunctionCompiler<'a> {
                     for (field_name, val) in fields {
                         self.emit_op(Opcode::Dup);
                         self.compile_expr(val);
-                        let idx = self.chunk.add_field_name(field_name);
+                        // Try to use struct-specific field index
+                        let field_idx = self.symbols.lookup(name).and_then(|entry| {
+                            if let SymKind::Struct(def) = &entry.kind {
+                                def.fields.iter().position(|f| f.name == *field_name)
+                            } else {
+                                None
+                            }
+                        });
+                        let idx: u16 = field_idx.map(|i| i as u16).unwrap_or_else(|| self.chunk.add_field_name(field_name));
                         self.emit_op(Opcode::StoreField(idx));
                         self.emit_op(Opcode::Pop);
                     }
                 } else {
-                    // Push field names then values; MakeStruct pops in reverse order
-                    for (field_name, val) in fields {
-                        self.load_const(Value::Str(field_name.clone().into()));
-                        self.compile_expr(val);
+                    // Compile fields in struct declaration order so that
+                    // MakeStruct creates StructData with fields in declaration order,
+                    // matching the indices emitted by LoadField/StoreField.
+                    let field_order: Vec<CompactString> = self
+                        .symbols
+                        .lookup(name)
+                        .and_then(|entry| {
+                            if let SymKind::Struct(def) = &entry.kind {
+                                Some(def.fields.iter().map(|f| f.name.clone()).collect())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| fields.iter().map(|(n, _)| n.clone()).collect());
+
+                    // Build a map from field name to expression for O(1) lookup
+                    let field_map: HashMap<&CompactString, &Expr> =
+                        fields.iter().map(|(n, e)| (n, e)).collect();
+
+                    for fn_name in &field_order {
+                        if let Some(val) = field_map.get(fn_name) {
+                            self.load_const(Value::Str(fn_name.clone().into()));
+                            self.compile_expr(val);
+                        }
                     }
                     let type_const_idx = self.chunk.add_constant(Value::Str(name.clone().into()));
-                    self.emit_op(Opcode::MakeStruct(type_const_idx, fields.len() as u16));
+                    self.emit_op(Opcode::MakeStruct(type_const_idx, field_order.len() as u16));
                 }
             }
 
@@ -1332,6 +1383,7 @@ impl<'a> FunctionCompiler<'a> {
             self.lambda_counter.clone(),
             self.lambda_fns.clone(),
             self.symbols,
+            self.types,
         );
 
         // Enter scope, add upvalues as locals first, then params
@@ -1375,7 +1427,19 @@ impl<'a> FunctionCompiler<'a> {
             Expr::Field { obj, field } => {
                 self.compile_expr(obj);
                 self.compile_expr(value);
-                let idx = self.chunk.add_field_name(field);
+                let field_idx = self.types.get(obj).and_then(|ty| match ty {
+                    Type::Named(struct_name) => {
+                        self.symbols.lookup(struct_name).and_then(|entry| {
+                            if let SymKind::Struct(def) = &entry.kind {
+                                def.fields.iter().position(|f| f.name == *field)
+                            } else {
+                                None
+                            }
+                        })
+                    }
+                    _ => None,
+                });
+                let idx: u16 = field_idx.map(|i| i as u16).unwrap_or_else(|| self.chunk.add_field_name(field));
                 self.emit_op(Opcode::StoreField(idx));
             }
             Expr::Index { obj, index } => {
