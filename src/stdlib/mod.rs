@@ -8,6 +8,7 @@ use crate::vm::{VM, VMContext};
 
 mod fs;
 mod iter;
+mod json;
 mod log;
 mod map;
 mod math;
@@ -46,6 +47,9 @@ pub fn register_builtins(vm: &mut VM) {
 
     // Maps / dictionaries
     map::register(vm);
+
+    // JSON serialization
+    json::register(vm);
 
     // Vector/scalar math for games (Vec2/Vec3, lerp/clamp, trig, RNG)
     math::register(vm);
@@ -335,6 +339,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
         },
     ];
     sigs.extend(fs::signatures());
+    sigs.extend(json::signatures());
     sigs.extend(log::signatures());
     sigs.extend(map::signatures());
     sigs.extend(math::signatures());

@@ -32,6 +32,74 @@ impl VMContext {
         vm.timers.retain(|t| t.id != id);
         vm.pending_timers.retain(|t| t.id != id);
     }
+
+    /// Call a script function or closure from a native function.
+    ///
+    /// This is the safe entry point for calling back into Zenlang from Rust
+    /// native functions. It pushes a new call frame, runs the function to
+    /// completion, and returns the result value.
+    ///
+    /// Reentrancy: this calls `VM::execute()` recursively from within the
+    /// execution loop. A `return_to_depth` field on `VM` ensures the inner
+    /// `execute()` returns once the callback frame is popped, without
+    /// consuming the outer function's remaining instructions.
+    pub fn call_value(&mut self, callee: &Value, args: &[Value]) -> Result<Value> {
+        let vm: &mut VM = unsafe { &mut *self.raw_vm };
+        let frame_count = vm.frames.len();
+        let saved_count = vm.instruction_count;
+
+        vm.return_to_depth = Some(frame_count);
+
+        let result = match callee {
+            Value::Function(idx) => {
+                let fn_def = &vm.functions[*idx];
+                if fn_def.is_generator {
+                    return Err(vm.runtime_error("cannot call generator via call_value"));
+                }
+                let bp = vm.stack.len();
+                vm.frames.push(CallFrame {
+                    function_idx: *idx, ip: 0, bp,
+                    is_method: false, is_closure: true,
+                });
+                for arg in args {
+                    vm.stack.push(arg.clone());
+                }
+                let slot_count = fn_def.chunk.locals as usize;
+                while vm.stack.len() < bp + slot_count {
+                    vm.stack.push(Value::Nil);
+                }
+                vm.execute()?;
+                vm.stack.pop().unwrap_or(Value::Nil)
+            }
+            Value::Closure(h) => {
+                let data = vm.closures.get(*h);
+                let fn_idx = data.fn_idx;
+                let fn_def = &vm.functions[fn_idx];
+                let bp = vm.stack.len();
+                vm.frames.push(CallFrame {
+                    function_idx: fn_idx, ip: 0, bp,
+                    is_method: false, is_closure: true,
+                });
+                for uv in &data.upvalues {
+                    vm.stack.push(uv.clone());
+                }
+                for arg in args {
+                    vm.stack.push(arg.clone());
+                }
+                let slot_count = fn_def.chunk.locals as usize;
+                while vm.stack.len() < bp + slot_count {
+                    vm.stack.push(Value::Nil);
+                }
+                vm.execute()?;
+                vm.stack.pop().unwrap_or(Value::Nil)
+            }
+            _ => return Err(vm.runtime_error(format!("cannot call {}", callee.type_name()))),
+        };
+
+        vm.return_to_depth = None;
+        vm.instruction_count = saved_count;
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +174,7 @@ pub struct VM {
     frame_callbacks: Vec<Value>,
     timer_id_counter: u64,
     pub debug_state: DebugState,
+    return_to_depth: Option<usize>,
 
     // ── Slabs for heap-allocated objects ──
     pub arrays: Slab<ArrayData>,
@@ -135,6 +204,7 @@ impl VM {
                 step_start_depth: 0, breakpoints: Vec::new(),
                 resolved_breakpoints: Vec::new(), skip_offset: None,
             },
+            return_to_depth: None,
             arrays: Slab::new(), structs: Slab::new(), enums: Slab::new(),
             maps: Slab::new(), closures: Slab::new(), generators: Slab::new(),
             foreigns: Slab::new(), weaks: Slab::new(),
@@ -830,6 +900,11 @@ impl VM {
                         self.flush_pending_timers();
                         return Ok(());
                     }
+                    if Some(self.frames.len()) == self.return_to_depth {
+                        self.stack.push(result);
+                        self.return_to_depth = None;
+                        return Ok(());
+                    }
                     self.stack.push(result);
                 }
                 Opcode::MakeStruct(_, _) => {
@@ -1269,4 +1344,194 @@ pub mod tests {
     }
     #[test] fn test_range_for() { assert_eq!(run("let s = 0; for i in 0..=3 { s = s + i }; s"), Value::Int(6)); }
     #[test] fn test_map_operations() { assert_eq!(run("let m = map_new(); map_set(m, \"k\", 42); map_get(m, \"k\")"), run("Option::Some(42)")); }
+
+    #[test]
+    fn test_call_value_calls_script_function_from_native() {
+        let source = r#"
+            fn double(x: int) -> int { x * 2 }
+            fn main() -> int {
+                call_with_42(double)
+            }
+        "#;
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(source, &tokens);
+        let mut program = parser.parse().unwrap();
+        let mut native_names = crate::stdlib::native_names();
+        native_names.push("call_with_42".into());
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        vm.register_native("call_with_42", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+            let closure = &args[0];
+            ctx.call_value(closure, &[Value::Int(42)])
+        }));
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(84));
+    }
+
+    #[test]
+    fn test_call_value_calls_closure_from_native() {
+        let source = r#"
+            fn main() -> int {
+                call_with_42(|x| x * 3)
+            }
+        "#;
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(source, &tokens);
+        let mut program = parser.parse().unwrap();
+        let mut native_names = crate::stdlib::native_names();
+        native_names.push("call_with_42".into());
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        vm.register_native("call_with_42", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+            let closure = &args[0];
+            ctx.call_value(closure, &[Value::Int(42)])
+        }));
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(126));
+    }
+
+    #[test]
+    fn test_call_value_multiple_args() {
+        let source = r#"
+            fn add(a: int, b: int) -> int { a + b }
+            fn main() -> int {
+                call_with_2(add)
+            }
+        "#;
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        let parser = Parser::new(source, &tokens);
+        let mut program = parser.parse().unwrap();
+        let mut native_names = crate::stdlib::native_names();
+        native_names.push("call_with_2".into());
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        vm.register_native("call_with_2", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+            let closure = &args[0];
+            ctx.call_value(closure, &[Value::Int(100), Value::Int(23)])
+        }));
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(123));
+    }
+
+    // ── JSON serialisation tests ──
+
+    #[test]
+    fn test_json_bool() {
+        assert_eq!(run(r#"to_json(true)"#), run(r#""true""#));
+        assert_eq!(run(r#"to_json(false)"#), run(r#""false""#));
+    }
+
+    #[test]
+    fn test_json_int() {
+        assert_eq!(run(r#"to_json(42)"#), run(r#""42""#));
+    }
+
+    #[test]
+    fn test_json_float() {
+        assert_eq!(run(r#"to_json(3.14)"#), run(r#""3.14""#));
+    }
+
+    #[test]
+    fn test_json_string() {
+        assert_eq!(run(r#"to_json("hello")"#), run(r#""\"hello\"""#));
+    }
+
+    #[test]
+    fn test_json_array() {
+        let result = run(r#"to_json([1, 2, 3])"#);
+        assert_eq!(result.as_str(), Some(r#"[1,2,3]"#.into()));
+    }
+
+    #[test]
+    fn test_json_nested_array() {
+        let result = run(r#"to_json([[1, 2], [3, 4]])"#);
+        assert_eq!(result.as_str(), Some(r#"[[1,2],[3,4]]"#.into()));
+    }
+
+    #[test]
+    fn test_json_roundtrip_int() {
+        assert_eq!(run(r#"let s = to_json(42); from_json(s)"#), run("42"));
+    }
+
+    #[test]
+    fn test_json_roundtrip_bool() {
+        assert_eq!(run(r#"let s = to_json(true); from_json(s)"#), run("true"));
+    }
+
+    #[test]
+    fn test_json_roundtrip_string() {
+        assert_eq!(run(r#"let s = to_json("hi"); from_json(s)"#), run(r#""hi""#));
+    }
+
+    #[test]
+    fn test_json_roundtrip_array() {
+        let result = run(r#"to_json(from_json(to_json([1, 2, 3])))"#);
+        assert_eq!(result, run(r#""[1,2,3]""#));
+    }
+
+    #[test]
+    fn test_json_struct() {
+        let source = r#"
+            struct Point { x: int, y: int }
+            let p = Point { x: 10, y: 20 };
+            to_json(p)
+        "#;
+        let result = run(source);
+        let s = result.as_str().unwrap();
+        assert!(s.contains(r#""__type":"Point""#));
+        assert!(s.contains(r#""x":10"#));
+        assert!(s.contains(r#""y":20"#));
+    }
+
+    #[test]
+    fn test_json_enum() {
+        let source = r#"
+            enum Opt { Some(int), None }
+            let v = Opt::Some(42);
+            to_json(v)
+        "#;
+        let result = run(source);
+        let s = result.as_str().unwrap();
+        assert!(s.contains(r#""__tag":0"#));
+        assert!(s.contains(r#""fields":[42]"#));
+    }
+
+    #[test]
+    fn test_json_map() {
+        let source = r#"
+            let m = map_new();
+            map_set(m, "a", 1);
+            map_set(m, "b", 2);
+            to_json(m)
+        "#;
+        let result = run(source);
+        let s = result.as_str().unwrap();
+        assert!(s.contains(r#""a":1"#));
+        assert!(s.contains(r#""b":2"#));
+    }
+
+    #[test]
+    fn test_json_from_json_creates_array() {
+        let source = r#"from_json("[10, 20, 30]")"#;
+        let result = run(source);
+        assert_eq!(result, run("[10, 20, 30]"));
+    }
+
+    #[test]
+    fn test_json_closure_becomes_null() {
+        let result = run(r#"to_json(|x| x)"#);
+        assert_eq!(result, run(r#""null""#));
+    }
 }
