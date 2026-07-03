@@ -64,6 +64,11 @@ pub fn register_builtins(vm: &mut VM) {
     // Generator/Coroutine
     vm.register_native("next", Rc::new(next_impl));
 
+    // Timer / scheduling
+    vm.register_native("set_timeout", Rc::new(set_timeout_impl));
+    vm.register_native("set_interval", Rc::new(set_interval_impl));
+    vm.register_native("clear_timer", Rc::new(clear_timer_impl));
+
     // Option/Result helpers
     vm.register_native("is_some", Rc::new(is_some_impl));
     vm.register_native("is_none", Rc::new(is_none_impl));
@@ -269,6 +274,30 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "next".into(),
             params: vec![("gen".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "set_timeout".into(),
+            params: vec![
+                ("callback".into(), Type::Unit),
+                ("seconds".into(), Type::F64),
+            ],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "set_interval".into(),
+            params: vec![
+                ("callback".into(), Type::Unit),
+                ("seconds".into(), Type::F64),
+            ],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "clear_timer".into(),
+            params: vec![("id".into(), Type::I64)],
             return_type: Some(Type::Unit),
         },
     ];
@@ -593,6 +622,64 @@ fn unwrap_or_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 }
 
 // --- Generator/Coroutine ---
+
+fn set_timeout_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    eprintln!("DEBUG set_timeout_impl called with {} args", args.len());
+    if args.len() < 2 {
+        return Err(crate::error::Error::Script {
+            msg: "set_timeout requires a callback and a delay in seconds".into(),
+        });
+    }
+    let callback = args[0].clone();
+    if !matches!(callback, Value::Function(_) | Value::Closure(_)) {
+        return Err(crate::error::Error::Script {
+            msg: "set_timeout first argument must be a function".into(),
+        });
+    }
+    let seconds = match &args[1] {
+        Value::Float(f) => *f,
+        Value::Int(n) => *n as f64,
+        _ => {
+            return Err(crate::error::Error::Script {
+                msg: "set_timeout seconds must be a number".into(),
+            })
+        }
+    };
+    let id = ctx.register_timer(callback, seconds, None);
+    Ok(Value::Int(id as i64))
+}
+
+fn set_interval_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    if args.len() < 2 {
+        return Err(crate::error::Error::Script {
+            msg: "set_interval requires a callback and an interval in seconds".into(),
+        });
+    }
+    let callback = args[0].clone();
+    if !matches!(callback, Value::Function(_) | Value::Closure(_)) {
+        return Err(crate::error::Error::Script {
+            msg: "set_interval first argument must be a function".into(),
+        });
+    }
+    let seconds = match &args[1] {
+        Value::Float(f) => *f,
+        Value::Int(n) => *n as f64,
+        _ => {
+            return Err(crate::error::Error::Script {
+                msg: "set_interval seconds must be a number".into(),
+            })
+        }
+    };
+    let id = ctx.register_timer(callback, seconds, Some(seconds));
+    Ok(Value::Int(id as i64))
+}
+
+fn clear_timer_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    if let Some(Value::Int(id)) = args.first() {
+        ctx.remove_timer(*id as u64);
+    }
+    Ok(Value::Nil)
+}
 
 fn next_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {

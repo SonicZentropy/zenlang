@@ -626,3 +626,9 @@
 2026-07-03T04:13:28.586478Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
 2026-07-03T04:13:33.997394Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
 2026-07-03T04:13:33.997441Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-03T04:20:41.919550Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-03T04:20:41.919657Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-03T04:30:49.112539Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-03T04:30:49.112601Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-03T05:34:26.606348Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-03T05:34:26.606511Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration

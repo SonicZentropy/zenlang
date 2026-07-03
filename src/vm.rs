@@ -17,6 +17,33 @@ pub struct VMContext {
     pub raw_vm: *mut VM,
 }
 
+impl VMContext {
+    /// Register a one-shot or repeating timer from a native function.
+    /// The timer is queued and flushed into the active timer list after the
+    /// current callback returns, avoiding aliasing issues with the raw VM pointer.
+    pub fn register_timer(&mut self, callback: Value, delay: f64, interval: Option<f64>) -> u64 {
+        let vm: &mut VM = unsafe { &mut *self.raw_vm };
+        let id = vm.timer_id_counter;
+        vm.timer_id_counter += 1;
+        let fire_time = vm.time + delay.max(0.0);
+        eprintln!("DEBUG register_timer: id={}, time={}, fire_time={}, pending.len={}", id, vm.time, fire_time, vm.pending_timers.len());
+        vm.pending_timers.push(TimerEntry {
+            id,
+            callback,
+            fire_time,
+            interval,
+        });
+        id
+    }
+
+    /// Cancel a timer by ID from a native function.
+    pub fn remove_timer(&mut self, id: u64) {
+        let vm: &mut VM = unsafe { &mut *self.raw_vm };
+        vm.timers.retain(|t| t.id != id);
+        vm.pending_timers.retain(|t| t.id != id);
+    }
+}
+
 /// A call frame in the VM.
 struct CallFrame {
     function_idx: usize,
@@ -53,6 +80,14 @@ fn source_loc_from_frame(
     crate::span::SourceLocation::new(None, crate::span::Span::new(0, 0), line, 0)
 }
 
+/// A pending timer that fires at `fire_time` and optionally repeats.
+struct TimerEntry {
+    id: u64,
+    callback: Value,
+    fire_time: f64,
+    interval: Option<f64>,
+}
+
 pub struct VM {
     stack: Vec<Value>,
     frames: Vec<CallFrame>,
@@ -73,6 +108,15 @@ pub struct VM {
     /// Frame count when `resume_generator` last called `execute()`.
     /// When a generator returns, we break if frames fall to this depth.
     generator_base_frame_count: usize,
+    /// Current virtual time (in seconds). Advanced by calling `tick(dt)`.
+    time: f64,
+    /// Registered timers (timeouts and intervals).
+    timers: Vec<TimerEntry>,
+    /// Timers queued by native functions during callback execution.
+    /// Flushed into `timers` after each callback returns.
+    pending_timers: Vec<TimerEntry>,
+    /// Monotonically increasing timer ID counter.
+    timer_id_counter: u64,
 }
 
 impl VM {
@@ -91,6 +135,10 @@ impl VM {
             instruction_count: 0,
             active_generator: None,
             generator_base_frame_count: 0,
+            time: 0.0,
+            timers: Vec::new(),
+            pending_timers: Vec::new(),
+            timer_id_counter: 1,
         }
     }
 
@@ -109,6 +157,10 @@ impl VM {
             instruction_count: 0,
             active_generator: None,
             generator_base_frame_count: 0,
+            time: 0.0,
+            timers: Vec::new(),
+            pending_timers: Vec::new(),
+            timer_id_counter: 1,
         }
     }
 
@@ -135,6 +187,12 @@ impl VM {
     }
 
     pub fn load_bytecode(&mut self, fns: Vec<BytecodeFn>, global_names: Vec<String>) {
+        eprintln!("DEBUG global_names: {:?}", global_names);
+        for (i, f) in fns.iter().enumerate() {
+            eprintln!("DEBUG fn[{}]: name={}, is_generator={}, arity={}, locals={}, code={:?}", 
+                i, f.name, f.is_generator, f.arity, f.chunk.locals, 
+                f.chunk.code.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" "));
+        }
         let offset = self.functions.len();
         for (i, f) in fns.into_iter().enumerate() {
             let idx = offset + i;
@@ -289,6 +347,129 @@ impl VM {
         Ok(Some(self.stack.pop().unwrap_or(Value::Nil)))
     }
 
+    /// Register a one-shot or repeating timer.
+    ///
+    /// `delay` is in seconds; if `interval` is `Some(i)`, the timer repeats
+    /// every `i` seconds after the initial fire. Returns a unique timer ID
+    /// that can be passed to `remove_timer`.
+    pub fn add_timer(&mut self, callback: Value, delay: f64, interval: Option<f64>) -> u64 {
+        let id = self.timer_id_counter;
+        self.timer_id_counter += 1;
+        let fire_time = self.time + delay.max(0.0);
+        self.timers.push(TimerEntry {
+            id,
+            callback,
+            fire_time,
+            interval,
+        });
+        id
+    }
+
+    /// Cancel a timer by its ID. No-op if already fired or unknown.
+    pub fn remove_timer(&mut self, id: u64) {
+        self.timers.retain(|t| t.id != id);
+    }
+
+    /// Move any timers queued by native functions during callback execution
+    /// into the active timer list. Called after each `call_value` in `tick()`.
+    fn flush_pending_timers(&mut self) {
+        while let Some(t) = self.pending_timers.pop() {
+            eprintln!("DEBUG flush pending id={}", t.id);
+            self.timers.push(t);
+        }
+    }
+
+    /// Advance virtual time by `dt` seconds and fire any due timers.
+    ///
+    /// Each due timer's callback is invoked as a fresh call (no script may
+    /// be running when this is called). Intervals are re-scheduled after
+    /// firing, using the original fire time plus the interval to avoid
+    /// drift. If a timer's callback registers or cancels other timers,
+    /// those changes are visible on subsequent iterations of the loop.
+    pub fn tick(&mut self, dt: f64) -> Result<()> {
+        self.time += dt;
+        eprintln!("DEBUG tick time={}, timers.len={}, pending.len={}", self.time, self.timers.len(), self.pending_timers.len());
+        loop {
+            let idx = match self.timers.iter().position(|t| self.time >= t.fire_time) {
+                Some(i) => i,
+                None => { eprintln!("DEBUG no due timer, breaking"); break; },
+            };
+            eprintln!("DEBUG firing timer idx={}", idx);
+            let timer = self.timers.remove(idx);
+            if matches!(timer.callback, Value::Function(_) | Value::Closure(_)) {
+                eprintln!("DEBUG calling callback for timer");
+                self.call_value(&timer.callback, &[])?;
+                eprintln!("DEBUG callback done, flushing pending");
+                self.flush_pending_timers();
+                eprintln!("DEBUG after flush: timers.len={}, pending.len={}", self.timers.len(), self.pending_timers.len());
+            }
+            if let Some(interval) = timer.interval {
+                let next = timer.fire_time + interval;
+                let fire_time = if next <= self.time {
+                    self.time + interval
+                } else {
+                    next
+                };
+                self.timers.push(TimerEntry {
+                    id: timer.id,
+                    callback: timer.callback,
+                    fire_time,
+                    interval: Some(interval),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Call a script value (function or closure) with the given arguments.
+    ///
+    /// Pushes a fresh call frame at `bp = 0`, so this must only be used
+    /// when no script is currently executing (e.g. from `tick()` or from
+    /// host code between script runs).
+    fn call_value(&mut self, callee: &Value, args: &[Value]) -> Result<Value> {
+        match callee {
+            Value::Function(idx) => {
+                let fn_def = &self.functions[*idx];
+                if fn_def.is_generator {
+                    return Err(self.runtime_error("cannot call generator via timer"));
+                }
+                let frame = CallFrame::new(*idx, 0);
+                self.frames.push(frame);
+                for arg in args {
+                    self.stack.push(arg.clone());
+                }
+                let slot_count = fn_def.chunk.locals as usize;
+                while self.stack.len() < slot_count {
+                    self.stack.push(Value::Nil);
+                }
+                self.execute()?;
+                Ok(self.stack.pop().unwrap_or(Value::Nil))
+            }
+            Value::Closure(closure) => {
+                let data = closure.borrow();
+                let fn_idx = data.fn_idx;
+                eprintln!("DEBUG call_value closure: fn_idx={}, name={}", fn_idx, self.functions[fn_idx].name);
+                let fn_def = &self.functions[fn_idx];
+                let mut frame = CallFrame::new(fn_idx, 0);
+                frame.is_closure = true;
+                self.frames.push(frame);
+                for uv in &data.upvalues {
+                    self.stack.push(uv.clone());
+                }
+                for arg in args {
+                    self.stack.push(arg.clone());
+                }
+                let slot_count = fn_def.chunk.locals as usize;
+                while self.stack.len() < slot_count {
+                    self.stack.push(Value::Nil);
+                }
+                self.execute()?;
+                Ok(self.stack.pop().unwrap_or(Value::Nil))
+            }
+            _ => Err(self.runtime_error(format!("cannot call {}", callee.type_name()))),
+        }
+    }
+
     /// Run the main function.
     pub fn run_main(&mut self) -> Result<Value> {
         let main_idx = match self.natives.get("__main__") {
@@ -393,6 +574,10 @@ impl VM {
             let byte = self.read_byte();
             let op = Opcode::from_byte(byte)
                 .ok_or_else(|| self.runtime_error(format!("unknown opcode: {}", byte)))?;
+
+            if self.frames.last().map(|f| f.function_idx) == Some(2) {
+                eprintln!("DEBUG EXEC fn[{}] op={:?} (byte=0x{:02x})", self.frames.last().unwrap().function_idx, op, byte);
+            }
 
             match op {
                 Opcode::LoadConst(_) => {
@@ -870,6 +1055,7 @@ impl VM {
 
                     if self.frames.is_empty() {
                         self.stack.push(result);
+                        self.flush_pending_timers();
                         return Ok(());
                     }
 
@@ -1266,6 +1452,7 @@ impl VM {
                 }
             }
         }
+        self.flush_pending_timers();
         Ok(())
     }
 
@@ -2423,5 +2610,258 @@ mod module_tests {
         "#;
         let result = run(source);
         assert_eq!(result, Value::Bool(true));
+    }
+
+    // --- Timer / scheduling tests ---
+
+    fn run_for_timer_tests(source: &str) -> (VM, Vec<String>) {
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names.clone());
+        vm.run_main().unwrap();
+        (vm, global_names)
+    }
+
+    fn get_log_len(vm: &VM, names: &[String]) -> usize {
+        let idx = names.iter().position(|n| n == "log").unwrap();
+        match &vm.globals[idx] {
+            Value::Array(arr) => arr.borrow().len(),
+            _ => panic!("expected array global 'log'"),
+        }
+    }
+
+    #[test]
+    fn test_timer_set_timeout_fires_callback() {
+        let source = r#"
+            let log = [];
+            set_timeout(|| { push(log, "fired"); }, 0.5);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        assert_eq!(get_log_len(&vm, &names), 0);
+        vm.tick(0.6).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 1);
+    }
+
+    #[test]
+    fn test_timer_set_timeout_zero_delay_fires_immediately() {
+        let source = r#"
+            let log = [];
+            set_timeout(|| { push(log, "fired"); }, 0.0);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        assert_eq!(get_log_len(&vm, &names), 0);
+        vm.tick(0.0).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 1);
+    }
+
+    #[test]
+    fn test_timer_set_timeout_multiple_callbacks() {
+        let source = r#"
+            let log = [];
+            set_timeout(|| { push(log, "first"); }, 0.2);
+            set_timeout(|| { push(log, "second"); }, 0.1);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        assert_eq!(get_log_len(&vm, &names), 0);
+        vm.tick(0.15).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 1);
+        vm.tick(0.1).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 2);
+    }
+
+    #[test]
+    fn test_timer_interval_fires_repeatedly() {
+        let source = r#"
+            let log = [];
+            set_interval(|| { push(log, "tick"); }, 0.5);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        vm.tick(0.5).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 1);
+        vm.tick(0.5).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 2);
+        vm.tick(0.5).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 3);
+    }
+
+    #[test]
+    fn test_timer_clear_timeout_no_fire() {
+        let source = r#"
+            let log = [];
+            let id = set_timeout(|| { push(log, "fired"); }, 0.5);
+            clear_timer(id);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        vm.tick(1.0).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 0);
+    }
+
+    #[test]
+    fn test_timer_clear_interval_stops_repeating() {
+        let source = r#"
+            let log = [];
+            let id = set_interval(|| { push(log, "tick"); }, 0.5);
+            clear_timer(id);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        vm.tick(2.0).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 0);
+    }
+
+    #[test]
+    fn test_timer_nonexistent_id_does_nothing() {
+        let source = r#"
+            let log = [];
+            set_timeout(|| { push(log, "fired"); }, 0.5);
+            clear_timer(999);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        vm.tick(1.0).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 1);
+    }
+
+    #[test]
+    fn test_timer_set_timeout_returns_id() {
+        let source = r#"
+            let id = set_timeout(|| {}, 1.0);
+            id
+        "#;
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        let result = vm.run_main().unwrap();
+        assert!(result.as_int().unwrap() > 0, "expected positive timer ID");
+    }
+
+    #[test]
+    fn test_timer_callback_error_propagates() {
+        let source = r#"
+            set_timeout(|| { assert(false); }, 0.5);
+        "#;
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.run_main().unwrap();
+        let err = vm.tick(1.0).unwrap_err();
+        assert!(
+            err.to_string().contains("assert failed"),
+            "expected assert error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    #[test]
+    #[test]
+    fn test_timer_callback_multiple_statements() {
+        // Verify that a single callback can execute multiple statements
+        let source = r#"
+            let log = [];
+            set_timeout(|| {
+                push(log, "first");
+                push(log, "second");
+            }, 0.5);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        assert_eq!(get_log_len(&vm, &names), 0);
+        vm.tick(0.6).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 2, "expected both pushes to execute");
+    }
+
+    #[test]
+    #[test]
+    #[test]
+    fn test_timer_callback_calls_set_timeout() {
+        // Verify that a callback can call set_timeout (the outer call, not the second timer)
+        let source = r#"
+            let log = [];
+            set_timeout(|| {
+                push(log, "first");
+            }, 0.3);
+            set_timeout(|| {
+                push(log, "second");
+            }, 0.5);
+        "#;
+        let (mut vm, names) = run_for_timer_tests(source);
+        assert_eq!(get_log_len(&vm, &names), 0);
+        vm.tick(0.4).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 1, "expected first timer");
+        vm.tick(0.2).unwrap();
+        assert_eq!(get_log_len(&vm, &names), 2, "expected second timer");
+    }
+
+    #[test]
+    fn test_timer_register_from_callback_script() {
+        // Simpler script: register one timer from another, with a shared array
+        let source = r#"
+            let log = [];
+            set_timeout(|| {
+                push(log, "first");
+                set_timeout(|| { push(log, "second"); }, 0.1);
+            }, 0.5);
+        "#;
+        // Also try: a simpler version without push
+        let source2 = r#"
+            let log = [];
+            set_timeout(|| {
+                set_timeout(|| { push(log, "second"); }, 0.1);
+            }, 0.5);
+        "#;
+        eprintln!("=== Testing source1 ===");
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names.clone());
+
+        vm.run_main().unwrap();
+
+        // Timer should be registered
+        assert_eq!(vm.timers.len(), 1, "expected 1 timer after setup");
+
+        vm.tick(0.5).unwrap();
+        // After first tick, the callback should have run (pushing "first" and registering new timer)
+        assert_eq!(vm.timers.len(), 1, "expected inner timer to be registered");
+        let log_idx = global_names.iter().position(|n| n == "log").unwrap();
+        let log_len = match &vm.globals[log_idx] {
+            Value::Array(arr) => arr.borrow().len(),
+            _ => panic!("expected array"),
+        };
+        assert_eq!(log_len, 1, "expected 1 log entry after first tick");
+
+        vm.tick(0.5).unwrap();
+        // After second tick, the inner timer should have fired too
+        let log_len = match &vm.globals[log_idx] {
+            Value::Array(arr) => arr.borrow().len(),
+            _ => panic!("expected array"),
+        };
+        assert_eq!(log_len, 2, "expected 2 log entries after second tick");
     }
 }
