@@ -6,7 +6,7 @@
    - Closures with upvalue capture crash at top level (`__main__`).
    - `let mut` reassignment before a `for`/`loop` at top level causes a stack overflow.
    These being "top-level only" bugs is suspicious — it smells like top-level (`__main__`) code reuses locals/scope handling differently than function bodies, and hot-reloaded scripts often *are* top-level-heavy (config, entity registries, event wiring). Worth root-causing before building more on top. — **Investigated, found already fixed** (by an earlier, unrelated compiler fix — see the "Bug 2 fix" `compile_assignment` `Dup`-before-store change already in git history — the existing `tests/repro_closure*.zen` and `tests/repro_mut_for.zen` regression tests already cover the originally-reported cases and pass). To be sure this wasn't just "small cases happen to work," added `tests/repro_stress.zen`: 2000-iteration top-level `for` loops after a `let mut` reassignment, nested top-level loops, a 1000-iteration top-level `loop`, and 20 top-level closures created inside a `for` loop each capturing a *different* value of the loop variable (verified individually, not just "didn't crash" — classic closure-in-loop capture bugs return the same value for every closure). All pass correctly.
-- [ ] 4. **No reload hook for scripts.** When a struct's shape changes across a reload (e.g. you add a field to `Player`), existing live `Value::Struct` instances (`Rc<RefCell<HashMap<String,Value>>>`) simply keep their old field set — new code accessing the new field gets a runtime error instead of a sane default. A `fn on_reload(old)` convention (or auto-filling missing fields with a declared default) would make iteration much less painful.
+- [x] 4. **No reload hook for scripts.** When a struct's shape changes across a reload (e.g. you add a field to `Player`), existing live `Value::Struct` instances (`Rc<RefCell<HashMap<String,Value>>>`) simply keep their old field set — new code accessing the new field gets a runtime error instead of a sane default. A `fn on_reload(old)` convention (or auto-filling missing fields with a declared default) would make iteration much less painful. — **Added**: `do_reload()` in `src/hotreload.rs` calls `self.vm.call_if_exists("on_reload")?;` after swapping bytecode and restoring globals. Optional — scripts without `on_reload` are unaffected. Tested in `test_reload_calls_on_reload_hook_if_defined` (uses a `get_reload_count` accessor to avoid `run_main()`'s global reset) and `test_reload_without_on_reload_hook_is_fine`.
 
 ## Stdlib/language gaps that matter specifically for games
 
@@ -36,86 +36,13 @@
 - [x] 3. Add iterator adapters (`map`/`filter`/`fold`/`enumerate`) — cheap now that the protocol exists. (Delivered as a Zenlang-language prelude — see above.)
 - [x] 4. Add a small math/vector stdlib module (`Vec2`/`Vec3`, lerp/clamp, trig, RNG).
 - [x] 5. Investigate and fix the two known top-level closure/loop bugs, since they'll surface constantly in hot-reloaded top-level game config code. (Found already fixed; added `tests/repro_stress.zen` to lock it in.)
+- [x] 6. Implement `fn on_reload()` hook for scripts — called after every successful hot reload, so scripts can re-derive caches, fix up struct shapes, etc. (`src/hotreload.rs:177`).
 
 ### Bonus fixes made along the way (not originally listed)
 
 - [x] Two related typeck bugs found while adding maps/iterators: `Expr::For`'s loop-variable type inference and `Expr::Index`'s element-type inference both defaulted to `Type::I64` for any non-array/non-str value instead of the type-erased `Type::Unit` placeholder — this silently broke type checking for `for`-loops and indexing over ranges-as-values, maps, and custom iterators. Fixed both to default to `Type::Unit`.
 - [x] `Expr::MethodCall`, `Expr::Match` (enum-variant patterns), `Expr::Call`, `Expr::If`, and `Expr::While` in `typeck.rs` all unconditionally rejected `Type::Unit` (the codebase's established "type-erased/generic" placeholder) operands — meaning calling a method on, matching an enum out of, calling, or branching on any type-erased value (e.g. an untyped closure parameter, or the result of a native function like `iter()`) was a hard type error. Fixed all five to treat `Type::Unit` as passthrough/compatible, consistent with `types_compatible`'s existing rule. This was required for the Zenlang-native prelude (`map`/`filter`/etc.) to type-check at all.
 - [x] Found and fixed a real parser bug in `match_target()` (the restricted expression parser used for `match <target> { ... }` to avoid struct-literal ambiguity): it supported `ident` and `ident.field.field` chains but never applied trailing calls, so `match it.next() { ... }` silently dropped the `()` and failed to parse (previously you had to write `match (it.next()) { ... }`, wrapping in parens, which is still supported). Fixed `match_target` to apply the normal postfix chain (field access, method/function calls, indexing) after the initial struct-literal-safe prefix.
-- [x] Verified via `cargo build`, `cargo test --lib` (169 tests), and `cargo run -- test` (36 `.zen` integration tests) that nothing regressed across all of the above.
+- [x] Verified via `cargo build`, `cargo test --lib` (172 tests), and `cargo run -- test` (36 `.zen` integration tests) that nothing regressed across all of the above.
 
 
-# CURRENTLY DOING:
-The test is failing because `reload_count` stays at 0 after `on_reload` runs, suggesting `run_main()` isn't returning the expected value. I'm checking whether `run_main` might be resetting globals — looking at the resize logic, it only expands the globals array if needed without clearing existing values, so that shouldn't be the issue. But I'm wondering if calling `main()` itself is somehow affecting the reload count.
-
-Actually, I think I've found it: the `__main__` bytecode contains all top-level statements including `let reload_count = 0;`, and if `main()` exists, `__main__` executes the entire top-level program from scratch before calling `main()`. This means every time `run_main()` is invoked, it re-executes that initial `let reload_count = 0;` assignment, resetting the global back to 0 before `main()` even runs — which is why `on_reload` incremented it in a separate frame, but then the full `run_main()` call wiped it out first.
-
-This isn't a bug I introduced; it's how `run_main()` already works and matches the usage pattern in `main.rs` where it's called once per reload, not repeatedly. My test was flawed because it assumed `run_main()` would just invoke `main()` without re-running the top-level initialization. The fix is to verify `on_reload`'s effects differently — by having it set a value that I read through a separate accessor function instead of re-invoking `run_main()`, which triggers the global reset.
-
-This also clarifies the design: `on_reload()` runs after `reload_functions()` restores and re-initializes globals, so it executes in the correct "reloaded" state where old values are preserved where names match. That revealed something about `run_main()`'s semantics (it re-executes the whole top-level program each call, resetting globals) — not a bug, but my test needs to check via a plain accessor instead of re-calling `run_main()`. Let's fix the test:
-
-    let result = reloader.vm_mut().run_main().unwrap();
-    assert_eq!(result, crate::value::Value::Int(99));
-
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-/// If the script defines `fn on_reload()`, it must be called exactly
-/// once after each successful reload, with the *new* bytecode already
-/// live (so it can call other new functions / see restored globals).
-#[test]
-fn test_reload_calls_on_reload_hook_if_defined() {
-    let dir = std::env::temp_dir().join(format!("zen_hotreload_test3_{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&dir);
-    let root_path = dir.join("main.zen");
-
-    std::fs::write(
-        &root_path,
-        "let reload_count = 0;\nfn main() { reload_count }\n",
-    )
-    .unwrap();
-
-    let vm = compile_and_run(&root_path);
-    let mut reloader = HotReloader::new([root_path.clone()], vm);
-
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    std::fs::write(
-        &root_path,
-        "let reload_count = 0;\nfn on_reload() { reload_count = reload_count + 1; }\nfn main() { reload_count }\n",
-        "let reload_count = 0;\nfn on_reload() { reload_count = reload_count + 1; }\nfn get_reload_count() -> i64 { reload_count }\nfn main() { reload_count }\n",
-    )
-    .unwrap();
-    assert!(reloader.tick().unwrap());
-    // on_reload ran once as part of this reload.
-    assert_eq!(
-        reloader.vm_mut().run_main().unwrap(),
-        crate::value::Value::Int(1)
-    );
-    // `on_reload` ran once as part of this reload. Check via a plain
-    // accessor function rather than `run_main()`, since `run_main()`
-    // re-executes the whole top-level program (including `let
-    // reload_count = 0;`) each time it's called, which would mask the
-    // hook's effect.
-    let count = reloader
-        .vm_mut()
-        .call_if_exists("get_reload_count")
-        .unwrap();
-    assert_eq!(count, Some(crate::value::Value::Int(1)));
-
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-/// A script with no `on_reload` defined must reload without error —
-/// the hook is entirely optional.
-#[test]
-fn test_reload_without_on_reload_hook_is_fine() {
-    let dir = std::env::temp_dir().join(format!("zen_hotreload_test4_{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&dir);
-    let root_path = dir.join("main.zen");
-
-    std::fs::write(&root_path, "let x = 1;\nfn main() { x }\n").unwrap();
-    let vm = compile_and_run(&root_path);
-    let mut reloader = HotReloader::new([root_path.clone()], vm);
-
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    std::fs::write(&root_path, "let x = 2;\nfn main() { x }\n").unwrap();
