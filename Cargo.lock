@@ -1195,6 +1195,16 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "url",
+ "zenlang-macros",
+]
+
+[[package]]
+name = "zenlang-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

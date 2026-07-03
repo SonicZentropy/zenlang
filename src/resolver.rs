@@ -11,12 +11,25 @@ pub fn resolve(program: &mut Program) -> Result<SymbolTable> {
 
 /// Resolve a program with pre-registered native function names.
 /// Native functions registered here will be callable from scripts.
-pub fn resolve_with_natives(program: &mut Program, _native_names: &[String]) -> Result<SymbolTable> {
+pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> Result<SymbolTable> {
     let mut resolver = Resolver::new();
     // Pre-register native functions with accurate type signatures
     for sig in crate::stdlib::native_fn_sigs() {
         let name = sig.name.clone();
         let _ = resolver.symbols.define(&name, SymKind::Function(sig));
+    }
+    // Pre-register user-defined native functions (e.g. from `register_native`)
+    // as generic functions with unknown signatures.
+    for name in native_names {
+        if resolver.symbols.lookup(name).is_none() {
+            let sig = crate::symbol::FnSignature {
+                name: name.clone(),
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(crate::ast::Type::Unit),
+            };
+            let _ = resolver.symbols.define(name, SymKind::Function(sig));
+        }
     }
     // Pre-register built-in Option type
     let option_param = TypeParam { name: "T".into(), bounds: vec![] };

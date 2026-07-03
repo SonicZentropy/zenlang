@@ -610,6 +610,11 @@ impl<'a> TypeChecker<'a> {
                             Type::Unit
                         }
                     }
+                    // `Type::Unit` is used as the type-erased placeholder for
+                    // foreign values and generic native returns. Field access
+                    // on such values can't be statically validated, so allow
+                    // it through (field access will be resolved at runtime).
+                    Type::Unit => Type::Unit,
                     _ => {
                         self.error(format!(
                             "cannot access field on type '{}'",

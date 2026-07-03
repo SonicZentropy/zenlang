@@ -2,20 +2,22 @@
 ///
 /// Run with: cargo run --example foreign_types
 
+use std::any::TypeId;
 use std::rc::Rc;
 
 use zenlang::compiler::compile;
-use zenlang::interop::{with_foreign, with_foreign_mut};
+use zenlang::interop::with_foreign;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
 use zenlang::resolver::resolve_with_natives;
 use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
 use zenlang::vm::VMContext;
-use zenlang::{Value, VM};
+use zenlang::{Value, VM, ZenForeign};
 
 // A Rust struct we want to expose to scripts.
-#[derive(Clone, Debug)]
+// The derive macro generates `register_zen_foreign()` with field accessors.
+#[derive(Clone, Debug, ZenForeign)]
 struct Player {
     name: String,
     health: i32,
@@ -36,6 +38,17 @@ fn main() -> zenlang::Result<()> {
     let mut vm = VM::new();
     register_builtins(&mut vm);
 
+    // Register the Player type with auto-generated field accessors from the macro
+    Player::register_zen_foreign(&mut vm);
+
+    // Manually add a method via the (already public) registry.
+    // Uses Rc::make_mut since foreign_registry is behind Rc.
+    // This is separate because the derive macro currently only handles fields.
+    Rc::make_mut(&mut vm.foreign_registry).get_mut(&TypeId::of::<Player>()).unwrap()
+        .method("heal_percent", Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
+            with_foreign::<Player, _, _>(&args[0], |p| Ok(Value::Float(p.heal_percent())))
+        }));
+
     // Register a native function to create a Player from the script side
     vm.register_native("create_player", Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
         let name = args.first().and_then(|v| v.as_str()).unwrap_or_default();
@@ -44,30 +57,6 @@ fn main() -> zenlang::Result<()> {
             zenlang::value::ForeignObject::new("Player", player),
         ))))
     }));
-
-    // Register the Player type with fields and methods
-    vm.register_type::<Player>("Player")
-        .field("name",
-            |obj: &Value| -> zenlang::Result<Value> {
-                with_foreign::<Player, _, _>(obj, |p| Ok(Value::Str(p.name.clone().into())))
-            },
-            |obj: &mut Value, val: Value| -> zenlang::Result<()> {
-                let name = val.as_str().unwrap_or_default();
-                with_foreign_mut::<Player, _, _>(obj, |p| { p.name = name; Ok(()) })
-            },
-        )
-        .field("health",
-            |obj: &Value| -> zenlang::Result<Value> {
-                with_foreign::<Player, _, _>(obj, |p| Ok(Value::Int(p.health as i64)))
-            },
-            |obj: &mut Value, val: Value| -> zenlang::Result<()> {
-                let h = val.as_int().unwrap_or(0) as i32;
-                with_foreign_mut::<Player, _, _>(obj, |p| { p.health = h; Ok(()) })
-            },
-        )
-        .method("heal_percent", Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
-            with_foreign::<Player, _, _>(&args[0], |p| Ok(Value::Float(p.heal_percent())))
-        }));
 
     let mut names = vm.native_names();
     for n in &stdlib_names() {

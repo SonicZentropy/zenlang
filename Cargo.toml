@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "macros"]
+
 [package]
 name = "zenlang"
 version = "0.1.0"
@@ -5,6 +8,7 @@ edition = "2024"
 description = "An embedded Rust-like scripting language for game engines"
 
 [dependencies]
+zenlang-macros = { path = "macros" }
 snafu = "0.8"
 derive_more = { version = "2", features = ["add", "display", "from"] }
 tracing = "0.1"
