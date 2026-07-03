@@ -214,6 +214,9 @@ pub fn compile(
                 }
 
                 match body.last() {
+                    Some(last) if matches!(last.node, Stmt::Expr(Expr::Yield(_))) => {
+                        fc.none();
+                    }
                     Some(last) if matches!(last.node, Stmt::Expr(_)) => {}
                     _ => {
                         fc.none();
@@ -361,6 +364,7 @@ fn count_lambdas_in_expr(expr: &Expr) -> usize {
         Expr::Array(elems) => elems.iter().map(count_lambdas_in_expr).sum(),
         Expr::Range { start, end, .. } => count_lambdas_in_expr(start) + count_lambdas_in_expr(end),
         Expr::Return(Some(inner)) => count_lambdas_in_expr(inner),
+        Expr::Yield(inner) => count_lambdas_in_expr(inner),
         _ => 0,
     }
 }
@@ -450,6 +454,7 @@ fn collect_free_vars_inner(expr: &Expr, own: &HashSet<String>, result: &mut Vec<
             collect_free_vars_inner(end, own, result);
         }
         Expr::Return(Some(inner)) => collect_free_vars_inner(inner, own, result),
+        Expr::Yield(inner) => collect_free_vars_inner(inner, own, result),
         _ => {}
     }
 }
@@ -563,6 +568,7 @@ struct FunctionCompiler<'a> {
     lambda_counter: Rc<RefCell<usize>>,
     lambda_fns: Rc<RefCell<Vec<BytecodeFn>>>,
     symbols: &'a SymbolTable,
+    is_generator: bool,
 }
 
 struct Local {
@@ -603,6 +609,7 @@ impl<'a> FunctionCompiler<'a> {
             lambda_counter,
             lambda_fns,
             symbols,
+            is_generator: false,
         }
     }
 
@@ -612,6 +619,7 @@ impl<'a> FunctionCompiler<'a> {
             chunk: self.chunk,
             arity: self.arity,
             upvalues: Vec::new(),
+            is_generator: self.is_generator,
         }
     }
 
@@ -757,8 +765,11 @@ impl<'a> FunctionCompiler<'a> {
                 }
             }
             Stmt::Expr(expr) => {
+                let is_yield = matches!(expr, Expr::Yield(_));
                 self.compile_expr(expr);
-                self.emit_op(Opcode::Pop);
+                if !is_yield {
+                    self.emit_op(Opcode::Pop);
+                }
             }
             Stmt::Return(Some(expr)) => {
                 self.compile_expr(expr);
@@ -1230,6 +1241,12 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Return);
             }
 
+            Expr::Yield(inner) => {
+                self.is_generator = true;
+                self.compile_expr(inner);
+                self.emit_op(Opcode::Yield);
+            }
+
             Expr::StructLit {
                 name,
                 fields,
@@ -1404,6 +1421,7 @@ fn const_hash(val: &Value) -> u64 {
         Value::Bool(b) => 1 ^ ((*b as u64) << 1),
         Value::Int(n) => 2 ^ (n.wrapping_mul(0x9e3779b97f4a7c15u64 as i64) as u64),
         Value::Float(n) => 3 ^ n.to_bits(),
+        Value::Generator(_) => 5,
         Value::Str(s) => {
             let mut h = 4u64;
             for b in s.as_bytes() {

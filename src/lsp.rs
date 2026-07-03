@@ -1004,6 +1004,7 @@ fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span
         Expr::Range { start, end, .. } => find_definition_in_expr(start, source, name)
             .or_else(|| find_definition_in_expr(end, source, name)),
         Expr::Return(Some(inner)) => find_definition_in_expr(inner, source, name),
+        Expr::Yield(inner) => find_definition_in_expr(inner, source, name),
         // Literals and control-flow keywords have no sub-definitions
         Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)
         | Expr::Unit | Expr::Ident(_) | Expr::Break | Expr::Continue

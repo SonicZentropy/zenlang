@@ -888,6 +888,10 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::Return(None) => Type::Unit,
             Expr::Break | Expr::Continue => Type::Unit,
+            Expr::Yield(inner) => {
+                self.check_expr(inner);
+                Type::Unit
+            }
             Expr::StructLit {
                 name,
                 fields,

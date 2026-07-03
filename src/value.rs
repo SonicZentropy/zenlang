@@ -11,6 +11,21 @@ pub struct ClosureData {
     pub upvalues: Vec<Value>,
 }
 
+/// Saved execution state for a suspended generator (coroutine).
+#[derive(Debug, Clone)]
+pub struct GeneratorState {
+    /// Which function this generator is executing.
+    pub function_idx: usize,
+    /// Next instruction to execute (saved on yield).
+    pub ip: usize,
+    /// If `true`, first_call — no saved locals yet.
+    pub first_call: bool,
+    /// If `true`, the generator has finished (returned, not yielded).
+    pub exhausted: bool,
+    /// Saved local variables (populated after first yield).
+    pub locals: Vec<Value>,
+}
+
 use crate::error::Result;
 
 /// A native Rust function that can be called from Zenlang.
@@ -161,6 +176,8 @@ pub enum Value {
     /// `bool` (see `MapKey`) since `float`/`array`/`struct` etc. don't have
     /// stable hashing/equality suitable for map keys.
     Map(Rc<RefCell<HashMap<MapKey, Value>>>),
+    /// A suspended generator (coroutine) that yields values.
+    Generator(Rc<RefCell<GeneratorState>>),
 }
 
 impl fmt::Debug for Value {
@@ -185,6 +202,14 @@ impl fmt::Debug for Value {
             ),
             Value::Range(s, e, inc) => write!(f, "Range({}, {}, {})", s, e, inc),
             Value::Map(m) => write!(f, "Map({} entries)", m.borrow().len()),
+            Value::Generator(g) => {
+                let state = g.borrow();
+                if state.exhausted {
+                    write!(f, "Generator(exhausted)")
+                } else {
+                    write!(f, "Generator(fn={}, suspended)", state.function_idx)
+                }
+            }
         }
     }
 }
@@ -209,6 +234,7 @@ impl Clone for Value {
             Value::Closure(c) => Value::Closure(c.clone()),
             Value::Range(s, e, inc) => Value::Range(*s, *e, *inc),
             Value::Map(m) => Value::Map(m.clone()),
+            Value::Generator(g) => Value::Generator(g.clone()),
         }
     }
 }
@@ -235,6 +261,11 @@ impl PartialEq for Value {
             }
             (Value::Range(a, b, c), Value::Range(d, e, f)) => a == d && b == e && c == f,
             (Value::Map(a), Value::Map(b)) => *a.borrow() == *b.borrow(),
+            (Value::Generator(a), Value::Generator(b)) => {
+                let ga = a.borrow();
+                let gb = b.borrow();
+                ga.function_idx == gb.function_idx && ga.ip == gb.ip && ga.exhausted == gb.exhausted
+            }
             _ => false,
         }
     }
@@ -258,6 +289,7 @@ impl Value {
             Value::Closure(_) => "closure",
             Value::Range(..) => "range",
             Value::Map(_) => "map",
+            Value::Generator(_) => "generator",
         }
     }
 

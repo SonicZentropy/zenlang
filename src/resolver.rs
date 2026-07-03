@@ -527,6 +527,9 @@ impl Resolver {
                 self.symbols.exit_scope();
             }
             Expr::Return(None) => {}
+            Expr::Yield(inner) => {
+                self.resolve_expr(inner);
+            }
             // Literals don't have names to resolve
             Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)
             | Expr::Unit | Expr::Break | Expr::Continue => {}

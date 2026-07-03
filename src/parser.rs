@@ -237,6 +237,8 @@ impl<'a> Parser<'a> {
             Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else if self.r#match(TokenKind::Return) {
             self.return_stmt()
+        } else if self.r#match(TokenKind::Yield) {
+            self.yield_stmt()
         } else if self.r#match(TokenKind::Break) {
             let span = self.prev_span();
             self.r#match(TokenKind::Semi);
@@ -347,6 +349,18 @@ impl<'a> Parser<'a> {
         self.r#match(TokenKind::Semi);
         let span = start.merge(&self.prev_span());
         Ok(Spanned::new(Stmt::Return(value), span))
+    }
+
+    fn yield_stmt(&mut self) -> Result<Spanned<Stmt>> {
+        let start = self.prev_span();
+        let value = if self.check(&TokenKind::Semi) || self.check(&TokenKind::CloseBrace) {
+            Expr::Unit
+        } else {
+            self.expression(Precedence::Lowest)?
+        };
+        self.r#match(TokenKind::Semi);
+        let span = start.merge(&self.prev_span());
+        Ok(Spanned::new(Stmt::Expr(Expr::Yield(Box::new(value))), span))
     }
 
     // ---------- Function declarations ----------
@@ -791,6 +805,11 @@ impl<'a> Parser<'a> {
 
             // Control flow (these consume their own keyword token)
             TokenKind::If => self.if_stmt(),
+            TokenKind::Yield => {
+                self.advance();
+                let value = self.expression(Precedence::Lowest)?;
+                Ok(Expr::Yield(Box::new(value)))
+            }
             TokenKind::While => self.while_stmt(),
             TokenKind::For => self.for_stmt(),
             TokenKind::Loop => self.loop_stmt(),

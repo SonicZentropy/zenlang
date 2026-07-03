@@ -262,10 +262,12 @@ pub enum Expr {
     /// Match expression: `match expr { pattern => body, ... }`.
     Match { expr: Box<Expr>, arms: Vec<MatchArm> },
 
-    // Return / Break / Continue
+    // Return / Break / Continue / Yield
     Return(Option<Box<Expr>>),
     Break,
     Continue,
+    /// Yield expression: `yield value` — produces a value from a generator.
+    Yield(Box<Expr>),
 
     // Data literals
     /// Struct literal: `Point { x: 1, y: 2 }` or `Point { x, y }` or `Point { ..base }`.

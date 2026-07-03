@@ -50,6 +50,7 @@ pub enum Opcode {
     LoadEnumField(u16),
     MakeRange,
     Halt,
+    Yield,
 }
 
 impl Opcode {
@@ -103,6 +104,7 @@ impl Opcode {
             LoadEnumField(_) => 44,
             MakeRange => 46,
             Halt => 45,
+            Yield => 47,
         }
     }
 
@@ -156,6 +158,7 @@ impl Opcode {
             44 => LoadEnumField(0),
             46 => MakeRange,
             45 => Halt,
+            47 => Yield,
             _ => return None,
         })
     }
@@ -402,6 +405,7 @@ impl Chunk {
                 Opcode::BitNot => println!("BitNot"),
                 Opcode::LoadEnumTag => println!("LoadEnumTag"),
                 Opcode::MakeRange => println!("MakeRange"),
+                Opcode::Yield => println!("Yield"),
                 Opcode::Halt => println!("Halt"),
             }
             offset = next;
@@ -438,11 +442,14 @@ pub struct BytecodeFn {
     pub upvalues: Vec<UpvalueDesc>,
     pub name: String,
     pub arity: u32,
+    /// If `true`, this function contains at least one `yield` expression
+    /// and should be treated as a generator.
+    pub is_generator: bool,
 }
 
 impl BytecodeFn {
     pub fn new(name: String, arity: u32) -> Self {
-        Self { chunk: Chunk::new(), upvalues: Vec::new(), name, arity }
+        Self { chunk: Chunk::new(), upvalues: Vec::new(), name, arity, is_generator: false }
     }
 
     /// Print the disassembly of this function to stdout.

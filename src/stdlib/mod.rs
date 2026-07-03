@@ -61,6 +61,9 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("to_float", Rc::new(to_float_impl));
     vm.register_native("to_str", Rc::new(to_str_impl));
 
+    // Generator/Coroutine
+    vm.register_native("next", Rc::new(next_impl));
+
     // Option/Result helpers
     vm.register_native("is_some", Rc::new(is_some_impl));
     vm.register_native("is_none", Rc::new(is_none_impl));
@@ -260,6 +263,12 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "iter".into(),
             params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "next".into(),
+            params: vec![("gen".into(), Type::Unit)],
             return_type: Some(Type::Unit),
         },
     ];
@@ -580,6 +589,23 @@ fn unwrap_or_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             .unwrap_or_else(|| default.clone())),
         (_, Some(default)) => Ok(default.clone()),
         _ => Ok(Value::Nil),
+    }
+}
+
+// --- Generator/Coroutine ---
+
+fn next_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    match args.first() {
+        Some(Value::Generator(cell)) => {
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            match vm.resume_generator(cell.clone())? {
+                Some(val) => Ok(option_some(val)),
+                None => Ok(option_none()),
+            }
+        }
+        _ => Err(crate::error::Error::Script {
+            msg: "next() requires a generator argument".into(),
+        }),
     }
 }
 

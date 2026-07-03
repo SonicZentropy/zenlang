@@ -11,6 +11,10 @@ use crate::value::{ClosureData, NativeFn, Value};
 /// Execution context provided to native functions.
 pub struct VMContext {
     pub registry: Rc<ForeignTypeRegistry>,
+    /// Raw pointer to the VM, allows native functions to interact with
+    /// the VM (e.g. resume generators). Only safe to dereference in
+    /// contexts where the VM is known to outlive the call.
+    pub raw_vm: *mut VM,
 }
 
 /// A call frame in the VM.
@@ -64,6 +68,11 @@ pub struct VM {
     instruction_limit: u64,
     /// Instruction counter for the current `execute()` run.
     instruction_count: u64,
+    /// If set, we are executing inside a generator and `Yield` should save state here.
+    active_generator: Option<Rc<RefCell<crate::value::GeneratorState>>>,
+    /// Frame count when `resume_generator` last called `execute()`.
+    /// When a generator returns, we break if frames fall to this depth.
+    generator_base_frame_count: usize,
 }
 
 impl VM {
@@ -80,6 +89,8 @@ impl VM {
             foreign_registry: Rc::new(ForeignTypeRegistry::new()),
             instruction_limit: 0,
             instruction_count: 0,
+            active_generator: None,
+            generator_base_frame_count: 0,
         }
     }
 
@@ -96,6 +107,8 @@ impl VM {
             foreign_registry: registry,
             instruction_limit: 0,
             instruction_count: 0,
+            active_generator: None,
+            generator_base_frame_count: 0,
         }
     }
 
@@ -650,16 +663,32 @@ impl VM {
                     match callee {
                         Value::Function(idx) => {
                             let fn_def = &self.functions[*idx];
-                            // bp points to the first argument
-                            let bp = args_start;
-                            let frame = CallFrame::new(*idx, bp);
-                            self.frames.push(frame);
+                            if fn_def.is_generator {
+                                // Generator function called: return a Generator value immediately
+                                let g = Rc::new(RefCell::new(
+                                    crate::value::GeneratorState {
+                                        function_idx: *idx,
+                                        ip: 0,
+                                        first_call: true,
+                                        exhausted: false,
+                                        locals: Vec::new(),
+                                    },
+                                ));
+                                // Pop callee and args, push Generator
+                                self.stack.truncate(args_start - 1);
+                                self.stack.push(Value::Generator(g));
+                            } else {
+                                // bp points to the first argument
+                                let bp = args_start;
+                                let frame = CallFrame::new(*idx, bp);
+                                self.frames.push(frame);
 
-                            // Ensure stack has room for locals (params already occupy
-                            // slots 0..arg_count, push nils for remaining locals)
-                            let slot_count = fn_def.chunk.locals as usize;
-                            while self.stack.len() < bp + slot_count {
-                                self.stack.push(Value::Nil);
+                                // Ensure stack has room for locals (params already occupy
+                                // slots 0..arg_count, push nils for remaining locals)
+                                let slot_count = fn_def.chunk.locals as usize;
+                                while self.stack.len() < bp + slot_count {
+                                    self.stack.push(Value::Nil);
+                                }
                             }
                         }
                         Value::Closure(closure) => {
@@ -694,6 +723,7 @@ impl VM {
                             self.stack.pop(); // pop callee
                             let mut ctx = VMContext {
                                 registry: self.foreign_registry.clone(),
+                                raw_vm: self as *mut VM,
                             };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
@@ -728,6 +758,7 @@ impl VM {
                             let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
                             let mut ctx = VMContext {
                                 registry: self.foreign_registry.clone(),
+                                raw_vm: self as *mut VM,
                             };
                             match self.foreign_registry.call_method(
                                 &type_id,
@@ -792,6 +823,7 @@ impl VM {
                             self.stack.pop();
                             let mut ctx = VMContext {
                                 registry: self.foreign_registry.clone(),
+                                raw_vm: self as *mut VM,
                             };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
@@ -809,7 +841,22 @@ impl VM {
                     let result = self.stack.pop().unwrap_or(Value::Nil);
                     let frame = self.frames.pop().unwrap();
 
-                    if frame.is_method || frame.is_closure {
+                    // If returning from a generator function, mark it as exhausted
+                    if let Some(state_cell) = &self.active_generator {
+                        state_cell.borrow_mut().exhausted = true;
+                    }
+
+                    if self.active_generator.is_some() {
+                        // Generator resumed frame: bp points to where generator's
+                        // stack begins (no callee). Trim to bp.
+                        self.stack.truncate(frame.bp);
+                        // If we've returned to the generator's base frame level,
+                        // break out so resume_generator regains control.
+                        if self.frames.len() <= self.generator_base_frame_count {
+                            self.stack.push(result);
+                            break;
+                        }
+                    } else if frame.is_method || frame.is_closure {
                         // Method/closure: bp points to receiver/first-upvalue.
                         // Trim at bp (callee already removed) to keep below values.
                         self.stack.truncate(frame.bp);
@@ -1186,12 +1233,100 @@ impl VM {
                     }
                 }
 
+                Opcode::Yield => {
+                    let val = self.stack.pop().unwrap();
+                    match &self.active_generator {
+                        Some(state_cell) => {
+                            let saved_frame = self.frames.last().unwrap();
+                            let fn_idx = saved_frame.function_idx;
+                            let bp = saved_frame.bp;
+                            let ip = saved_frame.ip;
+                            let fn_def = &self.functions[fn_idx];
+                            let local_count = fn_def.chunk.locals as usize;
+                            let mut state = state_cell.borrow_mut();
+                            state.ip = ip;
+                            state.locals = self.stack[bp..bp + local_count].to_vec();
+                            state.first_call = false;
+                            // Pop the frame and leave the yielded value on the stack
+                            self.frames.pop();
+                            self.stack.truncate(bp);
+                            self.stack.push(val);
+                            break;
+                        }
+                        None => {
+                            return Err(
+                                self.runtime_error("yield outside generator function")
+                            );
+                        }
+                    }
+                }
+
                 Opcode::Halt => {
                     break;
                 }
             }
         }
         Ok(())
+    }
+
+    /// Resume execution of a generator. Returns the yielded value, or `None`
+    /// if the generator is exhausted.
+    pub fn resume_generator(&mut self, state_cell: Rc<RefCell<crate::value::GeneratorState>>) -> Result<Option<Value>> {
+        let state = state_cell.borrow();
+        if state.exhausted {
+            return Ok(None);
+        }
+        let fn_idx = state.function_idx;
+        let first_call = state.first_call;
+        let saved_locals = state.locals.clone();
+        let saved_ip = state.ip;
+        drop(state);
+
+        let fn_def = &self.functions[fn_idx];
+        let bp = self.stack.len();
+        let frame = CallFrame::new(fn_idx, bp);
+        self.frames.push(frame);
+
+        if first_call {
+            // Initial call: arguments are already on the stack
+            let local_count = fn_def.chunk.locals as usize;
+            while self.stack.len() < bp + local_count {
+                self.stack.push(Value::Nil);
+            }
+        } else {
+            // Restore saved locals onto the stack
+            self.stack.extend(saved_locals);
+        }
+
+        // Set ip to the saved position
+        {
+            let frame = self.frames.last_mut().unwrap();
+            frame.ip = saved_ip;
+        }
+
+        self.active_generator = Some(state_cell.clone());
+        self.generator_base_frame_count = self.frames.len();
+        let result = self.execute();
+        self.active_generator = None;
+        self.generator_base_frame_count = 0;
+
+        match result {
+            Ok(()) => {
+                let val = self.stack.pop().unwrap_or(Value::Nil);
+                // Check if generator was exhausted (normal return, not yield)
+                let state = state_cell.borrow();
+                if state.exhausted {
+                    Ok(None)
+                } else {
+                    Ok(Some(val))
+                }
+            }
+            Err(e) => {
+                // Mark as exhausted on error too
+                state_cell.borrow_mut().exhausted = true;
+                Err(e)
+            }
+        }
     }
 }
 
@@ -1626,6 +1761,7 @@ pub mod tests {
         // Call method via registry
         let mut ctx = VMContext {
             registry: vm.foreign_registry.clone(),
+            raw_vm: std::ptr::null_mut(),
         };
         let result = vm
             .foreign_registry
@@ -1648,6 +1784,7 @@ pub mod tests {
         // Verify the NativeFn works directly:
         let ctx = &mut VMContext {
             registry: Rc::new(ForeignTypeRegistry::new()),
+            raw_vm: std::ptr::null_mut(),
         };
         let result = double(ctx, &[Value::Int(5)]).unwrap();
         assert_eq!(result, Value::Int(10));
@@ -2236,5 +2373,55 @@ mod module_tests {
         // Default limit is 0 (unlimited), so this should complete normally.
         let result = vm.run_main().unwrap();
         assert_eq!(result, Value::Int(100));
+    }
+
+    #[test]
+    fn test_generator_yields_value() {
+        let source = r#"
+            fn gen() {
+                yield 42;
+            }
+
+            let g = gen();
+            let result = unwrap(next(g));
+            result
+        "#;
+        let result = run(source);
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_generator_multiple_yields() {
+        let source = r#"
+            fn gen() {
+                yield 1;
+                yield 2;
+                yield 3;
+            }
+
+            let g = gen();
+            let a = unwrap(next(g));
+            let b = unwrap(next(g));
+            let c = unwrap(next(g));
+            a + b + c
+        "#;
+        let result = run(source);
+        assert_eq!(result, Value::Int(6));
+    }
+
+    #[test]
+    fn test_generator_exhausted_returns_none() {
+        let source = r#"
+            fn gen() {
+                yield 42;
+            }
+
+            let g = gen();
+            let a = unwrap(next(g));
+            let b = next(g);
+            is_none(b)
+        "#;
+        let result = run(source);
+        assert_eq!(result, Value::Bool(true));
     }
 }

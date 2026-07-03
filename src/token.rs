@@ -34,6 +34,7 @@ pub enum TokenKind {
     Type,
     Trait,
     Underscore,
+    Yield,
 
     // Operators & Delimiters
     Plus,
@@ -125,6 +126,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Type => write!(f, "`type`"),
             TokenKind::Trait => write!(f, "`trait`"),
             TokenKind::Underscore => write!(f, "`_`"),
+            TokenKind::Yield => write!(f, "`yield`"),
             TokenKind::Plus => write!(f, "`+`"),
             TokenKind::PlusEq => write!(f, "`+=`"),
             TokenKind::Minus => write!(f, "`-`"),
@@ -222,6 +224,7 @@ pub fn match_keyword(ident: &str) -> Option<TokenKind> {
         "type" => Some(TokenKind::Type),
         "trait" => Some(TokenKind::Trait),
         "_" => Some(TokenKind::Underscore),
+        "yield" => Some(TokenKind::Yield),
         _ => None,
     }
 }
