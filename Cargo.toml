@@ -8,6 +8,7 @@ edition = "2024"
 description = "An embedded Rust-like scripting language for game engines"
 
 [dependencies]
+arena-b = "1.0.0"
 zenlang-macros = { path = "macros" }
 snafu = "0.8"
 derive_more = { version = "2", features = ["add", "display", "from"] }
@@ -37,3 +38,6 @@ path = "src/main.rs"
 [dev-dependencies]
 pretty_assertions = "1"
 tempfile = "3"
+
+[patch.crates-io]
+arena-b = { path = "patches/arena-b" }

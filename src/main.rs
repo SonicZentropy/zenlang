@@ -7,6 +7,8 @@ use clap::{Parser, Subcommand};
 use zenlang::hotreload::HotReloader;
 use zenlang::{Error, VM};
 
+use arena_b::Arena;
+
 #[derive(Parser)]
 #[command(name = "zenc", version, about = "Zenlang scripting language")]
 struct Cli {
@@ -381,25 +383,26 @@ print(greeting);
 }
 
 fn cmd_build(path: Option<&camino::Utf8PathBuf>) -> zenlang::Result<()> {
-    let project_dir = path.map(|p| p.as_std_path().to_path_buf()).unwrap_or_else(|| std::env::current_dir().map_err(|e| Error::Io { source: e }).unwrap());
+    let project_dir = path
+        .map(|p| p.as_std_path().to_path_buf())
+        .unwrap_or_else(|| {
+            std::env::current_dir()
+                .map_err(|e| Error::Io { source: e })
+                .unwrap()
+        });
     let config_path = project_dir.join("zenc.json");
-    let config_str = std::fs::read_to_string(&config_path).map_err(|_| {
-        Error::Runtime {
-            msg: format!("no zenc.json found in {}", project_dir.display()),
-            stack_trace: Vec::new(),
-        }
+    let config_str = std::fs::read_to_string(&config_path).map_err(|_| Error::Runtime {
+        msg: format!("no zenc.json found in {}", project_dir.display()),
+        stack_trace: Vec::new(),
     })?;
-    let config: serde_json::Value = serde_json::from_str(&config_str).map_err(|e| {
-        Error::Runtime {
+    let config: serde_json::Value =
+        serde_json::from_str(&config_str).map_err(|e| Error::Runtime {
             msg: format!("invalid zenc.json: {}", e),
             stack_trace: Vec::new(),
-        }
-    })?;
-    let entry = config["entry"].as_str().ok_or_else(|| {
-        Error::Runtime {
-            msg: "zenc.json missing 'entry' field".into(),
-            stack_trace: Vec::new(),
-        }
+        })?;
+    let entry = config["entry"].as_str().ok_or_else(|| Error::Runtime {
+        msg: "zenc.json missing 'entry' field".into(),
+        stack_trace: Vec::new(),
     })?;
 
     let entry_path = project_dir.join(entry);
