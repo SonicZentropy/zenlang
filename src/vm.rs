@@ -59,6 +59,11 @@ pub struct VM {
     natives: HashMap<String, usize>,
     native_fns: Vec<(String, NativeFn)>,
     pub foreign_registry: Rc<ForeignTypeRegistry>,
+    /// Maximum number of instructions to execute before raising a script timeout error.
+    /// `0` means unlimited.
+    instruction_limit: u64,
+    /// Instruction counter for the current `execute()` run.
+    instruction_count: u64,
 }
 
 impl VM {
@@ -73,6 +78,8 @@ impl VM {
             natives: HashMap::new(),
             native_fns: Vec::new(),
             foreign_registry: Rc::new(ForeignTypeRegistry::new()),
+            instruction_limit: 0,
+            instruction_count: 0,
         }
     }
 
@@ -87,7 +94,17 @@ impl VM {
             natives: HashMap::new(),
             native_fns: Vec::new(),
             foreign_registry: registry,
+            instruction_limit: 0,
+            instruction_count: 0,
         }
+    }
+
+    /// Set a maximum number of instructions that can be executed per `run_main` / `call_function`
+    /// call. When the limit is reached, a runtime error is returned.
+    ///
+    /// A value of `0` (the default) means unlimited execution.
+    pub fn set_instruction_limit(&mut self, limit: u64) {
+        self.instruction_limit = limit;
     }
 
     /// Register a foreign type with the VM.
@@ -345,10 +362,19 @@ impl VM {
     }
 
     fn execute(&mut self) -> Result<()> {
+        self.instruction_count = 0;
         loop {
             let frame = self.frames.last().unwrap();
             if frame.ip >= self.chunk().code.len() {
                 break;
+            }
+
+            self.instruction_count += 1;
+            if self.instruction_limit > 0 && self.instruction_count > self.instruction_limit {
+                return Err(self.runtime_error(format!(
+                    "script timeout: executed {} instructions (limit: {})",
+                    self.instruction_count, self.instruction_limit,
+                )));
             }
 
             let byte = self.read_byte();
@@ -2170,5 +2196,45 @@ mod module_tests {
             triple(4)
         ");
         assert_eq!(result, Value::Int(12));
+    }
+
+    #[test]
+    fn test_instruction_limit_hits_timeout() {
+        let source = "loop {}";
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.set_instruction_limit(100);
+        let err = vm.run_main().unwrap_err();
+        assert!(
+            err.to_string().contains("script timeout"),
+            "expected script timeout error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_instruction_limit_zero_is_unlimited() {
+        let source = "let x = 0; loop { x = x + 1; if x >= 100 { break; } } x";
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let mut program = crate::parser::Parser::new(source, &tokens).parse().unwrap();
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let types = crate::typeck::check(&program, &mut symbols).unwrap();
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        // Default limit is 0 (unlimited), so this should complete normally.
+        let result = vm.run_main().unwrap();
+        assert_eq!(result, Value::Int(100));
     }
 }
