@@ -289,10 +289,17 @@ pub fn run_server() {
     let (mut connection, io_threads) = lsp_server::Connection::stdio();
 
     let capabilities = ServerCapabilities {
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
-        // NOTE: Kind(FULL/INCREMENTAL) and Options({change,openClose,save})
-        // have both been tried — Zed still does NOT send didChange/didSave.
-        // The root cause appears to be on the client (Zed) side.
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::FULL),
+                will_save: Some(false),
+                will_save_wait_until: Some(false),
+                save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                    include_text: Some(true),
+                })),
+            },
+        )),
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec![".".to_string(), ":".to_string()]),
             ..Default::default()
@@ -1610,5 +1617,183 @@ fn type_display(ty: &crate::ast::Type) -> String {
         }
         crate::ast::Type::Option(inner) => format!("Option<{}>", type_display(inner)),
         crate::ast::Type::Result(ok, err) => format!("Result<{}, {}>", type_display(ok), type_display(err)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: assert that the first diagnostic's message contains `substr`.
+    fn assert_diag_contains(result: &Result<DocumentState, Vec<Diagnostic>>, substr: &str) {
+        match result {
+            Ok(_) => panic!("expected Err with diagnostic containing '{substr}', got Ok"),
+            Err(diags) => {
+                assert!(!diags.is_empty(), "expected at least one diagnostic");
+                assert!(
+                    diags.iter().any(|d| d.message.contains(substr)),
+                    "expected diagnostic containing '{substr}', got: {}",
+                    diags.iter().map(|d| d.message.as_str()).collect::<Vec<_>>().join("; ")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_compile_source_ok() {
+        let result = compile_source("fn main() { let x = 42; }");
+        assert!(result.is_ok(), "expected Ok, got Err: {:?}", result.err());
+        let state = result.unwrap();
+        assert_eq!(state.source, "fn main() { let x = 42; }");
+        assert!(!state.symbols.symbols.is_empty(), "expected symbols");
+    }
+
+    #[test]
+    fn test_compile_source_syntax_error() {
+        let result = compile_source("fn main() { let x = ; }");
+        assert_diag_contains(&result, "expected");
+    }
+
+    #[test]
+    fn test_compile_source_type_error() {
+        let result = compile_source("fn main() { let x: int = \"hello\"; }");
+        assert_diag_contains(&result, "type");
+    }
+
+    #[test]
+    fn test_offset_to_position() {
+        let src = "hello\nworld\nfoo";
+        assert_eq!(offset_to_position(src, 0), Position { line: 0, character: 0 });
+        assert_eq!(offset_to_position(src, 5), Position { line: 0, character: 5 });
+        assert_eq!(offset_to_position(src, 6), Position { line: 1, character: 0 });
+        assert_eq!(offset_to_position(src, 11), Position { line: 1, character: 5 });
+        assert_eq!(offset_to_position(src, 16), Position { line: 2, character: 3 });
+        assert_eq!(offset_to_position(src, src.len()), Position { line: 2, character: 3 });
+    }
+
+    #[test]
+    fn test_position_to_offset() {
+        let src = "hello\nworld\nfoo";
+        assert_eq!(position_to_offset(src, Position { line: 0, character: 0 }), Some(0));
+        assert_eq!(position_to_offset(src, Position { line: 0, character: 5 }), Some(5));
+        assert_eq!(position_to_offset(src, Position { line: 1, character: 0 }), Some(6));
+        assert_eq!(position_to_offset(src, Position { line: 1, character: 5 }), Some(11));
+        // Character 3 of line "foo" (past last char) = EOF = source.len()
+        assert_eq!(position_to_offset(src, Position { line: 2, character: 3 }), Some(15));
+        // OOB character
+        assert_eq!(position_to_offset(src, Position { line: 2, character: 4 }), None);
+        // OOB line
+        assert_eq!(position_to_offset(src, Position { line: 10, character: 0 }), None);
+    }
+
+    #[test]
+    fn test_span_to_range() {
+        // source "hello world", span covers "world"
+        let src = "hello world";
+        // A span covering bytes 6..11 = "world"
+        let range = span_to_range(src, Span(6, 11));
+        assert_eq!(range.start, Position { line: 0, character: 6 });
+        assert_eq!(range.end, Position { line: 0, character: 11 });
+    }
+
+    #[test]
+    fn test_compile_source_empty() {
+        let result = compile_source("");
+        assert!(result.is_ok(), "empty program should compile (just main)");
+    }
+
+    #[test]
+    fn test_comment_before() {
+        let src = "// hello\nfn main() {}";
+        // offset 9 = start of `fn` statement
+        assert_eq!(comment_before(src, 9), Some("// hello".into()));
+
+        let src = "fn main() {}";
+        // No comment before `fn` (offset 0)
+        assert_eq!(comment_before(src, 0), None);
+    }
+
+    #[test]
+    fn test_document_symbols() {
+        let src = "fn foo() {} \n struct Bar { x: int }";
+        let state = compile_source(src).expect("compilation failed");
+        let symbols = document_symbols(&state);
+        assert!(symbols.is_some());
+        let list = symbols.unwrap();
+        assert!(!list.is_empty());
+        // Should contain at least function and struct symbols
+        let names: Vec<&str> = list.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"foo"), "expected 'foo' in symbols, got: {names:?}");
+        assert!(names.contains(&"Bar"), "expected 'Bar' in symbols, got: {names:?}");
+    }
+
+    #[test]
+    fn test_hover() {
+        let src = "fn adder(a: int, b: int) -> int { a + b }";
+        let state = compile_source(src).expect("compilation failed");
+        // Hover over "adder" at line 0, char 3
+        let hover = hover(&state, &Position { line: 0, character: 3 });
+        assert!(hover.is_some(), "expected hover result for 'adder'");
+        let h = hover.unwrap();
+        let contents_str = match &h.contents {
+            HoverContents::Scalar(MarkedString::String(s)) => s.as_str(),
+            _ => panic!("expected Scalar(String) hover contents"),
+        };
+        assert!(contents_str.contains("adder"), "hover should mention 'adder'");
+    }
+
+    #[test]
+    fn test_goto_definition() {
+        let src = "let x = 42;\nlet y = x;";
+        let state = compile_source(src).expect("compilation failed");
+        let mut docs = HashMap::new();
+        let uri: DocUri = "file:///test.zen".parse().unwrap();
+        docs.insert(uri.clone(), state);
+
+        // Go to definition of 'x' at its usage on line 1, char 8 (the 'x' in "let y = x;")
+        let result = goto_definition(&docs, &TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
+            position: Position { line: 1, character: 8 },
+        });
+        assert!(result.is_some(), "expected a definition location for 'x'");
+        let loc = match result.unwrap() {
+            GotoDefinitionResponse::Scalar(loc) => loc,
+            _ => panic!("expected Scalar location"),
+        };
+        // Should point to the definition of 'x' on line 0
+        assert_eq!(loc.uri, uri);
+        assert_eq!(loc.range.start.line, 0);
+    }
+
+    #[test]
+    fn test_completion() {
+        let src = "fn main() {}";
+        let state = compile_source(src).expect("compilation failed");
+        let result = completion(&state, &Position { line: 1, character: 0 });
+        assert!(result.is_some(), "expected completion items");
+        let items = match result.unwrap() {
+            CompletionResponse::Array(items) => items,
+            _ => panic!("expected Array"),
+        };
+        // Should include keywords like 'fn', 'let', 'if'
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"fn"), "expected 'fn' in completions");
+        assert!(labels.contains(&"let"));
+        assert!(labels.contains(&"if"));
+    }
+
+    #[test]
+    fn test_semantic_tokens() {
+        let src = "fn main() { let x = 42; }";
+        let state = compile_source(src).expect("compilation failed");
+        let result = semantic_tokens(&state);
+        assert!(result.is_some(), "expected semantic tokens");
+        let tokens_result = result.unwrap();
+        match tokens_result {
+            SemanticTokensResult::Tokens(tokens) => {
+                assert!(!tokens.data.is_empty(), "expected at least one token");
+            }
+            _ => panic!("expected Tokens variant"),
+        }
     }
 }
