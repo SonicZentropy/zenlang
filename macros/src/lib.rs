@@ -4,6 +4,74 @@ use syn::{
     parse_macro_input, Data, DeriveInput, Fields, FnArg, ImplItem, ItemImpl, ReturnType, Type,
 };
 
+/// Attribute macro to generate a `FnSignature` for a native function.
+///
+/// # Syntax
+/// ```ignore
+/// #[zen_native_fn(params: [Str, I64], returns: Bool)]
+/// fn contains(vm: &mut VMContext, args: &[Value]) -> Result<Value> { ... }
+/// ```
+///
+/// Generates a `<fn_name>_sig()` function returning `crate::symbol::FnSignature`.
+#[proc_macro_attribute]
+pub fn zen_native_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as ZenNativeFnArgs);
+    let func = parse_macro_input!(item as syn::ItemFn);
+    let fn_name = &func.sig.ident;
+    let fn_name_str = fn_name.to_string();
+    let sig_name = syn::Ident::new(&format!("{}_sig", fn_name_str), proc_macro2::Span::call_site());
+
+    let param_types = &args.params;
+    let return_type = &args.returns;
+    let param_count = param_types.len();
+
+    // Build parameter pairs: ("arg0", Type::Str), ("arg1", Type::I64), ...
+    let params: Vec<_> = (0..param_count)
+        .map(|i| {
+            let pname = format!("arg{}", i);
+            let ptype = &param_types[i];
+            quote! { (#pname.into(), crate::ast::Type::#ptype) }
+        })
+        .collect();
+
+    let expanded = quote! {
+        #func
+
+        fn #sig_name() -> crate::symbol::FnSignature {
+            crate::symbol::FnSignature {
+                name: #fn_name_str.into(),
+                type_params: vec![],
+                params: vec![#(#params),*],
+                return_type: Some(crate::ast::Type::#return_type),
+            }
+        }
+    };
+    expanded.into()
+}
+
+struct ZenNativeFnArgs {
+    params: Vec<syn::Ident>,
+    returns: syn::Ident,
+}
+
+impl syn::parse::Parse for ZenNativeFnArgs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        // Parse "params:" keyword
+        input.parse::<syn::Ident>()?;
+        input.parse::<syn::Token![:]>()?;
+        // Parse "[" list of idents "]"
+        let content;
+        syn::bracketed!(content in input);
+        let params: Vec<syn::Ident> = content.parse_terminated(syn::Ident::parse, syn::Token![,])?.into_iter().collect();
+        // Parse ", returns:" keyword
+        input.parse::<syn::Token![,]>()?;
+        input.parse::<syn::Ident>()?;
+        input.parse::<syn::Token![:]>()?;
+        let returns: syn::Ident = input.parse()?;
+        Ok(ZenNativeFnArgs { params, returns })
+    }
+}
+
 #[proc_macro_derive(ZenForeign)]
 pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

@@ -5,6 +5,7 @@ use crate::ast::Type;
 use crate::symbol::FnSignature;
 use crate::value::{EnumData, Value, WeakData, WeakKind};
 use crate::vm::{VM, VMContext};
+use crate::zen_native_fn;
 
 mod fs;
 mod iter;
@@ -128,12 +129,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             params: vec![("val".into(), Type::Unit)],
             return_type: Some(Type::I64),
         },
-        FnSignature {
-            type_params: vec![],
-            name: "contains".into(),
-            params: vec![("s".into(), Type::Str), ("sub".into(), Type::Str)],
-            return_type: Some(Type::Bool),
-        },
+        contains_impl_sig(),
         FnSignature {
             type_params: vec![],
             name: "trim".into(),
@@ -409,6 +405,7 @@ fn len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     }
 }
 
+#[zen_native_fn(params: [Str, Str], returns: Bool)]
 fn contains_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1)) {
         (Some(Value::Str(s)), Some(Value::Str(sub))) => Ok(Value::Bool(s.contains(sub.as_ref()))),
