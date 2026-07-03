@@ -283,6 +283,25 @@ impl VM {
         self.debug_state.resolved_breakpoints.clear();
     }
 
+    /// Set breakpoints on all functions that contain the given (1-based) source line.
+    /// Returns the number of breakpoints set.
+    pub fn set_source_breakpoint(&mut self, line: usize) -> usize {
+        let mut count = 0;
+        let names: Vec<String> = self.function_name_map.keys().cloned().collect();
+        for name in &names {
+            if let Some(&idx) = self.function_name_map.get(name) {
+                if let Some(f) = self.functions.get(idx) {
+                    if f.chunk.lines.iter().any(|l| *l + 1 == line) {
+                        if self.set_breakpoint(name, line) {
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        count
+    }
+
     /// Re-resolve all breakpoints from function names + line numbers to
     /// bytecode offsets.
     fn rebuild_breakpoints(&mut self) {

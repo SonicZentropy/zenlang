@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod compiler;
+pub mod dap;
 pub mod error;
 pub mod formatter;
 pub mod hotreload;

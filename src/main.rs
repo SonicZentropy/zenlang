@@ -29,6 +29,8 @@ enum Command {
     Check { path: camino::Utf8PathBuf },
     /// Start the LSP language server (stdin/stdout)
     Lsp,
+    /// Start the DAP debug adapter server (stdin/stdout)
+    Dap { path: camino::Utf8PathBuf },
     /// Run tests
     Test { paths: Vec<camino::Utf8PathBuf> },
 }
@@ -50,6 +52,11 @@ fn main() -> zenlang::Result<()> {
         Some(Command::Lsp) => {
             zenlang::lsp::run_server();
             Ok(())
+        }
+        Some(Command::Dap { path }) => {
+            let source = std::fs::read_to_string(path.as_std_path())
+                .map_err(|e| zenlang::Error::Io { source: e })?;
+            zenlang::dap::run_dap(&source, Some(path.as_std_path()))
         }
         None => {
             if let Some(path) = &cli.file {
