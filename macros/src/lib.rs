@@ -292,6 +292,18 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Check if a type is `Self`.
+fn is_self_type(ty: &Type) -> bool {
+    matches!(ty, Type::Path(type_path) if type_path.qself.is_none()
+        && type_path.path.segments.len() == 1
+        && type_path.path.segments[0].ident == "Self")
+}
+
+/// Check if a type is a reference (used to generate `&p_i` for &str params).
+fn is_ref_type(ty: &Type) -> bool {
+    matches!(ty, Type::Reference(_))
+}
+
 /// Attribute macro to register all methods in an `impl` block as callable
 /// Zenlang methods on the foreign type.
 ///
@@ -301,6 +313,9 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
 /// Supports `&self` and `&mut self` methods with parameters of types:
 /// `i64`, `i32`, `i16`, `i8`, `u64`, `u32`, `u16`, `u8`, `f64`, `f32`,
 /// `bool`, `String`, `Value`.
+///
+/// Methods without `&self` that return `Self` are treated as constructors
+/// and auto-registered as native functions.
 ///
 /// Return types can be: `()`, `i64`, `i32`, `i16`, `i8`, `u64`, `u32`,
 /// `u16`, `u8`, `f64`, `f32`, `bool`, `String`, `Value`.
@@ -312,6 +327,8 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let self_ty = &impl_block.self_ty;
 
     let mut method_registrations = Vec::new();
+    // Constructors (no &self, returns Self) are registered as native fns
+    let mut constructor_registrations = Vec::new();
 
     for item in &impl_block.items {
         let method = match item {
@@ -319,27 +336,129 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
             _ => continue,
         };
 
-        // Skip methods without &self / &mut self (e.g. constructors)
         let has_self = method.sig.inputs.first().map_or(false, |arg| {
             matches!(arg, FnArg::Receiver(_))
         });
+        let method_name = method.sig.ident.to_string();
+        let method_ident = &method.sig.ident;
+
+        // ── Detect constructor: no self receiver, returns Self ──
+        let is_constructor = !has_self
+            && matches!(&method.sig.output, ReturnType::Type(_, ty) if is_self_type(ty));
+
+        if is_constructor {
+            let mut param_types = Vec::new();
+            for arg in &method.sig.inputs {
+                if let FnArg::Typed(pat_type) = arg {
+                    param_types.push(pat_type.ty.as_ref());
+                }
+            }
+
+            let param_extractions: Vec<_> = param_types
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let fi = i;
+                    let pname = syn::Ident::new(&format!("p{}", i), proc_macro2::Span::call_site());
+                    match ty_to_field_type(ty) {
+                        FieldType::String => {
+                            quote! { let #pname = ::std::convert::Into::<String>::into(args[#fi].as_str().unwrap_or_default()); }
+                        }
+                        FieldType::I64 => {
+                            quote! { let #pname: i64 = args[#fi].as_int().unwrap_or(0); }
+                        }
+                        FieldType::I32 => {
+                            quote! { let #pname: i32 = args[#fi].as_int().unwrap_or(0) as i32; }
+                        }
+                        FieldType::I16 => {
+                            quote! { let #pname: i16 = args[#fi].as_int().unwrap_or(0) as i16; }
+                        }
+                        FieldType::I8 => {
+                            quote! { let #pname: i8 = args[#fi].as_int().unwrap_or(0) as i8; }
+                        }
+                        FieldType::U64 => {
+                            quote! { let #pname: u64 = args[#fi].as_int().unwrap_or(0) as u64; }
+                        }
+                        FieldType::U32 => {
+                            quote! { let #pname: u32 = args[#fi].as_int().unwrap_or(0) as u32; }
+                        }
+                        FieldType::U16 => {
+                            quote! { let #pname: u16 = args[#fi].as_int().unwrap_or(0) as u16; }
+                        }
+                        FieldType::U8 => {
+                            quote! { let #pname: u8 = args[#fi].as_int().unwrap_or(0) as u8; }
+                        }
+                        FieldType::F64 => {
+                            quote! { let #pname: f64 = args[#fi].as_float().unwrap_or(0.0); }
+                        }
+                        FieldType::F32 => {
+                            quote! { let #pname: f32 = args[#fi].as_float().unwrap_or(0.0) as f32; }
+                        }
+                        FieldType::Bool => {
+                            quote! { let #pname: bool = args[#fi].as_bool().unwrap_or(false); }
+                        }
+                        FieldType::Value | FieldType::ForeignReference => {
+                            quote! { let #pname = args[#fi].clone(); }
+                        }
+                        FieldType::Unknown => {
+                            return syn::Error::new_spanned(
+                                ty,
+                                format!(
+                                    "unsupported parameter type '{}' in constructor '{}'",
+                                    quote!(#ty),
+                                    method_name
+                                ),
+                            )
+                            .to_compile_error()
+                            .into();
+                        }
+                    }
+                })
+                .collect();
+
+            let param_idents: Vec<_> = param_types
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let id = syn::Ident::new(&format!("p{}", i), proc_macro2::Span::call_site());
+                    if is_ref_type(ty) {
+                        quote! { &#id }
+                    } else {
+                        quote! { #id }
+                    }
+                })
+                .collect();
+
+            // Use stringify! and strip spaces to get the type name
+            let type_name_str = stringify!(#self_ty).replace(' ', "");
+
+            constructor_registrations.push(quote! {
+                vm.register_native(#method_name, ::std::rc::Rc::new(
+                    |ctx: &mut ::zenlang::vm::VMContext, args: &[::zenlang::value::Value]| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                        #(#param_extractions)*
+                        let obj = #self_ty::#method_ident(#(#param_idents)*);
+                        let vm: &mut ::zenlang::VM = unsafe { &mut *ctx.raw_vm };
+                        let h = vm.foreigns.insert(::zenlang::value::ForeignObject::new(#type_name_str, obj));
+                        ::std::result::Result::Ok(::zenlang::value::Value::Foreign(h))
+                    }
+                ));
+            });
+            continue;
+        }
+
+        // ── Skip non-constructor methods without &self / &mut self ──
         if !has_self {
             continue;
         }
 
-        let method_name = method.sig.ident.to_string();
-        let method_ident = &method.sig.ident;
         let is_mut = method.sig.inputs.first().map_or(false, |arg| {
             matches!(arg, FnArg::Receiver(r) if r.mutability.is_some())
         });
 
         let mut param_types = Vec::new();
         for arg in method.sig.inputs.iter().skip(1) {
-            match arg {
-                FnArg::Typed(pat_type) => {
-                    param_types.push(pat_type.ty.as_ref());
-                }
-                _ => {}
+            if let FnArg::Typed(pat_type) = arg {
+                param_types.push(pat_type.ty.as_ref());
             }
         }
 
@@ -491,7 +610,7 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     }
 
-    if method_registrations.is_empty() {
+    if method_registrations.is_empty() && constructor_registrations.is_empty() {
         return quote! { #impl_block }.into();
     }
 
@@ -505,6 +624,7 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 if let Some(def) = ::std::rc::Rc::make_mut(&mut vm.foreign_registry).get_mut(&tid) {
                     #(#method_registrations)*
                 }
+                #(#constructor_registrations)*
             }
         }
     };
@@ -533,7 +653,7 @@ enum FieldType {
 fn ty_to_field_type(ty: &Type) -> FieldType {
     let ty_str = quote!(#ty).to_string();
     match ty_str.as_str() {
-        "String" | "std :: string :: String" | "alloc :: string :: String" => FieldType::String,
+        "String" | "std :: string :: String" | "alloc :: string :: String" | "& str" | "&mut str" => FieldType::String,
         "i64" => FieldType::I64,
         "i32" => FieldType::I32,
         "i16" => FieldType::I16,

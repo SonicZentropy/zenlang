@@ -7,22 +7,26 @@ use crate::vm::{VM, VMContext};
 
 use super::{option_none, option_some};
 
+#[derive(Clone)]
 struct ArrayIterState {
     data: Handle,
     idx: usize,
 }
 
+#[derive(Clone)]
 struct RangeIterState {
     cur: i64,
     end: i64,
     inclusive: bool,
 }
 
+#[derive(Clone)]
 struct StrIterState {
     chars: Vec<char>,
     idx: usize,
 }
 
+#[derive(Clone)]
 struct MapIterState {
     // Snapshotted at `iter()` time so mutating the map mid-iteration can't
     // invalidate the cursor.

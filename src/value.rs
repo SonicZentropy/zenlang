@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
+type CloneFn = Rc<dyn Fn(&dyn Any) -> Box<dyn Any>>;
+
 use crate::error::Result;
 use crate::slab::Handle;
 
@@ -128,11 +130,20 @@ pub struct ForeignObject {
     pub type_id: TypeId,
     pub type_name: &'static str,
     pub data: Box<dyn Any>,
+    clone_fn: CloneFn,
 }
 
 impl ForeignObject {
-    pub fn new<T: 'static>(type_name: &'static str, data: T) -> Self {
-        Self { type_id: TypeId::of::<T>(), type_name, data: Box::new(data) }
+    pub fn new<T: 'static + Clone>(type_name: &'static str, data: T) -> Self {
+        Self {
+            type_id: TypeId::of::<T>(),
+            type_name,
+            data: Box::new(data),
+            clone_fn: Rc::new(move |any: &dyn Any| {
+                let typed = any.downcast_ref::<T>().expect("ForeignObject clone: type mismatch");
+                Box::new(typed.clone())
+            }),
+        }
     }
 
     pub fn downcast<T: 'static>(&self) -> Option<&T> {
@@ -152,7 +163,12 @@ impl fmt::Debug for ForeignObject {
 
 impl Clone for ForeignObject {
     fn clone(&self) -> Self {
-        unimplemented!("ForeignObject clone requires type-specific cloning; use VM foreign_slab")
+        Self {
+            type_id: self.type_id,
+            type_name: self.type_name,
+            data: (self.clone_fn)(&*self.data),
+            clone_fn: self.clone_fn.clone(),
+        }
     }
 }
 
