@@ -147,8 +147,11 @@ impl<'a> Parser<'a> {
             self.mod_decl(vis)
         } else if self.r#match(TokenKind::Const) {
             self.const_decl(vis)
+        } else if self.r#match(TokenKind::Opaque) {
+            self.expect(TokenKind::Type)?;
+            self.type_decl(vis, true)
         } else if self.r#match(TokenKind::Type) {
-            self.type_decl(vis)
+            self.type_decl(vis, false)
         } else if self.r#match(TokenKind::Pub) {
             self.declaration_with_vis(Vis::Public)
         } else {
@@ -206,8 +209,11 @@ impl<'a> Parser<'a> {
             self.mod_decl(vis)
         } else if self.r#match(TokenKind::Const) {
             self.const_decl(vis)
+        } else if self.r#match(TokenKind::Opaque) {
+            self.expect(TokenKind::Type)?;
+            self.type_decl(vis, true)
         } else if self.r#match(TokenKind::Type) {
-            self.type_decl(vis)
+            self.type_decl(vis, false)
         } else if self.r#match(TokenKind::Pub) {
             self.statement_with_vis(Vis::Public)
         } else if self.r#match(TokenKind::Let) {
@@ -276,7 +282,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn type_decl(&mut self, vis: Vis) -> Result<Spanned<Stmt>> {
+    fn type_decl(&mut self, vis: Vis, opaque: bool) -> Result<Spanned<Stmt>> {
         let start = self.prev_span();
         let name = self.expect_ident()?;
         let type_params = self.parse_type_params()?;
@@ -287,6 +293,7 @@ impl<'a> Parser<'a> {
         Ok(Spanned::new(
             Stmt::Type {
                 vis,
+                opaque,
                 name: name.into(),
                 type_params,
                 alias,

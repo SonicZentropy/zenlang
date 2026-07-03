@@ -151,9 +151,10 @@ pub enum Stmt {
         type_ann: Option<Type>,
         init: Expr,
     },
-    /// `[pub] type Name<T> = AliasType;`
+    /// `[pub] [opaque] type Name<T> = AliasType;`
     Type {
         vis: Vis,
+        opaque: bool,
         name: CompactString,
         type_params: Vec<TypeParam>,
         alias: Type,

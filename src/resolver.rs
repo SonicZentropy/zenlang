@@ -234,11 +234,12 @@ impl Resolver {
                     self.error(e);
                 }
             }
-            Stmt::Type { name, type_params, alias, .. } => {
+            Stmt::Type { name, type_params, alias, opaque, .. } => {
                 let resolved_alias = self.resolve_type(alias, type_params);
                 if let Err(e) = self.symbols.define(name, SymKind::TypeAlias {
                     type_params: type_params.clone(),
                     alias: resolved_alias,
+                    opaque: *opaque,
                 }) {
                     self.error(e);
                 }

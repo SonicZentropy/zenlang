@@ -628,23 +628,25 @@ impl<'a> TypeChecker<'a> {
                 let obj_ty = self.check_expr(obj);
                 match &obj_ty {
                     Type::Named(struct_name) => {
-                        if let Some(entry) = self.symbols.lookup(struct_name) {
+                        // Resolve through transparent type aliases
+                        let resolved_name = self.resolve_type_alias_name(struct_name);
+                        if let Some(entry) = self.symbols.lookup(&resolved_name) {
                             if let SymKind::Struct(def) = &entry.kind {
                                 if let Some(f) = def.fields.iter().find(|f| f.name == *field) {
                                     f.type_ann.clone()
                                 } else {
                                     self.error(format!(
                                         "struct '{}' has no field '{}'",
-                                        struct_name, field
+                                        resolved_name, field
                                     ));
                                     Type::Unit
                                 }
                             } else {
-                                self.error(format!("'{}' is not a struct", struct_name));
+                                self.error(format!("'{}' is not a struct", resolved_name));
                                 Type::Unit
                             }
                         } else {
-                            self.error(format!("undefined struct '{}'", struct_name));
+                            self.error(format!("undefined struct '{}'", resolved_name));
                             Type::Unit
                         }
                     }
@@ -953,7 +955,18 @@ impl<'a> TypeChecker<'a> {
                 spread,
             } => {
                 let entry = self.symbols.lookup(name).cloned();
-                match entry {
+                // Resolve through type aliases to find the actual struct
+                let resolved = match &entry {
+                    Some(SymEntry { kind: SymKind::TypeAlias { alias, opaque: false, .. }, .. }) => {
+                        if let Type::Named(base) = alias {
+                            self.symbols.lookup(base).cloned()
+                        } else {
+                            entry.clone()
+                        }
+                    }
+                    _ => entry.clone(),
+                };
+                match resolved {
                     Some(SymEntry {
                         kind: SymKind::Struct(def),
                         ..
@@ -1044,7 +1057,17 @@ impl<'a> TypeChecker<'a> {
             (Type::F32, Type::F64) | (Type::F64, Type::F32) => true, // implicit f32↔f64
             (Type::Bool, Type::Bool) => true,
             (Type::Str, Type::Str) => true,
-            (Type::Named(a), Type::Named(b)) => a == b,
+            (Type::Named(a), Type::Named(b)) => {
+                if a == b {
+                    true
+                } else if self.is_opaque(&Type::Named(a.clone())) || self.is_opaque(&Type::Named(b.clone())) {
+                    // Opaque types: name mismatch → incompatible
+                    false
+                } else {
+                    // Structural compatibility: check if fields match
+                    self.structurally_compatible(a, b)
+                }
+            }
             (Type::Array(a), Type::Array(b)) => self.types_compatible(a, b),
             (Type::Option(a), Type::Option(b)) => self.types_compatible(a, b),
             (Type::Result(oka, erra), Type::Result(okb, errb)) => {
@@ -1070,7 +1093,12 @@ impl<'a> TypeChecker<'a> {
             Type::Named(s) => {
                 // Check if this name is a type alias
                 if let Some(entry) = self.symbols.lookup(s) {
-                    if let SymKind::TypeAlias { alias, .. } = &entry.kind {
+                    if let SymKind::TypeAlias { alias, opaque, .. } = &entry.kind {
+                        if *opaque {
+                            // Opaque types are NOT transparent — they are
+                            // nominally distinct and must be compared by name only.
+                            return ty.clone();
+                        }
                         return alias.clone();
                     }
                     if matches!(entry.kind, SymKind::TypeParam(_)) {
@@ -1081,6 +1109,75 @@ impl<'a> TypeChecker<'a> {
             }
             _ => ty.clone(),
         }
+    }
+
+    /// Returns `true` if `ty` is an opaque type alias (nominally distinct,
+    /// not structurally compatible with its base).
+    fn is_opaque(&self, ty: &Type) -> bool {
+        if let Type::Named(s) = ty {
+            if let Some(entry) = self.symbols.lookup(s) {
+                if let SymKind::TypeAlias { opaque, .. } = &entry.kind {
+                    return *opaque;
+                }
+            }
+        }
+        false
+    }
+
+    /// If `name` is a transparent type alias, resolve to the underlying type name.
+    fn resolve_type_alias_name(&self, name: &str) -> CompactString {
+        if let Some(entry) = self.symbols.lookup(name) {
+            if let SymKind::TypeAlias { alias, opaque: false, .. } = &entry.kind {
+                if let Type::Named(base) = alias {
+                    return base.clone();
+                }
+            }
+        }
+        name.into()
+    }
+
+    /// Check structural compatibility between two named types.
+    /// A provided type `P` is structurally compatible with expected type `E`
+    /// if every field in `E` exists in `P` with a compatible type (width
+    /// subtyping: extra fields in the provided type are OK).
+    fn structurally_compatible(&self, provided: &str, expected: &str) -> bool {
+        let provided_fields = self.get_struct_fields(provided);
+        let expected_fields = self.get_struct_fields(expected);
+        match (provided_fields, expected_fields) {
+            (Some(pf), Some(ef)) => {
+                // Every field in the expected type must exist in the provided type
+                for (ename, ety) in &ef {
+                    if let Some((_, pty)) = pf.iter().find(|(pn, _)| pn == ename) {
+                        if !self.types_compatible(pty, ety) {
+                            return false;
+                        }
+                    } else {
+                        return false; // field `ename` missing in provided type
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Look up the fields of a struct type by name.
+    fn get_struct_fields(&self, name: &str) -> Option<Vec<(String, Type)>> {
+        if let Some(entry) = self.symbols.lookup(name) {
+            match &entry.kind {
+                SymKind::Struct(def) => {
+                    return Some(def.fields.iter().map(|f| (f.name.to_string(), f.type_ann.clone())).collect());
+                }
+                SymKind::TypeAlias { alias, opaque: false, .. } => {
+                    // Transparent alias — resolve and recurse
+                    if let Type::Named(base) = alias {
+                        return self.get_struct_fields(base);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
     }
 
     fn type_display(&self, ty: &Type) -> String {

@@ -1340,6 +1340,20 @@ pub mod tests {
         vm.run_main().unwrap()
     }
 
+    fn try_run(source: &str) -> crate::error::Result<Value> {
+        let tokens = Lexer::new(source).tokenize()?;
+        let parser = Parser::new(source, &tokens);
+        let mut program = parser.parse()?;
+        let native_names = crate::stdlib::native_names();
+        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
+        let types = crate::typeck::check(&program, &mut symbols)?;
+        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source)?;
+        let mut vm = VM::new();
+        crate::stdlib::register_builtins(&mut vm);
+        vm.load_bytecode(fns, global_names);
+        vm.run_main()
+    }
+
     pub fn run_program(source: &str) -> crate::error::Result<Value> {
         let tokens = Lexer::new(source).tokenize()?;
         let parser = Parser::new(source, &tokens);
@@ -1681,5 +1695,112 @@ pub mod tests {
     fn test_stdlib_sqrt() {
         let result = run(r#"sqrt(9.0)"#);
         assert!((result.as_float().unwrap() - 3.0).abs() < 1e-10);
+    }
+
+    // ── Phase 2: Structural typing + opaque type ──────────────────────
+
+    #[test]
+    fn test_structural_compatibility_same_fields() {
+        // Two structs with identical fields should be structurally compatible
+        let source = r#"
+            struct A { x: int, y: int }
+            struct B { x: int, y: int }
+            fn accept(a: A) -> int { a.x }
+            let b = B { x: 10, y: 20 };
+            accept(b)
+        "#;
+        assert_eq!(run(source), Value::Int(10));
+    }
+
+    #[test]
+    fn test_structural_compatibility_extra_fields() {
+        // B has extra fields — width subtyping allows passing B where A expected
+        let source = r#"
+            struct A { x: int }
+            struct B { x: int, y: int }
+            fn accept(a: A) -> int { a.x }
+            let b = B { x: 10, y: 20 };
+            accept(b)
+        "#;
+        assert_eq!(run(source), Value::Int(10));
+    }
+
+    #[test]
+    fn test_structural_compatibility_missing_fields_fails() {
+        // B missing a field that A requires — should fail
+        let source = r#"
+            struct A { x: int, y: int }
+            struct B { x: int }
+            fn accept(a: A) -> int { a.x + a.y }
+            let b = B { x: 10 };
+            accept(b)
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: B missing field 'y' required by A");
+    }
+
+    #[test]
+    fn test_structural_incompatible_field_types() {
+        // Same field name but different types — should fail
+        let source = r#"
+            struct A { x: int }
+            struct B { x: str }
+            fn accept(a: A) -> int { a.x }
+            let b = B { x: "hi" };
+            accept(b)
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: field 'x' has incompatible types");
+    }
+
+    #[test]
+    fn test_opaque_type_isolation() {
+        // Opaque type should NOT be compatible with its base
+        let source = r#"
+            struct Point { x: int, y: int }
+            opaque type Distance = Point
+            fn accept(d: Distance) -> int { d.x }
+            let p = Point { x: 10, y: 20 };
+            accept(p)
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: opaque type Distance is not compatible with Point");
+    }
+
+    #[test]
+    fn test_opaque_type_not_transparent() {
+        // Opaque type should not be transparent through aliases
+        let source = r#"
+            struct Base { value: int }
+            opaque type Wrapped = Base
+            let w = Wrapped { value: 42 };
+            w.value
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: opaque type fields not accessible");
+    }
+
+    #[test]
+    fn test_type_alias_transparent() {
+        // Regular (non-opaque) type alias should be transparent
+        let source = r#"
+            struct Point { x: int, y: int }
+            type Coordinates = Point;
+            let c = Coordinates { x: 5, y: 10 };
+            c.x + c.y
+        "#;
+        assert_eq!(run(source), Value::Int(15));
+    }
+
+    #[test]
+    fn test_excess_property_check() {
+        // Struct literal with unknown field should fail
+        let source = r#"
+            struct P { x: int }
+            let p = P { x: 10, z: 99 };
+            p.x
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: excess property 'z'");
     }
 }
