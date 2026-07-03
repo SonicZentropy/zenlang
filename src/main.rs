@@ -27,6 +27,10 @@ enum Command {
     Disasm { path: camino::Utf8PathBuf },
     /// Type-check only (no execution)
     Check { path: camino::Utf8PathBuf },
+    /// Create a new Zenlang project
+    New { name: String },
+    /// Build (type-check) a Zenlang project
+    Build { path: Option<camino::Utf8PathBuf> },
     /// Start the LSP language server (stdin/stdout)
     Lsp,
     /// Start the DAP debug adapter server (stdin/stdout)
@@ -58,6 +62,8 @@ fn main() -> zenlang::Result<()> {
                 .map_err(|e| zenlang::Error::Io { source: e })?;
             zenlang::dap::run_dap(&source, Some(path.as_std_path()))
         }
+        Some(Command::New { name }) => cmd_new(name),
+        Some(Command::Build { path }) => cmd_build(path.as_ref()),
         None => {
             if let Some(path) = &cli.file {
                 run_script(path)
@@ -338,5 +344,82 @@ fn run_repl() -> zenlang::Result<()> {
     }
 
     println!();
+    Ok(())
+}
+
+fn cmd_new(name: &str) -> zenlang::Result<()> {
+    let dir = std::path::Path::new(name);
+    if dir.exists() {
+        eprintln!("error: directory '{}' already exists", name);
+        std::process::exit(1);
+    }
+
+    let src_dir = dir.join("src");
+    std::fs::create_dir_all(&src_dir).map_err(|e| Error::Io { source: e })?;
+
+    let main_zen = r#"// Zenlang script
+// Entry point — the result of the top-level expression is the script's return value.
+let greeting = "Hello from Zenlang!";
+print(greeting);
+42
+"#;
+    std::fs::write(src_dir.join("main.zen"), main_zen).map_err(|e| Error::Io { source: e })?;
+
+    let config = format!(
+        r#"{{
+    "name": "{}",
+    "entry": "src/main.zen"
+}}
+"#,
+        name
+    );
+    std::fs::write(dir.join("zenc.json"), config).map_err(|e| Error::Io { source: e })?;
+
+    println!("Created project '{}'", name);
+    println!("  cd {} && zenc run src/main.zen", name);
+    Ok(())
+}
+
+fn cmd_build(path: Option<&camino::Utf8PathBuf>) -> zenlang::Result<()> {
+    let project_dir = path.map(|p| p.as_std_path().to_path_buf()).unwrap_or_else(|| std::env::current_dir().map_err(|e| Error::Io { source: e }).unwrap());
+    let config_path = project_dir.join("zenc.json");
+    let config_str = std::fs::read_to_string(&config_path).map_err(|_| {
+        Error::Runtime {
+            msg: format!("no zenc.json found in {}", project_dir.display()),
+            stack_trace: Vec::new(),
+        }
+    })?;
+    let config: serde_json::Value = serde_json::from_str(&config_str).map_err(|e| {
+        Error::Runtime {
+            msg: format!("invalid zenc.json: {}", e),
+            stack_trace: Vec::new(),
+        }
+    })?;
+    let entry = config["entry"].as_str().ok_or_else(|| {
+        Error::Runtime {
+            msg: "zenc.json missing 'entry' field".into(),
+            stack_trace: Vec::new(),
+        }
+    })?;
+
+    let entry_path = project_dir.join(entry);
+    let source = std::fs::read_to_string(&entry_path).map_err(|e| Error::Io { source: e })?;
+    let path = Some(entry_path.as_path());
+
+    // Run full compilation pipeline
+    let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
+    let parser = zenlang::parser::Parser::new(&source, &tokens);
+    let mut program = parser.parse()?;
+    if let Some(p) = path {
+        zenlang::mod_resolver::resolve_modules(&mut program, p)?;
+    }
+    zenlang::prelude::inject(&mut program)?;
+    let native_names = zenlang::stdlib::native_names();
+    let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &native_names)?;
+    let types = zenlang::typeck::check(&program, &mut symbols)?;
+    let (_fns, _global_names) =
+        zenlang::compiler::compile(&program, &types, &symbols, &native_names, &source)?;
+
+    println!("Build succeeded");
     Ok(())
 }
