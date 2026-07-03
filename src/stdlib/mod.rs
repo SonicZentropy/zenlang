@@ -79,6 +79,10 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("unwrap", Rc::new(unwrap_impl));
     vm.register_native("unwrap_or", Rc::new(unwrap_or_impl));
     vm.register_native("expect", Rc::new(expect_impl));
+
+    // Weak references
+    vm.register_native("make_weak", Rc::new(make_weak_impl));
+    vm.register_native("upgrade", Rc::new(upgrade_impl));
 }
 
 /// Return the list of all built-in native function names.
@@ -264,6 +268,18 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "expect".into(),
             params: vec![("val".into(), Type::Unit), ("msg".into(), Type::Str)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "make_weak".into(),
+            params: vec![("val".into(), Type::Unit)],
+            return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "upgrade".into(),
+            params: vec![("val".into(), Type::Unit)],
             return_type: Some(Type::Unit),
         },
         FnSignature {
@@ -761,6 +777,50 @@ fn expect_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         }
         _ => Err(crate::error::Error::Script {
             msg: format!("expect failed: {msg}"),
+        }),
+    }
+}
+
+// --- Weak references ---
+
+fn make_weak_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    use std::collections::HashMap;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    use crate::value::{WeakTarget, StructData, MapKey};
+
+    let val = args.first().cloned().unwrap_or(Value::Nil);
+    let weak = match &val {
+        Value::Struct(data, name) => {
+            let w = Rc::downgrade(data);
+            Value::Weak(Rc::new(RefCell::new(WeakTarget::Struct(w, name.clone()))))
+        }
+        Value::Array(data) => {
+            let w = Rc::downgrade(data);
+            Value::Weak(Rc::new(RefCell::new(WeakTarget::Array(w))))
+        }
+        Value::Map(data) => {
+            let w = Rc::downgrade(data);
+            Value::Weak(Rc::new(RefCell::new(WeakTarget::Map(w))))
+        }
+        _ => return Err(crate::error::Error::Script {
+            msg: format!("cannot create weak reference from {}", val.type_name()),
+        }),
+    };
+    Ok(weak)
+}
+
+fn upgrade_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    match args.first() {
+        Some(Value::Weak(data)) => {
+            let target = data.borrow();
+            match target.upgrade() {
+                Some(val) => Ok(option_some(val)),
+                None => Ok(option_none()),
+            }
+        }
+        _ => Err(crate::error::Error::Script {
+            msg: "upgrade requires a weak reference argument".into(),
         }),
     }
 }

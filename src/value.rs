@@ -169,6 +169,53 @@ impl StructData {
     }
 }
 
+/// A weak reference to a heap-allocated Zenlang value. Weak references do not
+/// prevent the value from being deallocated, which breaks reference cycles
+/// (e.g. parent→child and child→parent references in a scene graph).
+///
+/// Create one via `make_weak(value)` and retrieve the original (if still alive)
+/// via `upgrade(weak)`, which returns `Option<T>`.
+#[derive(Debug, Clone)]
+pub enum WeakTarget {
+    /// Weak reference to a struct with its type name.
+    Struct(std::rc::Weak<RefCell<StructData>>, String),
+    /// Weak reference to an array.
+    Array(std::rc::Weak<RefCell<Vec<Value>>>),
+    /// Weak reference to a map.
+    Map(std::rc::Weak<RefCell<HashMap<MapKey, Value>>>),
+}
+
+impl WeakTarget {
+    /// Try to upgrade this weak reference. Returns `Some(value)` if the target
+    /// is still alive, `None` if it has been dropped.
+    pub fn upgrade(&self) -> Option<Value> {
+        match self {
+            WeakTarget::Struct(weak, name) => {
+                weak.upgrade().map(|rc| Value::Struct(rc, name.clone()))
+            }
+            WeakTarget::Array(weak) => {
+                weak.upgrade().map(|rc| Value::Array(rc))
+            }
+            WeakTarget::Map(weak) => {
+                weak.upgrade().map(|rc| Value::Map(rc))
+            }
+        }
+    }
+}
+
+impl PartialEq for WeakTarget {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (WeakTarget::Struct(a, an), WeakTarget::Struct(b, bn)) => {
+                an == bn && std::rc::Weak::ptr_eq(a, b)
+            }
+            (WeakTarget::Array(a), WeakTarget::Array(b)) => std::rc::Weak::ptr_eq(a, b),
+            (WeakTarget::Map(a), WeakTarget::Map(b)) => std::rc::Weak::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
 /// A runtime value in the Zenlang VM.
 ///
 /// All values are boxed — integers, floats, strings, arrays, structs, enums,
@@ -222,6 +269,11 @@ pub enum Value {
     /// `bool` (see `MapKey`) since `float`/`array`/`struct` etc. don't have
     /// stable hashing/equality suitable for map keys.
     Map(Rc<RefCell<HashMap<MapKey, Value>>>),
+    /// A weak reference to a heap-allocated value. Does not prevent the target
+    /// from being deallocated, enabling safe cycle-breaking in parent/child
+    /// references. Use `make_weak(value)` to create and `upgrade(weak)` to
+    /// retrieve the original (returns `Option<T>`).
+    Weak(Rc<RefCell<WeakTarget>>),
     /// A suspended generator (coroutine) that yields values.
     Generator(Rc<RefCell<GeneratorState>>),
 }
@@ -248,6 +300,11 @@ impl fmt::Debug for Value {
             ),
             Value::Range(s, e, inc) => write!(f, "Range({}, {}, {})", s, e, inc),
             Value::Map(m) => write!(f, "Map({} entries)", m.borrow().len()),
+            Value::Weak(target) => match &*target.borrow() {
+                WeakTarget::Struct(_, name) => write!(f, "Weak({})", name),
+                WeakTarget::Array(_) => write!(f, "Weak(array)"),
+                WeakTarget::Map(_) => write!(f, "Weak(map)"),
+            },
             Value::Generator(g) => {
                 let state = g.borrow();
                 if state.exhausted {
@@ -280,6 +337,7 @@ impl Clone for Value {
             Value::Closure(c) => Value::Closure(c.clone()),
             Value::Range(s, e, inc) => Value::Range(*s, *e, *inc),
             Value::Map(m) => Value::Map(m.clone()),
+            Value::Weak(w) => Value::Weak(w.clone()),
             Value::Generator(g) => Value::Generator(g.clone()),
         }
     }
@@ -307,6 +365,7 @@ impl PartialEq for Value {
             }
             (Value::Range(a, b, c), Value::Range(d, e, f)) => a == d && b == e && c == f,
             (Value::Map(a), Value::Map(b)) => *a.borrow() == *b.borrow(),
+            (Value::Weak(a), Value::Weak(b)) => *a.borrow() == *b.borrow(),
             (Value::Generator(a), Value::Generator(b)) => {
                 let ga = a.borrow();
                 let gb = b.borrow();
@@ -335,6 +394,7 @@ impl Value {
             Value::Closure(_) => "closure",
             Value::Range(..) => "range",
             Value::Map(_) => "map",
+            Value::Weak(_) => "weak",
             Value::Generator(_) => "generator",
         }
     }
