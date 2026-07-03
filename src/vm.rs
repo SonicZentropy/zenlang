@@ -8,7 +8,7 @@ use crate::ir::{BytecodeFn, Chunk, Opcode};
 use crate::slab::{Handle, Slab};
 use crate::value::{
     ArrayData, ClosureData, EnumData, ForeignObject, GeneratorState, MapData, NativeFn,
-    StructData, Value, WeakData,
+    StructBuilder, StructData, Value, WeakData,
 };
 
 /// Execution context provided to native functions.
@@ -431,6 +431,13 @@ impl VM {
             }
         }
         snapshot
+    }
+
+    /// Build a `Value::Struct` from a `StructBuilder`.
+    pub fn make_struct(&mut self, builder: StructBuilder) -> Value {
+        let name = builder.name().to_string();
+        let h = self.structs.insert(builder.build());
+        Value::Struct(h, name)
     }
 
     pub fn restore_globals_by_name(&mut self, snapshot: &HashMap<String, Value>) {

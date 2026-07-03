@@ -409,3 +409,45 @@ impl TryFrom<Value> for String {
         })
     }
 }
+
+/// Builder for constructing `StructData` with named fields.
+///
+/// # Example
+/// ```ignore
+/// let builder = StructBuilder::new("Point")
+///     .field("x", 10i64)
+///     .field("y", 20i64)
+///     .field("label", "origin");
+/// let (data, name) = (builder.build(), builder.into_name());
+/// let h = vm.structs.insert(data);
+/// let val = Value::Struct(h, name);
+/// ```
+pub struct StructBuilder {
+    name: String,
+    values: Vec<Value>,
+    field_names: Vec<String>,
+}
+
+impl StructBuilder {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), values: Vec::new(), field_names: Vec::new() }
+    }
+
+    pub fn field<V: Into<Value>>(mut self, name: impl Into<String>, value: V) -> Self {
+        self.field_names.push(name.into());
+        self.values.push(value.into());
+        self
+    }
+
+    pub fn build(self) -> StructData {
+        StructData { values: self.values, field_names: self.field_names }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn into_name(self) -> String {
+        self.name
+    }
+}
