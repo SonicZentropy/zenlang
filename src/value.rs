@@ -357,3 +357,55 @@ impl From<&str> for Value {
 impl From<String> for Value {
     fn from(s: String) -> Self { Value::Str(s.into()) }
 }
+
+impl From<i64> for Value {
+    fn from(n: i64) -> Self { Value::Int(n) }
+}
+
+impl From<f64> for Value {
+    fn from(n: f64) -> Self { Value::Float(n) }
+}
+
+impl From<bool> for Value {
+    fn from(b: bool) -> Self { Value::Bool(b) }
+}
+
+impl TryFrom<Value> for i64 {
+    type Error = crate::error::Error;
+    fn try_from(val: Value) -> crate::error::Result<i64> {
+        val.as_int().ok_or_else(|| crate::error::Error::Runtime {
+            msg: format!("expected integer, got {}", val.type_name()),
+            stack_trace: Vec::new(),
+        })
+    }
+}
+
+impl TryFrom<Value> for f64 {
+    type Error = crate::error::Error;
+    fn try_from(val: Value) -> crate::error::Result<f64> {
+        val.as_float().ok_or_else(|| crate::error::Error::Runtime {
+            msg: format!("expected float, got {}", val.type_name()),
+            stack_trace: Vec::new(),
+        })
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = crate::error::Error;
+    fn try_from(val: Value) -> crate::error::Result<bool> {
+        val.as_bool().ok_or_else(|| crate::error::Error::Runtime {
+            msg: format!("expected boolean, got {}", val.type_name()),
+            stack_trace: Vec::new(),
+        })
+    }
+}
+
+impl TryFrom<Value> for String {
+    type Error = crate::error::Error;
+    fn try_from(val: Value) -> crate::error::Result<String> {
+        val.as_str().ok_or_else(|| crate::error::Error::Runtime {
+            msg: format!("expected string, got {}", val.type_name()),
+            stack_trace: Vec::new(),
+        })
+    }
+}
