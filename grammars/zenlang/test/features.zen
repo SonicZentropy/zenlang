@@ -1,0 +1,38 @@
+// Advanced features
+
+struct Point {
+  x: int,
+  y: int,
+}
+
+fn distance(a: Point, b: Point) -> int {
+  let dx = b.x - a.x
+  let dy = b.y - a.y
+  (dx * dx + dy * dy).sqrt()
+}
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+fn color_name(c: Color) -> string {
+  match c {
+    Red => "red",
+    Green => "green",
+    Blue => "blue",
+  }
+}
+
+impl Point {
+  fn origin() -> Point {
+    Point { x: 0, y: 0 }
+  }
+}
+
+fn main() {
+  let p = Point { x: 3, y: 4 }
+  let d = distance(Point::origin(), p)
+  print(d)
+}

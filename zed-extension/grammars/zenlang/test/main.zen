@@ -1,0 +1,8 @@
+// Basic features
+
+fn main() {
+  let x = 42
+  let name = "zenlang"
+  print(x)
+  print(name)
+}
