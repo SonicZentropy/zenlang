@@ -16,7 +16,7 @@ Add `Type::Any` variant, replace wildcard `Unit` usages, clean up `types_compati
 - Expected-type propagation downward from context
 - Let-binding, lambda, and generic call-site inference
 
-### Phase 4: `unknown` + narrowing (~1-2 weeks)
+### Phase 4: `unknown` + narrowing (~1-2 weeks) ✅
 - `Type::Unknown` — safe top type, no implicit compatibility
 - Field access / method call on `unknown` → compile error
 - Narrowing through match patterns and casts

@@ -1848,4 +1848,40 @@ pub mod tests {
         "#;
         assert_eq!(run(source), Value::Int(7));
     }
+
+    // ── Phase 4: unknown + narrowing ──────────────────────────────────
+
+    #[test]
+    fn test_unknown_field_access_blocked() {
+        // Field access on unknown type should fail
+        let source = r#"
+            let x: unknown = 42;
+            x.value
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: field access on unknown type");
+    }
+
+    #[test]
+    fn test_unknown_method_call_blocked() {
+        // Method call on unknown type should fail
+        let source = r#"
+            let x: unknown = 42;
+            x.to_string()
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: method call on unknown type");
+    }
+
+    #[test]
+    fn test_unknown_not_compatible_with_other_types() {
+        // Unknown should not be compatible with other types
+        let source = r#"
+            let x: unknown = 42;
+            let y: i64 = x;
+            y
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "should fail: unknown not compatible with i64");
+    }
 }

@@ -734,6 +734,14 @@ impl<'a> TypeChecker<'a> {
                         }
                         Type::Any
                     }
+                    // `Type::Unknown` requires narrowing before method calls
+                    Type::Unknown => {
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        self.error("cannot call method on 'unknown' type; narrow via match or cast first");
+                        Type::Unit
+                    }
                     _ => {
                         for arg in args {
                             self.check_expr(arg);
@@ -777,6 +785,11 @@ impl<'a> TypeChecker<'a> {
                     // on such values can't be statically validated, so allow
                     // it through (field access will be resolved at runtime).
                     Type::Any => Type::Any,
+                    // `Type::Unknown` requires narrowing before field access
+                    Type::Unknown => {
+                        self.error("cannot access field on 'unknown' type; narrow via match or cast first");
+                        Type::Unit
+                    }
                     _ => {
                         self.error(format!(
                             "cannot access field on type '{}'",
@@ -1202,6 +1215,10 @@ impl<'a> TypeChecker<'a> {
             (Type::Option(_), Type::Named(a)) if a == "Option" => true,
             (Type::Named(a), Type::Result(_, _)) if a == "Result" => true,
             (Type::Result(_, _), Type::Named(a)) if a == "Result" => true,
+            // Unknown: safe top type, only compatible with itself and Any
+            (Type::Unknown, Type::Unknown) => true,
+            // Unknown is NOT compatible with other types (unlike Any)
+            // — must narrow first via match or cast
             _ => false,
         }
     }
@@ -1314,6 +1331,7 @@ impl<'a> TypeChecker<'a> {
             Type::Unit => "()".into(),
             Type::Any => "any".into(),
             Type::Var(id) => format!("?{}", id),
+            Type::Unknown => "unknown".into(),
             Type::Named(s) => s.to_string(),
             Type::Generic(s) => s.to_string(),
             Type::Array(inner) => format!("[{}]", self.type_display(inner)),

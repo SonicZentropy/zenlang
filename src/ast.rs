@@ -50,6 +50,11 @@ pub enum Type {
     /// The `u64` is a unique identifier; the variable is resolved by
     /// [`crate::typeck::TypeChecker::resolve_var`].
     Var(u64),
+    /// Safe top type — requires narrowing before use.
+    /// Unlike `Any`, `Unknown` is NOT compatible with other types and
+    /// does not allow field access or method calls.  Use `match` or
+    /// explicit casts to narrow to a concrete type.
+    Unknown,
     /// A named type reference, e.g. `MyStruct` or `Option`.
     Named(CompactString),
     /// A generic type parameter, e.g. `T` in `fn foo<T>(x: T)`.
