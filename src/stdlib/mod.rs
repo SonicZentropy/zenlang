@@ -379,7 +379,9 @@ fn assert_eq_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         return Ok(Value::Nil);
     }
     if args[0] != args[1] {
-        panic!("assert_eq failed: {:?} != {:?}", args[0], args[1]);
+        return Err(crate::error::Error::Script {
+            msg: format!("assert_eq failed: {:?} != {:?}", args[0], args[1]),
+        });
     }
     Ok(Value::Nil)
 }

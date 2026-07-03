@@ -140,7 +140,7 @@ impl Resolver {
                     name: name.to_string(),
                     type_params: type_params.clone(),
                     params: params.iter().map(|p| {
-                        let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Unit), type_params);
+                        let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Any), type_params);
                         (p.name.to_string(), ty)
                     }).collect(),
                     return_type: return_type.as_ref().map(|t| self.resolve_type(t, type_params)),
@@ -192,7 +192,7 @@ impl Resolver {
                             name: format!("{}::{}", type_name, name),
                             type_params: combined_type_params.clone(),
                             params: params.iter().map(|p| {
-                                let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Unit), &combined_type_params);
+                                let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Any), &combined_type_params);
                                 (p.name.to_string(), ty)
                             }).collect(),
                             return_type: return_type.as_ref().map(|t| self.resolve_type(t, &combined_type_params)),

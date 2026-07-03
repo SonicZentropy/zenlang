@@ -7,8 +7,6 @@ use clap::{Parser, Subcommand};
 use zenlang::hotreload::HotReloader;
 use zenlang::{Error, VM};
 
-use arena_b::Arena;
-
 #[derive(Parser)]
 #[command(name = "zenc", version, about = "Zenlang scripting language")]
 struct Cli {

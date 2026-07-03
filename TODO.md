@@ -1,22 +1,27 @@
-# To tackle in order.  After completing each task, mark it as done.
+# All items complete ✅
 
-### Phase 1: `Type::Any` split (~1 day) ✅
-Add `Type::Any` variant, replace wildcard `Unit` usages, clean up `types_compatible`.
+## Summary of changes
 
-### Phase 2: Structural typing + `opaque type` (~2-3 weeks) ✅
-- **Structural by default**: `types_compatible` falls through to `structurally_compatible(a, b)` when names differ and neither is opaque
-- **Width subtyping**: extra fields in provided type OK, missing fields in provided type fail
-- **Excess property checks**: struct *literals* with unknown field names → compile error
-- **`opaque type Name = Base`**: creates a nominally isolated type — NOT compatible with `Base` or any other type. Name-matching only. Requires explicit conversion both ways.
-- **Foreign type registration**: Rust foreign structs register their field types in the symbol table so they participate in structural comparison
+### 🔴 Critical
+1. **`assert_eq` panics the host process** — Changed `panic!()` to `return Err(Error::Script{..})` in `src/stdlib/mod.rs:382`. Added 2 tests.
+2. **`tests/fs.zen` fails** — Fixed 5 match arms returning `bool` vs `()` mismatch by changing `Ok(_) => true` to `Ok(_) => ()`.
+3. **`tests/prelude_iterators.zen` fails** — Changed default unannotated param type from `Type::Unit` to `Type::Any` in `src/resolver.rs:143,195` (function signatures), and changed default unannotated return type from `Type::Unit` to `Type::Any` in `src/typeck.rs:431` (function ident type lookup).
 
-### Phase 3: Local bidirectional inference (~2-3 weeks) ✅
-- `Type::Var(u64)` for local unification
-- `unify()` + `resolve()` in the typechecker
-- Expected-type propagation downward from context
-- Let-binding, lambda, and generic call-site inference
+### 🟡 Major
+4. **README CLI docs** — Updated all 19 `zenlang` → `zenc` references, added missing commands (`new`, `build`, `dap`, `test`).
+5. **README broken link** — Fixed `tests/tour.zen` → `examples/tour.zen`.
+6. **DAP `unwrap()`** — Replaced `unwrap()` with proper error handling in `src/dap.rs:33`.
+7. **Changelog** — Updated stale reference to non-existent test failures.
 
-### Phase 4: `unknown` + narrowing (~1-2 weeks) ✅
-- `Type::Unknown` — safe top type, no implicit compatibility
-- Field access / method call on `unknown` → compile error
-- Narrowing through match patterns and casts
+### 🔵 Minor
+8. **`parser_test.rs` compiled unconditionally** — Moved to `#[cfg(test)]` in `src/lib.rs:13`.
+9. **Dead code** — Removed unused `fresh_var()`, `next_id` from `src/typeck.rs`.
+10. **`operand_count` wrong for `NewClosure`** — Fixed from 1 to 2 in `src/ir.rs:174`.
+11. **Formatter missing `Match`** — Added `TokenKind::Match` to `must_start_line()` in `src/formatter.rs:190`.
+12. **JSON `from_f64` double unwrap** — Replaced with `unwrap_or_else` + `expect` in `src/stdlib/json.rs:40`.
+13. **Unused `arena_b::Arena` import** — Removed from `src/main.rs:10`.
+
+### Verifications
+- `cargo build`: 0 warnings
+- `cargo test --lib`: 246 passed, 0 failed
+- `cargo run -- test`: 37/37 passed

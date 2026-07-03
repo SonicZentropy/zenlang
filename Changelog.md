@@ -177,7 +177,7 @@ Would JIT help? Yes — but there are caveats.
 
 Next Steps
 - Consider adding convenience methods (e.g. `VM::alloc_array`, `VM::alloc_foreign`) to the public API for external users
-- The 3 pre-existing parser test failures (`test_nested_scopes`, `test_enum_match`, `test_map_operations`) are unrelated — `::` enum path syntax and `+` after block expr need parser work
+- All parser tests (`test_nested_scopes`, `test_enum_match`, `test_map_operations`) now pass.
 
 JSON serialization** — `to_json`/`from_json` native functions backed by serde_json
 2. **Closure callbacks** — `VMContext::call_value()` with reentrancy-safe `return_to_depth`
@@ -192,3 +192,25 @@ value.rs**: 52 new unit tests covering `From`/`TryFrom` impls, `ForeignObject`, 
 - **macros/src/lib.rs**: Added `name:` parameter to `#[zen_native_fn]` (optional; defaults to Rust fn name); doc on `#[derive(ZenForeign)]`
 - **stdlib/mod.rs**: Module-level doc; `contains_impl` now uses `#[zen_native_fn(name: "contains", ...)]` so the generated sig has the correct Zenlang name
 - **interop.rs**: Added rustdoc to `FieldAccessor::new`, `ForeignTypeDef::new/field/method`, `ForeignTypeRegistry::get/get_mut/get_by_name
+
+
+### Phase 1: `Type::Any` split (~1 day) ✅
+Add `Type::Any` variant, replace wildcard `Unit` usages, clean up `types_compatible`.
+
+### Phase 2: Structural typing + `opaque type` (~2-3 weeks) ✅
+- **Structural by default**: `types_compatible` falls through to `structurally_compatible(a, b)` when names differ and neither is opaque
+- **Width subtyping**: extra fields in provided type OK, missing fields in provided type fail
+- **Excess property checks**: struct *literals* with unknown field names → compile error
+- **`opaque type Name = Base`**: creates a nominally isolated type — NOT compatible with `Base` or any other type. Name-matching only. Requires explicit conversion both ways.
+- **Foreign type registration**: Rust foreign structs register their field types in the symbol table so they participate in structural comparison
+
+### Phase 3: Local bidirectional inference (~2-3 weeks) ✅
+- `Type::Var(u64)` for local unification
+- `unify()` + `resolve()` in the typechecker
+- Expected-type propagation downward from context
+- Let-binding, lambda, and generic call-site inference
+
+### Phase 4: `unknown` + narrowing (~1-2 weeks) ✅
+- `Type::Unknown` — safe top type, no implicit compatibility
+- Field access / method call on `unknown` → compile error
+- Narrowing through match patterns and casts

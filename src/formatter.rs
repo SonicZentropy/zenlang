@@ -187,7 +187,7 @@ fn must_start_line(kind: &TokenKind, _prev: &Option<TokenKind>) -> bool {
         | TokenKind::Impl
         | TokenKind::Trait => true,
         // Statement keywords that start a line
-        TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop => true,
+        TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop | TokenKind::Match => true,
         // Let/const binding
         TokenKind::Let | TokenKind::Const => true,
         // Return keyword

@@ -3,13 +3,13 @@ fn main() {
     let test_dir = "_test_fs";
     let r1 = create_dir(test_dir);
     match r1 {
-        Ok(_) => true,
+        Ok(_) => (),
         Err(msg) => {
             // May already exist from previous run; try to clean up and recreate
             remove_dir(test_dir);
             let r2 = create_dir(test_dir);
             match r2 {
-                Ok(_) => true,
+                Ok(_) => (),
                 Err(msg) => assert(len(msg) > 0),
             }
         },
@@ -21,7 +21,7 @@ fn main() {
     let test_file = path_join(test_dir, "hello.txt");
     let r3 = write_file(test_file, "Hello, World!\n");
     match r3 {
-        Ok(_) => true,
+        Ok(_) => (),
         Err(msg) => assert(len(msg) > 0),
     }
 
@@ -35,7 +35,7 @@ fn main() {
     // append_file (uses writeln!, so adds its own newline)
     let r5 = append_file(test_file, "Line 2");
     match r5 {
-        Ok(_) => true,
+        Ok(_) => (),
         Err(msg) => assert(len(msg) > 0),
     }
 
@@ -88,7 +88,7 @@ fn main() {
     let nested = path_join(test_dir, "a/b/c");
     let r9 = create_dirs(nested);
     match r9 {
-        Ok(_) => true,
+        Ok(_) => (),
         Err(msg) => assert(len(msg) > 0),
     }
     assert(is_dir(path_join(test_dir, "a/b/c")));

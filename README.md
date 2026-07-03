@@ -18,26 +18,34 @@ and a tight bytecode VM.
 - **Hot reload**: watch source files for changes, recompile, and reload while preserving
   global state.
 - **REPL**: interactive prompt with multi-line input detection.
-- **LSP server**: `zenlang lsp` — diagnostics, completions, hover, document symbols,
+- **LSP server**: `zenc lsp` — diagnostics, completions, hover, document symbols,
   semantic tokens.
-- **Disassembler**: `zenlang disasm <file>` — dump bytecode with opcodes, lines, constants.
+- **Disassembler**: `zenc disasm <file>` — dump bytecode with opcodes, lines, constants.
+- **Project scaffolding**: `zenc new <name>` — create a new project with `zenc.json`.
+- **Project build**: `zenc build [path]` — type-check a project via `zenc.json`.
+- **Debug adapter**: `zenc dap <script>` — DAP debug adapter server (stdin/stdout).
+- **Test runner**: `zenc test [paths...]` — run `.zen` test files.
 - **No GC**: deterministic `Rc`-based ownership; no stop-the-world pauses.
 - **No async**: synchronous single-threaded design; trivially embeddable.
 
 ## CLI Usage
 
 ```text
-zenlang [FILE] [COMMAND]
+zenc [COMMAND] [ARGS]
 
 Commands:
   run     Run a script file (with hot reload)
   repl    Start an interactive REPL
-  disasm  Disassemble a compiled script
   check   Type-check only (no execution)
+  disasm  Disassemble a compiled script
   lsp     Start the LSP language server (stdin/stdout)
+  new     Create a new project with `zenc.json`
+  build   Type-check an entire project
+  dap     Start the DAP debug adapter server
+  test    Run `.zen` test files
 
 Arguments:
-  [FILE]  Path to a script file to run (equivalent to `zenlang run <file>`)
+  [FILE]  Path to a script file to run (equivalent to `zenc run <file>`)
 ```
 
 ### Examples
@@ -45,13 +53,13 @@ Arguments:
 **Run a script:**
 
 ```console
-$ zenlang hello.zen
+$ zenc hello.zen
 ```
 
 **REPL:**
 
 ```console
-$ zenlang repl
+$ zenc repl
 > fn greet(name) { print("hello " + name); }
 ... greet("world");
 => nil
@@ -61,14 +69,14 @@ $ zenlang repl
 **Type-check only (no execution):**
 
 ```console
-$ zenlang check my_script.zen
+$ zenc check my_script.zen
 type check passed
 ```
 
 **Disassemble bytecode:**
 
 ```console
-$ zenlang disasm my_script.zen
+$ zenc disasm my_script.zen
 === main ===
 -- Constants --
 [0] "hello"
@@ -84,7 +92,7 @@ $ zenlang disasm my_script.zen
 Start on stdin/stdout — compatible with Neovim's built-in LSP, VS Code, etc.
 
 ```console
-$ zenlang lsp
+$ zenc lsp
 ```
 
 > The LSP provides text-sync diagnostics, completions, hover type info, document
@@ -92,11 +100,11 @@ $ zenlang lsp
 
 ## Language Tour
 
-The file [`tests/tour.zen`](tests/tour.zen) is a comprehensive, runnable tour of every
+The file [`examples/tour.zen`](examples/tour.zen) is a comprehensive, runnable tour of every
 supported language feature. Run it with:
 
 ```
-cargo run -- test tests/tour.zen
+cargo run -- test examples/tour.zen
 ```
 
 Below are the key features with short examples.

@@ -10,6 +10,7 @@ pub mod lexer;
 pub mod lsp;
 pub mod mod_resolver;
 pub mod parser;
+#[cfg(test)]
 pub mod parser_test;
 pub mod prelude;
 pub mod resolver;

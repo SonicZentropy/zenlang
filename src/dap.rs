@@ -30,7 +30,13 @@ fn read_message() -> Option<JsonValue> {
 }
 
 fn write_message(msg: &JsonValue) {
-    let body = serde_json::to_string(msg).unwrap();
+    let body = match serde_json::to_string(msg) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[dap] failed to serialize message: {e}");
+            return;
+        }
+    };
     let mut stdout = io::stdout().lock();
     let _ = write!(stdout, "Content-Length: {}\r\n\r\n{}", body.len(), body);
     let _ = stdout.flush();

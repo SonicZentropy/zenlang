@@ -37,7 +37,7 @@ fn value_to_json(ctx: &mut VMContext, val: &Value) -> Result<serde_json::Value> 
             serde_json::Number::from(*n)
         )),
         Value::Float(f) => Ok(serde_json::Value::Number(
-            serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from_f64(0.0).unwrap())
+            serde_json::Number::from_f64(*f).unwrap_or_else(|| serde_json::Number::from_f64(0.0).expect("0.0 is always a valid JSON number"))
         )),
         Value::Str(s) => Ok(serde_json::Value::String(s.as_ref().to_string())),
         Value::Array(h) => {

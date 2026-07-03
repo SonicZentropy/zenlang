@@ -170,9 +170,8 @@ impl Opcode {
             | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
             | Opcode::Call(_) | Opcode::MakeArray(_)
             | Opcode::LoadField(_) | Opcode::StoreField(_)
-            | Opcode::LoadEnumField(_)
-            | Opcode::NewClosure(_, _) => 1,
-            Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::MakeStruct(_, _) => 2,
+            | Opcode::LoadEnumField(_) => 1,
+            Opcode::NewClosure(_, _) | Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::MakeStruct(_, _) => 2,
             Opcode::MakeRange => 0,
             _ => 0,
         }

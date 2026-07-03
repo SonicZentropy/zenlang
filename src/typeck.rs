@@ -67,23 +67,14 @@ pub fn check(program: &Program, symbols: &mut SymbolTable) -> Result<TypeMap> {
 /// The `constraints` map tracks the type each variable has been unified with.
 /// Once a variable is constrained, `resolve_var` returns the concrete type.
 struct TypeVarStore {
-    next_id: u64,
     constraints: HashMap<u64, Type>,
 }
 
 impl TypeVarStore {
     fn new() -> Self {
         Self {
-            next_id: 0,
             constraints: HashMap::new(),
         }
-    }
-
-    /// Allocate a fresh unification variable.
-    fn fresh_var(&mut self) -> Type {
-        let id = self.next_id;
-        self.next_id += 1;
-        Type::Var(id)
     }
 
     /// Constrain a type variable to a concrete type.
@@ -128,11 +119,6 @@ impl<'a> TypeChecker<'a> {
             location: SourceLocation::new(None, span, 0, 0),
             msg: msg.into(),
         });
-    }
-
-    /// Allocate a fresh unification type variable.
-    fn fresh_var(&mut self) -> Type {
-        self.type_vars.fresh_var()
     }
 
     /// Resolve a type by following `Type::Var` chains to their constrained type.
@@ -428,7 +414,7 @@ impl<'a> TypeChecker<'a> {
                 Some(entry) => match &entry.kind {
                     SymKind::Variable(ty) => ty.clone(),
                     SymKind::Function(sig) => {
-                        let ret = sig.return_type.clone().unwrap_or(Type::Unit);
+                        let ret = sig.return_type.clone().unwrap_or(Type::Any);
                         Type::Fn {
                             params: sig.params.iter().map(|(_, t)| t.clone()).collect(),
                             ret: Box::new(ret),

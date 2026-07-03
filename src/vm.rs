@@ -1884,4 +1884,27 @@ pub mod tests {
         let result = try_run(source);
         assert!(result.is_err(), "should fail: unknown not compatible with i64");
     }
+
+    #[test]
+    fn test_assert_eq_returns_error_instead_of_panicking() {
+        // assert_eq on mismatched values should return a Script error, not panic
+        let source = r#"
+            assert_eq(1, 2);
+        "#;
+        let result = try_run(source);
+        assert!(result.is_err(), "assert_eq should return error on mismatch");
+        let err = result.unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("assert_eq failed"), "error should mention assert_eq failed, got: {}", msg);
+    }
+
+    #[test]
+    fn test_assert_eq_passes_on_match() {
+        // assert_eq on matching values should succeed
+        let source = r#"
+            assert_eq(42, 42);
+        "#;
+        let result = try_run(source);
+        assert!(result.is_ok(), "assert_eq should pass on matching values: {:?}", result.err());
+    }
 }
