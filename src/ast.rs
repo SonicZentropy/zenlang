@@ -91,8 +91,8 @@ pub enum Pattern {
     Str(CompactString),
     /// Literal boolean pattern.
     Bool(bool),
-    /// Enum variant destructuring: `Some(val)` or `None`.
-    EnumVariant { variant_name: CompactString, bindings: Vec<CompactString> },
+    /// Enum variant destructuring: `Some(val)` or `O::Some(val)`.
+    EnumVariant { enum_name: Option<CompactString>, variant_name: CompactString, bindings: Vec<CompactString> },
 }
 
 // ---------- Statements ----------
@@ -279,6 +279,8 @@ pub enum Expr {
 
     /// Lambda/closure: `\|x, y\| x + y`.
     Lambda { params: Vec<Param>, return_type: Option<Type>, body: Box<Expr> },
+    /// Qualified enum variant constructor: `O::Some(x)` or `Option::None`.
+    EnumCtor { enum_name: CompactString, variant_name: CompactString, args: Vec<Expr> },
 }
 
 // ---------- Program ----------

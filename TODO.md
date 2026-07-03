@@ -29,6 +29,5 @@ Would JIT help? Yes — but there are caveats.
 
 
 Next Steps
-- Run full integration suite with examples: `cargo run --example cross_call` and `cargo run --example foreign_types`
 - Consider adding convenience methods (e.g. `VM::alloc_array`, `VM::alloc_foreign`) to the public API for external users
 - The 3 pre-existing parser test failures (`test_nested_scopes`, `test_enum_match`, `test_map_operations`) are unrelated — `::` enum path syntax and `+` after block expr need parser work

@@ -88,35 +88,35 @@ fn test_enum_variant_construction_and_match() {
 
         fn describe_color(c: Color) -> str {
             match c {
-                Red => "red",
-                Green => "green",
-                Blue => "blue"
+                Color::Red => "red",
+                Color::Green => "green",
+                Color::Blue => "blue"
             }
         }
 
         fn my_is_some(opt: MyOption) -> bool {
             match opt {
-                MySome(_) => true,
-                MyNone => false
+                MyOption::MySome(_) => true,
+                MyOption::MyNone => false
             }
         }
 
         fn my_unwrap_or(opt: MyOption, default: i32) -> i32 {
             match opt {
-                MySome(v) => v,
-                MyNone => default
+                MyOption::MySome(v) => v,
+                MyOption::MyNone => default
             }
         }
 
         fn divide(a: i32, b: i32) -> MyResult {
-            if b == 0 { MyErr("division by zero") } else { MyOk(a / b) }
+            if b == 0 { MyResult::MyErr("division by zero") } else { MyResult::MyOk(a / b) }
         }
 
-        let a = describe_color(Green);
-        let b = my_is_some(MySome(10));
-        let c = my_is_some(MyNone);
-        let d = my_unwrap_or(MySome(5), 0);
-        let e = my_unwrap_or(MyNone, 42);
+        let a = describe_color(Color::Green);
+        let b = my_is_some(MyOption::MySome(10));
+        let c = my_is_some(MyOption::MyNone);
+        let d = my_unwrap_or(MyOption::MySome(5), 0);
+        let e = my_unwrap_or(MyOption::MyNone, 42);
         let f = divide(10, 2);
         let g = divide(5, 0);
     "#).unwrap();
@@ -218,9 +218,9 @@ fn test_unit_variant_exhaustiveness_check() {
     let source = r#"
         enum Color { Red, Green, Blue }
         fn main() {
-            let r = Red;
+            let r = Color::Red;
             match r {
-                Red => true,
+                Color::Red => true,
             }
         }
     "#;
@@ -264,11 +264,11 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
     // Test 1: match on unit variant returns correct int
     let r = run(r#"
         enum Color { Red, Green, Blue }
-        let r = Red;
+        let r = Color::Red;
         let result = match r {
-            Red => 1,
-            Green => 2,
-            Blue => 3,
+            Color::Red => 1,
+            Color::Green => 2,
+            Color::Blue => 3,
         };
         result
     "#);
@@ -277,11 +277,11 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
     // Test 2: match on unit variant returns correct string
     let r = run(r#"
         enum Color { Red, Green, Blue }
-        let r = Red;
+        let r = Color::Red;
         let label = match r {
-            Red => "hot",
-            Green => "go",
-            Blue => "cold",
+            Color::Red => "hot",
+            Color::Green => "go",
+            Color::Blue => "cold",
         };
         label
     "#);
@@ -292,20 +292,20 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
         enum Color { Red, Green, Blue }
         fn pick(c: Color) -> int {
             match c {
-                Red => 1,
-                Green => 2,
-                Blue => 3,
+                Color::Red => 1,
+                Color::Green => 2,
+                Color::Blue => 3,
             }
         }
-        pick(Red)
+        pick(Color::Red)
     "#);
     assert_eq!(r, Value::Int(1));
 
     // Test 4: wildcard match
     let r = run(r#"
         enum Color { Red, Green, Blue }
-        match Red {
-            Red => 1,
+        match Color::Red {
+            Color::Red => 1,
             _ => 0,
         }
     "#);
@@ -314,10 +314,10 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
     // Test 5: match on data variant with binding
     let r = run(r#"
         enum Maybe { Just(int), Empty }
-        let x = Just(42);
+        let x = Maybe::Just(42);
         match x {
-            Just(v) => v,
-            Empty => 0,
+            Maybe::Just(v) => v,
+            Maybe::Empty => 0,
         }
     "#);
     assert_eq!(r, Value::Int(42));
@@ -325,11 +325,11 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
     // Test 6: mixed unit and data variant match
     let r = run(r#"
         enum Status { Active, Inactive, Error(str) }
-        let s = Active;
+        let s = Status::Active;
         match s {
-            Active => "yes",
-            Inactive => "no",
-            Error(_) => "error",
+            Status::Active => "yes",
+            Status::Inactive => "no",
+            Status::Error(_) => "error",
         }
     "#);
     assert_eq!(r, Value::Str("yes".into()));
@@ -338,11 +338,11 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
     let r = run(r#"
         enum Color { Red, Green, Blue }
         enum Priority { Low, Medium, High }
-        let c = Green;
+        let c = Color::Green;
         match c {
-            Red => High,
-            Green => Medium,
-            Blue => Low,
+            Color::Red => Priority::High,
+            Color::Green => Priority::Medium,
+            Color::Blue => Priority::Low,
         }
     "#);
     assert!(matches!(r, Value::Enum(_)));

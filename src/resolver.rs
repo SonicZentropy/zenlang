@@ -49,7 +49,8 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
             tag: tag as u16,
             fields: fields.clone(),
         };
-        let _ = resolver.symbols.define(vname, cons);
+        let _ = resolver.symbols.define(vname, cons.clone());
+        let _ = resolver.symbols.define(&format!("{}::{}", "Option", vname), cons);
     }
     // Pre-register built-in Result type
     let result_t_param = TypeParam { name: "T".into(), bounds: vec![] };
@@ -70,7 +71,8 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
             tag: tag as u16,
             fields: fields.clone(),
         };
-        let _ = resolver.symbols.define(vname, cons);
+        let _ = resolver.symbols.define(vname, cons.clone());
+        let _ = resolver.symbols.define(&format!("{}::{}", "Result", vname), cons);
     }
     resolver.resolve_program(program)?;
     Ok(resolver.symbols)
@@ -164,7 +166,8 @@ impl Resolver {
                 if let Err(e) = self.symbols.define(name, SymKind::Enum(def)) {
                     self.error(e);
                 }
-                // Register each variant as a constructor in the current scope
+                // Register each variant as a constructor in the current scope (qualified name only;
+                // bare names are reserved for the prelude to avoid collisions with user enums).
                 for (tag, variant) in variants.iter().enumerate() {
                     let cons = SymKind::EnumConstructor {
                         enum_name: name.to_string(),
@@ -172,7 +175,7 @@ impl Resolver {
                         tag: tag as u16,
                         fields: self.resolve_types_in_vec(&variant.fields, type_params),
                     };
-                    if let Err(e) = self.symbols.define(&variant.name, cons) {
+                    if let Err(e) = self.symbols.define(&format!("{}::{}", name, variant.name), cons) {
                         self.error(e);
                     }
                 }
@@ -489,7 +492,7 @@ impl Resolver {
                                 self.error(e);
                             }
                         }
-                        Pattern::EnumVariant { variant_name: _, bindings } => {
+                        Pattern::EnumVariant { enum_name: _, variant_name: _, bindings } => {
                             for binding in bindings {
                                 if binding.is_empty() { continue; } // wildcard _
                                 if let Err(e) = self.symbols.define(binding, SymKind::Variable(Type::Unit)) {
@@ -542,6 +545,11 @@ impl Resolver {
             Expr::Return(None) => {}
             Expr::Yield(inner) => {
                 self.resolve_expr(inner);
+            }
+            Expr::EnumCtor { args, .. } => {
+                for arg in args {
+                    self.resolve_expr(arg);
+                }
             }
             // Literals don't have names to resolve
             Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)

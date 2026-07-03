@@ -501,6 +501,44 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
+            Expr::EnumCtor { enum_name, variant_name, args } => {
+                let qualified = format!("{}::{}", enum_name, variant_name);
+                let lookup_fields = self.symbols.lookup(&qualified).and_then(|entry| {
+                    match &entry.kind {
+                        SymKind::EnumConstructor { fields, .. } => Some(fields.clone()),
+                        _ => None,
+                    }
+                });
+                if let Some(fields) = lookup_fields {
+                    if args.len() != fields.len() {
+                        self.error(format!(
+                            "'{}' expects {} arguments, got {}",
+                            qualified,
+                            fields.len(),
+                            args.len()
+                        ));
+                        for arg in args { self.check_expr(arg); }
+                        return Type::Unit;
+                    }
+                    for (arg, field_ty) in args.iter().zip(fields.iter()) {
+                        let arg_ty = self.check_expr(arg);
+                        if !self.types_compatible(&arg_ty, field_ty) {
+                            self.error(format!(
+                                "argument type mismatch for '{}': expected '{}', got '{}'",
+                                qualified,
+                                self.type_display(field_ty),
+                                self.type_display(&arg_ty),
+                            ));
+                        }
+                    }
+                    return Type::Named(enum_name.clone().into());
+                }
+                for arg in args {
+                    self.check_expr(arg);
+                }
+                self.error(format!("no enum constructor '{}'", qualified));
+                Type::Unit
+            }
             Expr::MethodCall { obj, method, args } => {
                 let obj_ty = self.check_expr(obj);
                 match &obj_ty {
@@ -756,6 +794,7 @@ impl<'a> TypeChecker<'a> {
                             }
                         }
                         Pattern::EnumVariant {
+                            enum_name: _,
                             variant_name,
                             bindings,
                         } => {

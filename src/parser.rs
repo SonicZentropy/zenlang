@@ -57,7 +57,8 @@ impl Precedence {
             TokenKind::OpenParen
             | TokenKind::Dot
             | TokenKind::OpenBracket
-            | TokenKind::Question => Precedence::Call,
+            | TokenKind::Question
+            | TokenKind::ColonColon => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }
@@ -247,12 +248,6 @@ impl<'a> Parser<'a> {
             let span = self.prev_span();
             self.r#match(TokenKind::Semi);
             Ok(Spanned::new(Stmt::Expr(Expr::Continue), span))
-        } else if self.check(&TokenKind::OpenBrace) {
-            let start = self.peek().span.start();
-            let expr = self.block()?;
-            let end = self.prev_span().end();
-            self.r#match(TokenKind::Semi);
-            Ok(Spanned::new(Stmt::Expr(expr), Span::new(start, end)))
         } else {
             self.expr_stmt()
         }
@@ -713,6 +708,21 @@ impl<'a> Parser<'a> {
                     obj: Box::new(expr),
                     index: Box::new(index),
                 };
+            } else if matches!(tok, TokenKind::ColonColon) {
+                self.advance();
+                let variant = self.expect_ident()?;
+                let enum_name = match expr {
+                    Expr::Ident(ref name) => name.clone(),
+                    _ => return Err(self.error("expected enum name before '::'")),
+                };
+                let args = if self.r#match(TokenKind::OpenParen) {
+                    let a = self.arg_list()?;
+                    self.expect(TokenKind::CloseParen)?;
+                    a
+                } else {
+                    vec![]
+                };
+                expr = Expr::EnumCtor { enum_name, variant_name: variant.into(), args };
             } else if matches!(tok, TokenKind::Question) {
                 self.advance();
                 // Desugar expr?  →  match expr { Ok(val) => val, Err(e) => return Err(e) }
@@ -721,6 +731,7 @@ impl<'a> Parser<'a> {
                 let arms = vec![
                     MatchArm {
                         pattern: Pattern::EnumVariant {
+                            enum_name: None,
                             variant_name: "Ok".into(),
                             bindings: vec![val_binding.into()],
                         },
@@ -729,6 +740,7 @@ impl<'a> Parser<'a> {
                     },
                     MatchArm {
                         pattern: Pattern::EnumVariant {
+                            enum_name: None,
                             variant_name: "Err".into(),
                             bindings: vec![err_binding.into()],
                         },
@@ -1241,6 +1253,20 @@ impl<'a> Parser<'a> {
                     obj: Box::new(expr),
                     index: Box::new(index),
                 };
+            } else if self.r#match(TokenKind::ColonColon) {
+                let variant = self.expect_ident()?;
+                let args = if self.r#match(TokenKind::OpenParen) {
+                    let a = self.arg_list()?;
+                    self.expect(TokenKind::CloseParen)?;
+                    a
+                } else {
+                    vec![]
+                };
+                let enum_name = match expr {
+                    Expr::Ident(ref name) => name.clone(),
+                    _ => return Err(self.error("expected enum name before '::'")),
+                };
+                expr = Expr::EnumCtor { enum_name, variant_name: variant.into(), args };
             } else {
                 break;
             }
@@ -1303,6 +1329,32 @@ impl<'a> Parser<'a> {
             }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
+                // Qualified path: EnumName::VariantName(...)
+                if self.r#match(TokenKind::ColonColon) {
+                    let variant = self.expect_ident()?;
+                    let bindings = if self.r#match(TokenKind::OpenParen) {
+                        let mut b = Vec::new();
+                        while !self.check(&TokenKind::CloseParen) && !self.is_at_end() {
+                            let binding = if self.check(&TokenKind::Underscore) {
+                                self.advance();
+                                String::new()
+                            } else {
+                                self.expect_ident()?
+                            };
+                            b.push(binding.into());
+                            self.r#match(TokenKind::Comma);
+                        }
+                        self.expect(TokenKind::CloseParen)?;
+                        b
+                    } else {
+                        vec![]
+                    };
+                    return Ok(Pattern::EnumVariant {
+                        enum_name: Some(name.into()),
+                        variant_name: variant.into(),
+                        bindings,
+                    });
+                }
                 // Enum variant with data: Ident ( args... )
                 if self.r#match(TokenKind::OpenParen) {
                     let mut bindings = Vec::new();
@@ -1318,12 +1370,14 @@ impl<'a> Parser<'a> {
                     }
                     self.expect(TokenKind::CloseParen)?;
                     Ok(Pattern::EnumVariant {
+                        enum_name: None,
                         variant_name: name.into(),
                         bindings,
                     })
                 } else if name.starts_with(|c: char| c.is_uppercase()) {
                     // Uppercase ident without parens = unit enum variant
                     Ok(Pattern::EnumVariant {
+                        enum_name: None,
                         variant_name: name.into(),
                         bindings: vec![],
                     })

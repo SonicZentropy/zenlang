@@ -372,6 +372,7 @@ fn count_lambdas_in_expr(expr: &Expr) -> usize {
         Expr::Range { start, end, .. } => count_lambdas_in_expr(start) + count_lambdas_in_expr(end),
         Expr::Return(Some(inner)) => count_lambdas_in_expr(inner),
         Expr::Yield(inner) => count_lambdas_in_expr(inner),
+        Expr::EnumCtor { args, .. } => args.iter().map(count_lambdas_in_expr).sum(),
         _ => 0,
     }
 }
@@ -462,6 +463,11 @@ fn collect_free_vars_inner(expr: &Expr, own: &HashSet<String>, result: &mut Vec<
         }
         Expr::Return(Some(inner)) => collect_free_vars_inner(inner, own, result),
         Expr::Yield(inner) => collect_free_vars_inner(inner, own, result),
+        Expr::EnumCtor { args, .. } => {
+            for arg in args {
+                collect_free_vars_inner(arg, own, result);
+            }
+        }
         _ => {}
     }
 }
@@ -891,6 +897,26 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Call(args.len() as u16));
             }
 
+            Expr::EnumCtor { enum_name, variant_name, args } => {
+                let qualified = format!("{}::{}", enum_name, variant_name);
+                if let Some(entry) = self.symbols.lookup(&qualified) {
+                    if let SymKind::EnumConstructor {
+                        enum_name: _,
+                        variant_name: _,
+                        tag,
+                        fields: _,
+                    } = &entry.kind
+                    {
+                        for arg in args {
+                            self.compile_expr(arg);
+                        }
+                        self.emit_op(Opcode::MakeEnum(*tag, args.len() as u16));
+                        return;
+                    }
+                }
+                self.error(format!("no enum constructor '{}'", qualified));
+            }
+
             Expr::MethodCall { obj, method, args } => {
                 self.compile_expr(obj);
                 for arg in args {
@@ -1078,6 +1104,7 @@ impl<'a> FunctionCompiler<'a> {
                             arms: vec![
                                 MatchArm {
                                     pattern: Pattern::EnumVariant {
+                                        enum_name: None,
                                         variant_name: "Some".into(),
                                         bindings: vec![var.clone()],
                                     },
@@ -1086,6 +1113,7 @@ impl<'a> FunctionCompiler<'a> {
                                 },
                                 MatchArm {
                                     pattern: Pattern::EnumVariant {
+                                        enum_name: None,
                                         variant_name: "None".into(),
                                         bindings: vec![],
                                     },
@@ -1183,12 +1211,18 @@ impl<'a> FunctionCompiler<'a> {
                             self.patch_jump(next);
                         }
                         Pattern::EnumVariant {
+                            enum_name,
                             variant_name,
                             bindings,
                         } => {
+                            let lookup_name = if let Some(en) = enum_name {
+                                format!("{}::{}", en, variant_name)
+                            } else {
+                                variant_name.to_string()
+                            };
                             let tag: u16 = self
                                 .symbols
-                                .lookup(variant_name)
+                                .lookup(&lookup_name)
                                 .and_then(|entry| {
                                     if let SymKind::EnumConstructor {
                                         enum_name: _,
