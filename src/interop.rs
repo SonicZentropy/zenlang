@@ -150,7 +150,35 @@ where
     }
 }
 
-/// Helper to downcast a Value::Foreign mutably and apply a closure.
+/// Helper to downcast a Value::Foreign to a concrete type and apply a mutating closure.
+///
+/// Unlike `with_foreign_mut`, this takes `&Value` (not `&mut Value`), relying on
+/// the `Rc<RefCell<...>>` interior mutability to provide a `&mut T`. This is
+/// useful in method dispatchers where the receiver comes from an `&[Value]` slice.
+pub fn with_foreign_value_mut<T, R, F>(val: &Value, f: F) -> Result<R>
+where
+    T: 'static,
+    F: FnOnce(&mut T) -> Result<R>,
+{
+    match val {
+        Value::Foreign(obj) => {
+            let cloned = Rc::clone(obj);
+            let data = cloned.borrow_mut();
+            let mut r = data.data.borrow_mut();
+            let inner: &mut T = r.downcast_mut::<T>().ok_or_else(|| {
+                crate::error::Error::Runtime {
+                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), data.type_name),
+                    stack_trace: Vec::new(),
+                }
+            })?;
+            f(inner)
+        }
+        _ => Err(crate::error::Error::Runtime {
+            msg: format!("expected foreign value, got {}", val.type_name()),
+            stack_trace: Vec::new(),
+        }),
+    }
+}
 pub fn with_foreign_mut<T, R, F>(val: &mut Value, f: F) -> Result<R>
 where
     T: 'static,

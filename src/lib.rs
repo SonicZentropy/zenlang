@@ -27,6 +27,7 @@ pub use token::Token;
 pub use value::Value;
 pub use vm::VM;
 pub use zenlang_macros::ZenForeign;
+pub use zenlang_macros::zen_methods;
 
 /// Initialise tracing with sensible defaults for an embedded scripting language.
 pub fn init_tracing() {

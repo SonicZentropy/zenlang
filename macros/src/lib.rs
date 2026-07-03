@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Fields, FnArg, ImplItem, ItemImpl, ReturnType, Type,
+};
 
 #[proc_macro_derive(ZenForeign)]
 pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
@@ -20,12 +22,9 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
             }
         },
         _ => {
-            return syn::Error::new_spanned(
-                &input,
-                "ZenForeign only supports structs",
-            )
-            .to_compile_error()
-            .into()
+            return syn::Error::new_spanned(&input, "ZenForeign only supports structs")
+                .to_compile_error()
+                .into()
         }
     };
 
@@ -286,6 +285,225 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
             pub fn register_zen_foreign(vm: &mut ::zenlang::VM) {
                 vm.register_type::<#name>(stringify!(#name))
                     #(#field_registrations)*;
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+/// Attribute macro to register all methods in an `impl` block as callable
+/// Zenlang methods on the foreign type.
+///
+/// Must be used on an `impl TypeName { ... }` block where `TypeName` is a
+/// struct that also has `#[derive(ZenForeign)]`.
+///
+/// Supports `&self` and `&mut self` methods with parameters of types:
+/// `i64`, `i32`, `i16`, `i8`, `u64`, `u32`, `u16`, `u8`, `f64`, `f32`,
+/// `bool`, `String`, `Value`.
+///
+/// Return types can be: `()`, `i64`, `i32`, `i16`, `i8`, `u64`, `u32`,
+/// `u16`, `u8`, `f64`, `f32`, `bool`, `String`, `Value`.
+///
+/// Generates `TypeName::register_zen_methods(vm)`.
+#[proc_macro_attribute]
+pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let impl_block = parse_macro_input!(item as ItemImpl);
+    let self_ty = &impl_block.self_ty;
+
+    let mut method_registrations = Vec::new();
+
+    for item in &impl_block.items {
+        let method = match item {
+            ImplItem::Fn(m) => m,
+            _ => continue,
+        };
+
+        // Skip methods without &self / &mut self (e.g. constructors)
+        let has_self = method.sig.inputs.first().map_or(false, |arg| {
+            matches!(arg, FnArg::Receiver(_))
+        });
+        if !has_self {
+            continue;
+        }
+
+        let method_name = method.sig.ident.to_string();
+        let method_ident = &method.sig.ident;
+        let is_mut = method.sig.inputs.first().map_or(false, |arg| {
+            matches!(arg, FnArg::Receiver(r) if r.mutability.is_some())
+        });
+
+        let mut param_types = Vec::new();
+        for arg in method.sig.inputs.iter().skip(1) {
+            match arg {
+                FnArg::Typed(pat_type) => {
+                    param_types.push(pat_type.ty.as_ref());
+                }
+                _ => {}
+            }
+        }
+
+        let param_extractions: Vec<_> = param_types
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| {
+                let fi = i + 1;
+                let pname = syn::Ident::new(&format!("p{}", fi), proc_macro2::Span::call_site());
+                match ty_to_field_type(ty) {
+                    FieldType::String => {
+                        quote! { let #pname = ::std::convert::Into::<String>::into(args[#fi].as_str().unwrap_or_default()); }
+                    }
+                    FieldType::I64 => {
+                        quote! { let #pname: i64 = args[#fi].as_int().unwrap_or(0); }
+                    }
+                    FieldType::I32 => {
+                        quote! { let #pname: i32 = args[#fi].as_int().unwrap_or(0) as i32; }
+                    }
+                    FieldType::I16 => {
+                        quote! { let #pname: i16 = args[#fi].as_int().unwrap_or(0) as i16; }
+                    }
+                    FieldType::I8 => {
+                        quote! { let #pname: i8 = args[#fi].as_int().unwrap_or(0) as i8; }
+                    }
+                    FieldType::U64 => {
+                        quote! { let #pname: u64 = args[#fi].as_int().unwrap_or(0) as u64; }
+                    }
+                    FieldType::U32 => {
+                        quote! { let #pname: u32 = args[#fi].as_int().unwrap_or(0) as u32; }
+                    }
+                    FieldType::U16 => {
+                        quote! { let #pname: u16 = args[#fi].as_int().unwrap_or(0) as u16; }
+                    }
+                    FieldType::U8 => {
+                        quote! { let #pname: u8 = args[#fi].as_int().unwrap_or(0) as u8; }
+                    }
+                    FieldType::F64 => {
+                        quote! { let #pname: f64 = args[#fi].as_float().unwrap_or(0.0); }
+                    }
+                    FieldType::F32 => {
+                        quote! { let #pname: f32 = args[#fi].as_float().unwrap_or(0.0) as f32; }
+                    }
+                    FieldType::Bool => {
+                        quote! { let #pname: bool = args[#fi].as_bool().unwrap_or(false); }
+                    }
+                    FieldType::Value | FieldType::ForeignReference => {
+                        quote! { let #pname = args[#fi].clone(); }
+                    }
+                    FieldType::Unknown => {
+                        return syn::Error::new_spanned(
+                            ty,
+                            format!(
+                                "unsupported parameter type '{}' in method '{}'",
+                                quote!(#ty),
+                                method_name
+                            ),
+                        )
+                        .to_compile_error()
+                        .into();
+                    }
+                }
+            })
+            .collect();
+
+        let param_idents: Vec<_> = (1..=param_types.len())
+            .map(|i| {
+                let id = syn::Ident::new(&format!("p{}", i), proc_macro2::Span::call_site());
+                quote! { #id }
+            })
+            .collect();
+
+        let self_accessor = if is_mut {
+            quote! { ::zenlang::interop::with_foreign_value_mut::<#self_ty, _, _> }
+        } else {
+            quote! { ::zenlang::interop::with_foreign::<#self_ty, _, _> }
+        };
+
+        let return_conversion = match &method.sig.output {
+            ReturnType::Default => {
+                quote! {
+                    s.#method_ident(#(#param_idents)*);
+                    ::std::result::Result::Ok(::zenlang::value::Value::Nil)
+                }
+            }
+            ReturnType::Type(_, ty) => match ty_to_field_type(ty) {
+                FieldType::String => {
+                    quote! {
+                        ::std::result::Result::Ok(::zenlang::value::Value::Str(s.#method_ident(#(#param_idents)*).into()))
+                    }
+                }
+                FieldType::I64 => {
+                    quote! {
+                        ::std::result::Result::Ok(::zenlang::value::Value::Int(s.#method_ident(#(#param_idents)*)))
+                    }
+                }
+                FieldType::I32 | FieldType::I16 | FieldType::I8
+                | FieldType::U64 | FieldType::U32 | FieldType::U16 | FieldType::U8 => {
+                    quote! {
+                        ::std::result::Result::Ok(::zenlang::value::Value::Int(s.#method_ident(#(#param_idents)*) as i64))
+                    }
+                }
+                FieldType::F64 => {
+                    quote! {
+                        ::std::result::Result::Ok(::zenlang::value::Value::Float(s.#method_ident(#(#param_idents)*)))
+                    }
+                }
+                FieldType::F32 => {
+                    quote! {
+                        ::std::result::Result::Ok(::zenlang::value::Value::Float(s.#method_ident(#(#param_idents)*) as f64))
+                    }
+                }
+                FieldType::Bool => {
+                    quote! {
+                        ::std::result::Result::Ok(::zenlang::value::Value::Bool(s.#method_ident(#(#param_idents)*)))
+                    }
+                }
+                FieldType::Value | FieldType::ForeignReference => {
+                    quote! {
+                        ::std::result::Result::Ok(s.#method_ident(#(#param_idents)*))
+                    }
+                }
+                FieldType::Unknown => {
+                    return syn::Error::new_spanned(
+                        ty,
+                        format!(
+                            "unsupported return type '{}' in method '{}'",
+                            quote!(#ty),
+                            method_name
+                        ),
+                    )
+                    .to_compile_error()
+                    .into()
+                }
+            },
+        };
+
+        method_registrations.push(quote! {
+            def.method(#method_name, ::std::rc::Rc::new(
+                |_ctx: &mut ::zenlang::vm::VMContext , args: &[::zenlang::value::Value]| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                    #(#param_extractions)*
+                    let result = #self_accessor(&args[0], |s| {
+                        #return_conversion
+                    })?;
+                    ::std::result::Result::Ok(result)
+                }
+            ));
+        });
+    }
+
+    if method_registrations.is_empty() {
+        return quote! { #impl_block }.into();
+    }
+
+    let expanded = quote! {
+        #impl_block
+
+        impl #self_ty {
+            #[allow(non_snake_case)]
+            pub fn register_zen_methods(vm: &mut ::zenlang::VM) {
+                let tid = ::std::any::TypeId::of::<#self_ty>();
+                if let Some(def) = ::std::rc::Rc::make_mut(&mut vm.foreign_registry).get_mut(&tid) {
+                    #(#method_registrations)*
+                }
             }
         }
     };
