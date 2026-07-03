@@ -42,6 +42,10 @@ struct DapSession {
     output_buffer: Rc<RefCell<Vec<String>>>,
     running: bool,
     finished: bool,
+    /// Maps variablesReference IDs to compound values for tree expansion.
+    variable_refs: Vec<crate::value::Value>,
+    /// Breakpoint line → condition expression (for conditional breakpoints).
+    bp_conditions: std::collections::HashMap<usize, String>,
 }
 
 impl DapSession {
@@ -134,6 +138,11 @@ impl DapSession {
         match result {
             Ok(_) => {
                 if self.vm.is_paused() {
+                    // Check if this is a conditional breakpoint whose
+                    // condition evaluates to falsy — skip it automatically.
+                    if self.try_skip_conditional_breakpoint() {
+                        return;
+                    }
                     self.send_stopped();
                 } else {
                     self.finished = true;
@@ -152,6 +161,198 @@ impl DapSession {
                 self.send_event("terminated", json!({}));
             }
         }
+    }
+
+    /// If the VM is stopped at a breakpoint that has a condition, evaluate the
+    /// condition and return true (auto-resume) if the condition is falsy.
+    fn try_skip_conditional_breakpoint(&mut self) -> bool {
+        let loc = match self.vm.debug_current_location() {
+            Some(l) => l,
+            None => return false,
+        };
+        let cond = match self.bp_conditions.get(&loc.line) {
+            Some(c) => c.clone(),
+            None => return false,
+        };
+
+        // Simple evaluation via variable lookup in locals
+        let locals = self.vm.debug_locals(0);
+        let val = eval_condition(&cond, &locals);
+        match val {
+            Some(v) if is_truthy(&v) => false,
+            Some(_) => {
+                // Condition is falsy: resume
+                self.resume_and_check(|vm| vm.debug_continue());
+                true
+            }
+            None => false, // Could not evaluate; stop anyway
+        }
+    }
+
+    /// Convert a Value to a DAP variable descriptor, storing compound values
+    /// for tree expansion and returning a non-zero variablesReference.
+    fn value_to_dap_var(&mut self, name: &str, val: crate::value::Value) -> JsonValue {
+        let vr = self.store_variable(val.clone());
+        json!({
+            "name": name,
+            "value": format!("{:?}", val),
+            "type": val.type_name(),
+            "variablesReference": vr,
+        })
+    }
+
+    /// Store a compound value for tree expansion and return its reference ID.
+    /// Returns 0 for primitive values.
+    fn store_variable(&mut self, val: crate::value::Value) -> i64 {
+        match &val {
+            crate::value::Value::Array(_)
+            | crate::value::Value::Map(_)
+            | crate::value::Value::Struct(..)
+            | crate::value::Value::Foreign(_) => {
+                let id = self.variable_refs.len() + 2; // 1 = locals, 2+ = compound
+                self.variable_refs.push(val);
+                id as i64
+            }
+            _ => 0,
+        }
+    }
+
+}
+
+/// Expand a compound value into (name, value) pairs without borrowing self.
+fn expand_value_raw(val: &crate::value::Value) -> Vec<(String, crate::value::Value)> {
+    match val {
+        crate::value::Value::Array(arr) => {
+            let arr = arr.borrow();
+            arr.iter()
+                .enumerate()
+                .map(|(i, v)| (format!("[{}]", i), v.clone()))
+                .collect()
+        }
+        crate::value::Value::Map(map) => {
+            let map = map.borrow();
+            map.iter()
+                .map(|(k, v)| (format!("{:?}", k), v.clone()))
+                .collect()
+        }
+        crate::value::Value::Struct(data, _) => {
+            let data = data.borrow();
+            let names = data.field_names.clone();
+            names.iter()
+                .map(|name| {
+                    let fv = data.get_field(name).cloned().unwrap_or(crate::value::Value::Nil);
+                    (name.clone(), fv)
+                })
+                .collect()
+        }
+        crate::value::Value::Foreign(_) => {
+            // Foreign expansion requires the registry, which is not available
+            // from a free function. Return empty — the top-level locals handler
+            // will still show Foreign values with a non-zero variablesReference,
+            // and VS Code will request expansion, but we can't expand without
+            // the registry.
+            Vec::new()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Evaluate a condition expression for breakpoints.
+fn eval_condition(cond: &str, locals: &[(String, crate::value::Value)]) -> Option<crate::value::Value> {
+    let trimmed = cond.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Simple variable lookup
+    if let Some((_, val)) = locals.iter().find(|(name, _)| name == trimmed) {
+        return Some(val.clone());
+    }
+    // Binary operators: `a == b`, `a != b`, `a < b`, etc.
+    if let Some(op_pos) = trimmed.find(|c: char| c == '=' || c == '!' || c == '<' || c == '>') {
+        let lhs = trimmed[..op_pos].trim();
+        let mut rest = trimmed[op_pos..].trim_start();
+        // Handle ==, !=, <=, >=, <, >
+        let op = if rest.starts_with("==") {
+            rest = &rest[2..];
+            "=="
+        } else if rest.starts_with("!=") {
+            rest = &rest[2..];
+            "!="
+        } else if rest.starts_with("<=") {
+            rest = &rest[2..];
+            "<="
+        } else if rest.starts_with(">=") {
+            rest = &rest[2..];
+            ">="
+        } else if rest.starts_with('<') {
+            rest = &rest[1..];
+            "<"
+        } else if rest.starts_with('>') {
+            rest = &rest[1..];
+            ">"
+        } else {
+            return None;
+        };
+        let rhs = rest.trim();
+        if let (Some(lv), Some(rv)) = (eval_simple_term(lhs, locals), eval_simple_term(rhs, locals)) {
+            match op {
+                "==" => Some(crate::value::Value::Bool(lv == rv)),
+                "!=" => Some(crate::value::Value::Bool(lv != rv)),
+                _ => {
+                    // Numeric comparisons
+                    let li = to_f64(&lv);
+                    let ri = to_f64(&rv);
+                    match (li, ri) {
+                        (Some(a), Some(b)) => {
+                            let result = match op {
+                                "<" => a < b,
+                                "<=" => a <= b,
+                                ">" => a > b,
+                                ">=" => a >= b,
+                                _ => false,
+                            };
+                            Some(crate::value::Value::Bool(result))
+                        }
+                        _ => None,
+                    }
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+/// Evaluate a simple term (variable name or numeric literal).
+fn eval_simple_term(term: &str, locals: &[(String, crate::value::Value)]) -> Option<crate::value::Value> {
+    if let Ok(i) = term.parse::<i64>() {
+        return Some(crate::value::Value::Int(i));
+    }
+    if let Ok(f) = term.parse::<f64>() {
+        return Some(crate::value::Value::Float(f));
+    }
+    if let Some((_, val)) = locals.iter().find(|(name, _)| name == term) {
+        return Some(val.clone());
+    }
+    None
+}
+
+fn to_f64(v: &crate::value::Value) -> Option<f64> {
+    match v {
+        crate::value::Value::Int(i) => Some(*i as f64),
+        crate::value::Value::Float(f) => Some(*f),
+        crate::value::Value::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
+        _ => None,
+    }
+}
+
+fn is_truthy(v: &crate::value::Value) -> bool {
+    match v {
+        crate::value::Value::Nil => false,
+        crate::value::Value::Bool(b) => *b,
+        _ => true,
     }
 }
 
@@ -206,6 +407,8 @@ pub fn run_dap(source: &str, source_path: Option<&Path>) -> Result<()> {
         output_buffer,
         running: false,
         finished: false,
+        variable_refs: Vec::new(),
+        bp_conditions: std::collections::HashMap::new(),
     };
 
     session.dap_loop()
@@ -235,10 +438,10 @@ impl DapSession {
                         Some(json!({
                             "supportsConfigurationDoneRequest": true,
                             "supportsSetVariable": false,
-                            "supportsConditionalBreakpoints": false,
+                            "supportsConditionalBreakpoints": true,
                             "supportsHitConditionalBreakpoints": false,
                             "supportsFunctionBreakpoints": false,
-                            "supportsEvaluateForHovers": false,
+                            "supportsEvaluateForHovers": true,
                             "supportsStepBack": false,
                             "supportsDataBreakpoints": false,
                             "supportsTerminateRequest": true,
@@ -261,11 +464,17 @@ impl DapSession {
                         .unwrap_or_default();
 
                     self.vm.clear_breakpoints();
+                    self.bp_conditions.clear();
 
                     let mut actual_bps = Vec::new();
                     for bp in &bps {
                         let line = bp["line"].as_i64().unwrap_or(0) as usize;
                         let count = self.vm.set_source_breakpoint(line);
+                        if let Some(cond) = bp["condition"].as_str() {
+                            if !cond.is_empty() {
+                                self.bp_conditions.insert(line, cond.to_string());
+                            }
+                        }
                         actual_bps.push(json!({
                             "line": line,
                             "verified": count > 0,
@@ -363,24 +572,76 @@ impl DapSession {
                 }
 
                 "variables" => {
-                    let vars = self.vm.debug_locals(0);
-                    let variables: Vec<JsonValue> = vars
-                        .iter()
-                        .map(|(name, val)| {
-                            json!({
-                                "name": name,
-                                "value": format!("{:?}", val),
-                                "type": val.type_name(),
-                                "variablesReference": 0,
-                            })
-                        })
-                        .collect();
+                    let ref_id = req["arguments"]["variablesReference"].as_i64().unwrap_or(0) as usize;
+                    let variables: Vec<JsonValue> = if ref_id == 1 {
+                        // Top-level locals
+                        self.vm.debug_locals(0)
+                            .into_iter()
+                            .map(|(name, val)| self.value_to_dap_var(&name, val))
+                            .collect()
+                    } else {
+                        // Child variables from a compound value
+                        let idx = ref_id.wrapping_sub(2);
+                        let mut vars = Vec::new();
+                        if let Some(val) = self.variable_refs.get(idx) {
+                            // Foreign needs registry access
+                            if let crate::value::Value::Foreign(fobj) = val {
+                                let type_name = fobj.borrow().type_name.to_owned();
+                                let registry = &self.vm.foreign_registry;
+                                if let Some(def) = registry.get_by_name(&type_name) {
+                                    let children: Vec<(String, crate::value::Value)> = def.fields.keys().filter_map(|name| {
+                                        def.fields[name].get(val).ok().map(|fv| (name.clone(), fv))
+                                    }).collect();
+                                    for (name, fv) in children {
+                                        vars.push(self.value_to_dap_var(&name, fv));
+                                    }
+                                }
+                            } else {
+                                let children = expand_value_raw(val);
+                                for (name, fv) in children {
+                                    vars.push(self.value_to_dap_var(&name, fv));
+                                }
+                            }
+                        }
+                        vars
+                    };
                     self.send_response(
                         req_seq,
                         &command,
                         true,
                         Some(json!({ "variables": variables })),
                     );
+                }
+
+                "evaluate" => {
+                    let expr = req["arguments"]["expression"].as_str().unwrap_or("");
+                    let frame_id = req["arguments"]["frameId"].as_i64().unwrap_or(0) as usize;
+                    // Simple variable lookup in the specified frame
+                    let locals = self.vm.debug_locals(frame_id);
+                    let result = locals.iter().find(|(name, _)| name == expr).map(|(_, val)| {
+                        let var = self.value_to_dap_var(expr, val.clone());
+                        json!({
+                            "result": var["value"],
+                            "type": var["type"],
+                            "variablesReference": var["variablesReference"],
+                        })
+                    });
+                    match result {
+                        Some(body) => {
+                            self.send_response(req_seq, &command, true, Some(body));
+                        }
+                        None => {
+                            // Try to evaluate as a simple expression
+                            self.send_response(
+                                req_seq,
+                                &command,
+                                false,
+                                Some(json!({
+                                    "result": format!("cannot evaluate '{}'", expr),
+                                })),
+                            );
+                        }
+                    }
                 }
 
                 "source" => {
