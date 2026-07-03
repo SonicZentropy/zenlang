@@ -178,3 +178,17 @@ Would JIT help? Yes — but there are caveats.
 Next Steps
 - Consider adding convenience methods (e.g. `VM::alloc_array`, `VM::alloc_foreign`) to the public API for external users
 - The 3 pre-existing parser test failures (`test_nested_scopes`, `test_enum_match`, `test_map_operations`) are unrelated — `::` enum path syntax and `+` after block expr need parser work
+
+JSON serialization** — `to_json`/`from_json` native functions backed by serde_json
+2. **Closure callbacks** — `VMContext::call_value()` with reentrancy-safe `return_to_depth`
+3. **ForeignObject::clone** — `clone_fn` closure approach, derived Clone on iter states
+4. **Auto-register constructors** — `#[zen_methods]` detects no-self + returns Self → `vm.register_native()`
+5. **`TryFrom<Value>` / `From<T>` impls** — i64, f64, bool, String conversions to/from Value
+6. **StructBuilder API** — builder pattern + `VM::make_struct()` helper
+7. **`#[zen_native_fn]` proc macro** — generates `FnSignature` from annotated native functions
+
+value.rs**: 52 new unit tests covering `From`/`TryFrom` impls, `ForeignObject`, `StructBuilder`, `MapKey`, `Value` methods, `StructData`, `PartialEq`, debug format; rustdoc examples on `StructBuilder::new/field/build/name`
+- **vm.rs**: 20 new unit tests (stdlib fns, JSON edge cases, `make_struct`); rustdoc on `VMContext`, `register_timer`, `remove_timer`, `call_value`, `register_native`, `make_struct`
+- **macros/src/lib.rs**: Added `name:` parameter to `#[zen_native_fn]` (optional; defaults to Rust fn name); doc on `#[derive(ZenForeign)]`
+- **stdlib/mod.rs**: Module-level doc; `contains_impl` now uses `#[zen_native_fn(name: "contains", ...)]` so the generated sig has the correct Zenlang name
+- **interop.rs**: Added rustdoc to `FieldAccessor::new`, `ForeignTypeDef::new/field/method`, `ForeignTypeRegistry::get/get_mut/get_by_name

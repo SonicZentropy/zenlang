@@ -8,18 +8,19 @@ use syn::{
 ///
 /// # Syntax
 /// ```ignore
-/// #[zen_native_fn(params: [Str, I64], returns: Bool)]
-/// fn contains(vm: &mut VMContext, args: &[Value]) -> Result<Value> { ... }
+/// #[zen_native_fn(name: "contains", params: [Str, Str], returns: Bool)]
+/// fn contains_impl(vm: &mut VMContext, args: &[Value]) -> Result<Value> { ... }
 /// ```
 ///
+/// The `name` field is optional; if omitted the Rust function name is used.
 /// Generates a `<fn_name>_sig()` function returning `crate::symbol::FnSignature`.
 #[proc_macro_attribute]
 pub fn zen_native_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as ZenNativeFnArgs);
     let func = parse_macro_input!(item as syn::ItemFn);
     let fn_name = &func.sig.ident;
-    let fn_name_str = fn_name.to_string();
-    let sig_name = syn::Ident::new(&format!("{}_sig", fn_name_str), proc_macro2::Span::call_site());
+    let fn_name_str = args.name.as_deref().unwrap_or(&fn_name.to_string()).to_string();
+    let sig_name = syn::Ident::new(&format!("{}_sig", fn_name), proc_macro2::Span::call_site());
 
     let param_types = &args.params;
     let return_type = &args.returns;
@@ -50,28 +51,75 @@ pub fn zen_native_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 struct ZenNativeFnArgs {
+    name: Option<String>,
     params: Vec<syn::Ident>,
     returns: syn::Ident,
 }
 
 impl syn::parse::Parse for ZenNativeFnArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        // Parse "params:" keyword
-        input.parse::<syn::Ident>()?;
-        input.parse::<syn::Token![:]>()?;
-        // Parse "[" list of idents "]"
-        let content;
-        syn::bracketed!(content in input);
-        let params: Vec<syn::Ident> = content.parse_terminated(syn::Ident::parse, syn::Token![,])?.into_iter().collect();
-        // Parse ", returns:" keyword
-        input.parse::<syn::Token![,]>()?;
-        input.parse::<syn::Ident>()?;
-        input.parse::<syn::Token![:]>()?;
-        let returns: syn::Ident = input.parse()?;
-        Ok(ZenNativeFnArgs { params, returns })
+        let mut name = None;
+        let mut params = None;
+        let mut returns = None;
+
+        // Parse comma-separated key: value pairs
+        while !input.is_empty() {
+            let key: syn::Ident = input.parse()?;
+            input.parse::<syn::Token![:]>()?;
+
+            match key.to_string().as_str() {
+                "name" => {
+                    let lit: syn::LitStr = input.parse()?;
+                    name = Some(lit.value());
+                }
+                "params" => {
+                    let content;
+                    syn::bracketed!(content in input);
+                    params = Some(content.parse_terminated(syn::Ident::parse, syn::Token![,])?.into_iter().collect());
+                }
+                "returns" => {
+                    returns = Some(input.parse::<syn::Ident>()?);
+                }
+                _ => {
+                    return Err(syn::Error::new(key.span(), format!("unknown key '{}'", key)));
+                }
+            }
+
+            // Consume optional comma separator
+            if !input.is_empty() {
+                let _ = input.parse::<syn::Token![,]>();
+            }
+        }
+
+        let params = params.ok_or_else(|| input.error("missing required 'params:' key"))?;
+        let returns = returns.ok_or_else(|| input.error("missing required 'returns:' key"))?;
+
+        Ok(ZenNativeFnArgs { name, params, returns })
     }
 }
 
+/// Derive macro to register a Rust struct as a Zenlang foreign type.
+///
+/// Generates `TypeName::register_zen_foreign(vm: &mut VM)` that registers the
+/// type with all its named fields as accessible properties from Zenlang.
+///
+/// # Supported field types
+///
+/// `i64`, `i32`, `i16`, `i8`, `u64`, `u32`, `u16`, `u8`, `f64`, `f32`,
+/// `bool`, `String`, `Value`, and `Rc<RefCell<...>>` (as foreign references).
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(ZenForeign)]
+/// struct Player {
+///     name: String,
+///     health: i64,
+/// }
+///
+/// // Generated impl:
+/// // Player::register_zen_foreign(&mut vm);
+/// ```
 #[proc_macro_derive(ZenForeign)]
 pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

@@ -1,3 +1,12 @@
+//! Built-in native functions for the Zenlang VM.
+//!
+//! `register_builtins(vm)` registers all stdlib functions (I/O, math, strings,
+//! maps, iterators, JSON, file system, logging). Use `native_names()` to get
+//! the list of names for the resolver.
+//!
+//! Individual native function implementations are in sub-modules (`json`,
+//! `fs`, `iter`, `map`, `log`, `math`).
+
 use std::rc::Rc;
 
 use crate::Result;
@@ -405,7 +414,7 @@ fn len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     }
 }
 
-#[zen_native_fn(params: [Str, Str], returns: Bool)]
+#[zen_native_fn(name: "contains", params: [Str, Str], returns: Bool)]
 fn contains_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1)) {
         (Some(Value::Str(s)), Some(Value::Str(sub))) => Ok(Value::Bool(s.contains(sub.as_ref()))),

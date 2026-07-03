@@ -13,6 +13,7 @@ pub struct FieldAccessor {
 }
 
 impl FieldAccessor {
+    /// Create a new field accessor with getter and setter closures.
     pub fn new<G, S>(getter: G, setter: S) -> Self
     where
         G: Fn(&VM, &Value) -> Result<Value> + 'static,
@@ -45,10 +46,12 @@ pub struct ForeignTypeDef {
 }
 
 impl ForeignTypeDef {
+    /// Create a new type definition with the given name.
     pub fn new(name: &'static str) -> Self {
         Self { name, fields: HashMap::new(), methods: HashMap::new() }
     }
 
+    /// Register a named field with getter and setter closures.
     pub fn field<G, S>(&mut self, name: &str, getter: G, setter: S) -> &mut Self
     where
         G: Fn(&VM, &Value) -> Result<Value> + 'static,
@@ -58,6 +61,7 @@ impl ForeignTypeDef {
         self
     }
 
+    /// Register a method with the given name and native function.
     pub fn method(&mut self, name: &str, f: NativeFn) -> &mut Self {
         self.methods.insert(name.to_string(), f);
         self
@@ -80,14 +84,17 @@ impl ForeignTypeRegistry {
         self.types.insert(type_id, def);
     }
 
+    /// Get the type definition for the given TypeId.
     pub fn get(&self, type_id: &TypeId) -> Option<&ForeignTypeDef> {
         self.types.get(type_id)
     }
 
+    /// Get a mutable reference to the type definition for the given TypeId.
     pub fn get_mut(&mut self, type_id: &TypeId) -> Option<&mut ForeignTypeDef> {
         self.types.get_mut(type_id)
     }
 
+    /// Look up a type definition by its string name.
     pub fn get_by_name(&self, name: &str) -> Option<&ForeignTypeDef> {
         self.types.values().find(|d| d.name == name)
     }

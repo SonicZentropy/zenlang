@@ -12,12 +12,20 @@ use crate::value::{
 };
 
 /// Execution context provided to native functions.
+///
+/// Exposes `call_value` for calling back into the Zenlang runtime,
+/// and `register_timer` / `remove_timer` for scheduling.
 pub struct VMContext {
     pub registry: Rc<ForeignTypeRegistry>,
     pub raw_vm: *mut VM,
 }
 
 impl VMContext {
+    /// Register a one-shot or interval timer from a native function.
+    ///
+    /// The `callback` is a Zenlang function/closure invoked after `delay`
+    /// seconds. If `interval` is `Some(dur)`, the timer repeats every `dur`
+    /// seconds. Returns a timer ID that can be passed to `remove_timer`.
     pub fn register_timer(&mut self, callback: Value, delay: f64, interval: Option<f64>) -> u64 {
         let vm: &mut VM = unsafe { &mut *self.raw_vm };
         let id = vm.timer_id_counter;
@@ -27,6 +35,7 @@ impl VMContext {
         id
     }
 
+    /// Cancel a timer previously created with [`register_timer`](VMContext::register_timer).
     pub fn remove_timer(&mut self, id: u64) {
         let vm: &mut VM = unsafe { &mut *self.raw_vm };
         vm.timers.retain(|t| t.id != id);
@@ -417,6 +426,26 @@ impl VM {
         self.globals.resize(self.global_names.len(), Value::Nil);
     }
 
+    /// Register a native function that can be called from Zenlang scripts.
+    ///
+    /// The function receives a [`VMContext`] and a slice of argument [`Value`]s,
+    /// and must return a `Result<Value>`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use std::rc::Rc;
+    /// # use zenlang::vm::{VM, VMContext};
+    /// # use zenlang::error::Result;
+    /// # use zenlang::value::Value;
+    /// let mut vm = VM::new();
+    /// vm.register_native("increment", Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+    ///     match args.get(0) {
+    ///         Some(Value::Int(n)) => Ok(Value::Int(n + 1)),
+    ///         _ => Ok(Value::Nil),
+    ///     }
+    /// }));
+    /// ```
     pub fn register_native(&mut self, name: &str, f: NativeFn) {
         let idx = self.native_fns.len();
         self.natives.insert(name.to_string(), idx);
@@ -433,7 +462,24 @@ impl VM {
         snapshot
     }
 
-    /// Build a `Value::Struct` from a `StructBuilder`.
+    /// Build a `Value::Struct` from a [`StructBuilder`].
+    ///
+    /// Registers the struct in the VM's intern table and returns a
+    /// `Value::Struct(handle, name)`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// # use zenlang::value::StructBuilder;
+    /// # use zenlang::vm::VM;
+    /// let mut vm = VM::new();
+    /// let val = vm.make_struct(
+    ///     StructBuilder::new("Point")
+    ///         .field("x", 10i64)
+    ///         .field("y", 20i64)
+    /// );
+    /// assert_eq!(val.type_name(), "struct");
+    /// ```
     pub fn make_struct(&mut self, builder: StructBuilder) -> Value {
         let name = builder.name().to_string();
         let h = self.structs.insert(builder.build());
@@ -1540,5 +1586,100 @@ pub mod tests {
     fn test_json_closure_becomes_null() {
         let result = run(r#"to_json(|x| x)"#);
         assert_eq!(result, run(r#""null""#));
+    }
+
+    #[test]
+    fn test_make_struct() {
+        let mut vm = VM::new();
+        let val = vm.make_struct(
+            crate::value::StructBuilder::new("Point")
+                .field("x", 10i64)
+                .field("y", 20i64)
+        );
+        let (h, name) = match &val {
+            Value::Struct(h, name) => (*h, name.clone()),
+            _ => panic!("expected Struct"),
+        };
+        assert_eq!(name, "Point");
+        let sd = vm.structs.get(h);
+        assert_eq!(sd.get_field("x"), Some(&Value::Int(10)));
+        assert_eq!(sd.get_field("y"), Some(&Value::Int(20)));
+    }
+
+    #[test]
+    fn test_json_nil() {
+        assert_eq!(run(r#"to_json(from_json("null"))"#), run(r#""null""#));
+        assert_eq!(run(r#"from_json("null")"#), Value::Nil);
+    }
+
+    #[test]
+    fn test_json_from_json_invalid() {
+        let result = run_program(r#"from_json("not valid json")"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_json_roundtrip_nested_struct() {
+        let source = r#"
+            struct Inner { v: int }
+            struct Outer { inner: Inner }
+            let o = Outer { inner: Inner { v: 42 } };
+            let s = to_json(o);
+            s
+        "#;
+        let result = run(source);
+        let s = result.as_str().unwrap();
+        assert!(s.contains(r#""__type":"Inner""#));
+        assert!(s.contains(r#""v":42"#));
+    }
+
+    #[test]
+    fn test_json_roundtrip_empty_array() {
+        assert_eq!(run(r#"to_json([])"#), run(r#""[]""#));
+        assert_eq!(run(r#"from_json("[]")"#), run("[]"));
+    }
+
+    #[test]
+    fn test_stdlib_len() {
+        assert_eq!(run(r#"len("hello")"#), Value::Int(5));
+    }
+
+    #[test]
+    fn test_stdlib_contains() {
+        assert_eq!(run(r#"contains("hello world", "world")"#), Value::Bool(true));
+        assert_eq!(run(r#"contains("hello world", "xyz")"#), Value::Bool(false));
+    }
+
+    #[test]
+    fn test_stdlib_trim() {
+        assert_eq!(run(r#"trim("  hi  ")"#), run(r#""hi""#));
+    }
+
+    #[test]
+    fn test_stdlib_to_upper_lower() {
+        assert_eq!(run(r#"to_upper("abc")"#), run(r#""ABC""#));
+        assert_eq!(run(r#"to_lower("ABC")"#), run(r#""abc""#));
+    }
+
+    #[test]
+    fn test_stdlib_substring() {
+        assert_eq!(run(r#"substring("hello", 1, 3)"#), run(r#""el""#));
+    }
+
+    #[test]
+    fn test_stdlib_abs() {
+        assert_eq!(run(r#"abs(-5)"#), Value::Int(5));
+    }
+
+    #[test]
+    fn test_stdlib_min_max() {
+        assert_eq!(run(r#"min(3, 7)"#), Value::Int(3));
+        assert_eq!(run(r#"max(3, 7)"#), Value::Int(7));
+    }
+
+    #[test]
+    fn test_stdlib_sqrt() {
+        let result = run(r#"sqrt(9.0)"#);
+        assert!((result.as_float().unwrap() - 3.0).abs() < 1e-10);
     }
 }
