@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::value::Value as ZenValue;
 use crate::vm::{DebugStepMode, VM};
 use serde_json::{json, Value as JsonValue};
 use std::cell::RefCell;
@@ -219,38 +220,34 @@ impl DapSession {
 
 }
 
-/// Expand a compound value into (name, value) pairs without borrowing self.
-fn expand_value_raw(val: &crate::value::Value) -> Vec<(String, crate::value::Value)> {
+/// Expand a compound value into (name, value) pairs.
+fn expand_value_raw(vm: &VM, val: &ZenValue) -> Vec<(String, ZenValue)> {
     match val {
-        crate::value::Value::Array(arr) => {
-            let arr = arr.borrow();
+        ZenValue::Array(h) => {
+            let arr = &vm.arrays.get(*h).values;
             arr.iter()
                 .enumerate()
                 .map(|(i, v)| (format!("[{}]", i), v.clone()))
                 .collect()
         }
-        crate::value::Value::Map(map) => {
-            let map = map.borrow();
+        ZenValue::Map(h) => {
+            let map = &vm.maps.get(*h).entries;
             map.iter()
                 .map(|(k, v)| (format!("{:?}", k), v.clone()))
                 .collect()
         }
-        crate::value::Value::Struct(data, _) => {
-            let data = data.borrow();
+        ZenValue::Struct(h, _) => {
+            let data = vm.structs.get(*h);
             let names = data.field_names.clone();
             names.iter()
                 .map(|name| {
-                    let fv = data.get_field(name).cloned().unwrap_or(crate::value::Value::Nil);
+                    let fv = data.get_field(name).cloned().unwrap_or(ZenValue::Nil);
                     (name.clone(), fv)
                 })
                 .collect()
         }
-        crate::value::Value::Foreign(_) => {
-            // Foreign expansion requires the registry, which is not available
-            // from a free function. Return empty — the top-level locals handler
-            // will still show Foreign values with a non-zero variablesReference,
-            // and VS Code will request expansion, but we can't expand without
-            // the registry.
+        ZenValue::Foreign(_) => {
+            // Foreign expansion requires the registry; handled in the caller
             Vec::new()
         }
         _ => Vec::new(),
@@ -585,19 +582,20 @@ impl DapSession {
                         let mut vars = Vec::new();
                         if let Some(val) = self.variable_refs.get(idx) {
                             // Foreign needs registry access
-                            if let crate::value::Value::Foreign(fobj) = val {
-                                let type_name = fobj.borrow().type_name.to_owned();
+                            if let crate::value::Value::Foreign(h) = val {
+                                let fo = self.vm.foreigns.get(*h);
+                                let type_name = fo.type_name.to_owned();
                                 let registry = &self.vm.foreign_registry;
                                 if let Some(def) = registry.get_by_name(&type_name) {
-                                    let children: Vec<(String, crate::value::Value)> = def.fields.keys().filter_map(|name| {
-                                        def.fields[name].get(val).ok().map(|fv| (name.clone(), fv))
+                                    let children: Vec<(String, ZenValue)> = def.fields.keys().filter_map(|name| {
+                                        def.fields[name].get(&self.vm, val).ok().map(|fv| (name.clone(), fv))
                                     }).collect();
                                     for (name, fv) in children {
                                         vars.push(self.value_to_dap_var(&name, fv));
                                     }
                                 }
                             } else {
-                                let children = expand_value_raw(val);
+                                let children = expand_value_raw(&self.vm, val);
                                 for (name, fv) in children {
                                     vars.push(self.value_to_dap_var(&name, fv));
                                 }

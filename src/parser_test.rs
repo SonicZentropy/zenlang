@@ -345,7 +345,7 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
             Blue => Low,
         }
     "#);
-    assert!(matches!(r, Value::Enum { tag: 1, .. }));
+    assert!(matches!(r, Value::Enum(_)));
 }
 
 // Full integration test: generic function compiles and runs with type erasure

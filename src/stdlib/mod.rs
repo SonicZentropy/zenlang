@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::Result;
 use crate::ast::Type;
 use crate::symbol::FnSignature;
-use crate::value::Value;
+use crate::value::{EnumData, Value, WeakData, WeakKind};
 use crate::vm::{VM, VMContext};
 
 mod fs;
@@ -381,10 +381,13 @@ fn type_of_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 // --- String operations ---
 
-fn len_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
         Some(Value::Str(s)) => Ok(Value::Int(s.len() as i64)),
-        Some(Value::Array(arr)) => Ok(Value::Int(arr.borrow().len() as i64)),
+        Some(Value::Array(h)) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            Ok(Value::Int(vm.arrays.get(*h).values.len() as i64))
+        }
         Some(Value::Range(start, end, inclusive)) => {
             let len = if *inclusive {
                 *end - *start + 1
@@ -393,7 +396,10 @@ fn len_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             };
             Ok(Value::Int(len.max(0)))
         }
-        Some(Value::Map(m)) => Ok(Value::Int(m.borrow().len() as i64)),
+        Some(Value::Map(h)) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            Ok(Value::Int(vm.maps.get(*h).entries.len() as i64))
+        }
         _ => Ok(Value::Int(0)),
     }
 }
@@ -487,28 +493,33 @@ fn sqrt_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 // --- Array operations ---
 
-fn push_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn push_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1)) {
-        (Some(Value::Array(arr)), Some(val)) => {
-            arr.borrow_mut().push(val.clone());
+        (Some(Value::Array(h)), Some(val)) => {
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            vm.arrays.get_mut(*h).values.push(val.clone());
             Ok(Value::Nil)
         }
         _ => Ok(Value::Nil),
     }
 }
 
-fn pop_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn pop_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
-        Some(Value::Array(arr)) => Ok(arr.borrow_mut().pop().unwrap_or(Value::Nil)),
+        Some(Value::Array(h)) => {
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            Ok(vm.arrays.get_mut(*h).values.pop().unwrap_or(Value::Nil))
+        }
         _ => Ok(Value::Nil),
     }
 }
 
-fn insert_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn insert_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1), args.get(2)) {
-        (Some(Value::Array(arr)), Some(Value::Int(idx)), Some(val)) => {
+        (Some(Value::Array(h)), Some(Value::Int(idx)), Some(val)) => {
             let idx = *idx as usize;
-            let mut v = arr.borrow_mut();
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            let v = &mut vm.arrays.get_mut(*h).values;
             if idx <= v.len() {
                 v.insert(idx, val.clone());
             }
@@ -518,11 +529,12 @@ fn insert_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     }
 }
 
-fn remove_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn remove_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1)) {
-        (Some(Value::Array(arr)), Some(Value::Int(idx))) => {
+        (Some(Value::Array(h)), Some(Value::Int(idx))) => {
             let idx = *idx as usize;
-            let mut v = arr.borrow_mut();
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            let v = &mut vm.arrays.get_mut(*h).values;
             if idx < v.len() {
                 Ok(v.remove(idx))
             } else {
@@ -560,7 +572,7 @@ fn to_float_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     }
 }
 
-fn to_str_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn to_str_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
         Some(val) => Ok(Value::Str(match val {
             Value::Nil => "nil".into(),
@@ -570,7 +582,11 @@ fn to_str_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             Value::Str(s) => s.clone(),
             Value::Array(_) => "[...]".into(),
             Value::Struct(_, name) => format!("{name} {{...}}").into(),
-            Value::Enum { tag, .. } => format!("Enum({tag})").into(),
+            Value::Enum(h) => {
+                let vm: &VM = unsafe { &*ctx.raw_vm };
+                let tag = vm.enums.get(*h).tag;
+                format!("Enum({tag})").into()
+            }
             _ => format!("{val:?}").into(),
         })),
         None => Ok(Value::Str("nil".into())),
@@ -582,73 +598,83 @@ fn to_str_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 /// Build a `Some(v)` value using the built-in `Option` enum's convention
 /// (tag 0 = Some). Shared by any stdlib module that needs to hand a
 /// script-visible `Option<T>` back (iterators, map lookups, etc).
-pub(crate) fn option_some(v: Value) -> Value {
-    Value::Enum {
-        tag: 0,
-        data: std::rc::Rc::new(std::cell::RefCell::new(vec![v])),
-    }
+pub(crate) fn option_some(ctx: &mut VMContext, v: Value) -> Value {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let h = vm.enums.insert(EnumData { tag: 0, fields: vec![v] });
+    Value::Enum(h)
 }
 
 /// Build a `None` value using the built-in `Option` enum's convention (tag 1 = None).
-pub(crate) fn option_none() -> Value {
-    Value::Enum {
-        tag: 1,
-        data: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
-    }
+pub(crate) fn option_none(ctx: &mut VMContext) -> Value {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let h = vm.enums.insert(EnumData { tag: 1, fields: vec![] });
+    Value::Enum(h)
 }
 
-fn enum_tag(val: &Value) -> Option<u16> {
+fn enum_tag(ctx: &mut VMContext, val: &Value) -> Option<u16> {
     match val {
-        Value::Enum { tag, data: _ } => Some(*tag),
+        Value::Enum(h) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            Some(vm.enums.get(*h).tag)
+        }
         _ => None,
     }
 }
 
-fn is_some_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn is_some_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(v) == Some(0)),
+        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(0)),
     ))
 }
 
-fn is_none_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn is_none_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(v) == Some(1)),
+        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(1)),
     ))
 }
 
-fn is_ok_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn is_ok_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(v) == Some(0)),
+        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(0)),
     ))
 }
 
-fn is_err_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn is_err_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(v) == Some(1)),
+        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(1)),
     ))
 }
 
-fn unwrap_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn unwrap_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
-        Some(Value::Enum { tag, data }) if *tag == 0 => {
-            Ok(data.borrow().first().cloned().unwrap_or(Value::Nil))
+        Some(Value::Enum(h)) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            let data = vm.enums.get(*h);
+            if data.tag == 0 {
+                Ok(data.fields.first().cloned().unwrap_or(Value::Nil))
+            } else {
+                Err(crate::error::Error::Script {
+                    msg: "unwrap failed: got None/Err".into(),
+                })
+            }
         }
-        Some(Value::Enum { tag: _, data: _ }) => Err(crate::error::Error::Script {
-            msg: "unwrap failed: got None/Err".into(),
-        }),
         _ => Err(crate::error::Error::Script {
             msg: "unwrap called on non-enum value".into(),
         }),
     }
 }
 
-fn unwrap_or_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn unwrap_or_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match (args.first(), args.get(1)) {
-        (Some(Value::Enum { tag, data }), Some(default)) if *tag == 0 => Ok(data
-            .borrow()
-            .first()
-            .cloned()
-            .unwrap_or_else(|| default.clone())),
+        (Some(Value::Enum(h)), Some(default)) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            let data = vm.enums.get(*h);
+            if data.tag == 0 {
+                Ok(data.fields.first().cloned().unwrap_or_else(|| default.clone()))
+            } else {
+                Ok(default.clone())
+            }
+        }
         (_, Some(default)) => Ok(default.clone()),
         _ => Ok(Value::Nil),
     }
@@ -753,11 +779,11 @@ fn every_frame_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn next_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
-        Some(Value::Generator(cell)) => {
+        Some(Value::Generator(h)) => {
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-            match vm.resume_generator(cell.clone())? {
-                Some(val) => Ok(option_some(val)),
-                None => Ok(option_none()),
+            match vm.resume_generator(*h)? {
+                Some(val) => Ok(option_some(ctx, val)),
+                None => Ok(option_none(ctx)),
             }
         }
         _ => Err(crate::error::Error::Script {
@@ -766,14 +792,22 @@ fn next_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     }
 }
 
-fn expect_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn expect_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let msg = args
         .get(1)
         .and_then(|v| v.as_str())
         .unwrap_or_else(|| "expect failed".into());
     match args.first() {
-        Some(Value::Enum { tag, data }) if *tag == 0 => {
-            Ok(data.borrow().first().cloned().unwrap_or(Value::Nil))
+        Some(Value::Enum(h)) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            let data = vm.enums.get(*h);
+            if data.tag == 0 {
+                Ok(data.fields.first().cloned().unwrap_or(Value::Nil))
+            } else {
+                Err(crate::error::Error::Script {
+                    msg: format!("expect failed: {msg}"),
+                })
+            }
         }
         _ => Err(crate::error::Error::Script {
             msg: format!("expect failed: {msg}"),
@@ -783,40 +817,55 @@ fn expect_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 // --- Weak references ---
 
-fn make_weak_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    use std::collections::HashMap;
-    use std::rc::Rc;
-    use std::cell::RefCell;
-    use crate::value::{WeakTarget, StructData, MapKey};
-
+fn make_weak_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let val = args.first().cloned().unwrap_or(Value::Nil);
-    let weak = match &val {
-        Value::Struct(data, name) => {
-            let w = Rc::downgrade(data);
-            Value::Weak(Rc::new(RefCell::new(WeakTarget::Struct(w, name.clone()))))
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    match &val {
+        Value::Struct(h, name) => {
+            let w = vm.weaks.insert(WeakData {
+                kind: WeakKind::Struct,
+                target: *h,
+                type_name: name.clone(),
+            });
+            Ok(Value::Weak(w))
         }
-        Value::Array(data) => {
-            let w = Rc::downgrade(data);
-            Value::Weak(Rc::new(RefCell::new(WeakTarget::Array(w))))
+        Value::Array(h) => {
+            let w = vm.weaks.insert(WeakData {
+                kind: WeakKind::Array,
+                target: *h,
+                type_name: String::new(),
+            });
+            Ok(Value::Weak(w))
         }
-        Value::Map(data) => {
-            let w = Rc::downgrade(data);
-            Value::Weak(Rc::new(RefCell::new(WeakTarget::Map(w))))
+        Value::Map(h) => {
+            let w = vm.weaks.insert(WeakData {
+                kind: WeakKind::Map,
+                target: *h,
+                type_name: String::new(),
+            });
+            Ok(Value::Weak(w))
         }
         _ => return Err(crate::error::Error::Script {
             msg: format!("cannot create weak reference from {}", val.type_name()),
         }),
-    };
-    Ok(weak)
+    }
 }
 
-fn upgrade_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn upgrade_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     match args.first() {
-        Some(Value::Weak(data)) => {
-            let target = data.borrow();
-            match target.upgrade() {
-                Some(val) => Ok(option_some(val)),
-                None => Ok(option_none()),
+        Some(Value::Weak(h)) => {
+            let vm: &VM = unsafe { &*ctx.raw_vm };
+            let weak = vm.weaks.get(*h);
+            let target_handle = weak.target;
+            if vm.weaks.is_valid(target_handle) {
+                let val = match weak.kind {
+                    WeakKind::Struct => Value::Struct(target_handle, weak.type_name.clone()),
+                    WeakKind::Array => Value::Array(target_handle),
+                    WeakKind::Map => Value::Map(target_handle),
+                };
+                Ok(option_some(ctx, val))
+            } else {
+                Ok(option_none(ctx))
             }
         }
         _ => Err(crate::error::Error::Script {

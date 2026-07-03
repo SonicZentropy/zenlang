@@ -1,21 +1,24 @@
-use std::cell::RefCell;
 use std::fs;
 use std::rc::Rc;
 
 use crate::ast::Type;
 use crate::symbol::FnSignature;
-use crate::value::Value;
+use crate::value::{ArrayData, EnumData, Value};
 use crate::vm::{VM, VMContext};
 use crate::Result;
 
 // --- Helpers ---
 
-fn ok_val(val: Value) -> Value {
-    Value::Enum { tag: 0, data: Rc::new(RefCell::new(vec![val])) }
+fn ok_val(ctx: &mut VMContext, val: Value) -> Value {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let h = vm.enums.insert(EnumData { tag: 0, fields: vec![val] });
+    Value::Enum(h)
 }
 
-fn err_val(msg: &str) -> Value {
-    Value::Enum { tag: 1, data: Rc::new(RefCell::new(vec![Value::Str(msg.into())])) }
+fn err_val(ctx: &mut VMContext, msg: &str) -> Value {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let h = vm.enums.insert(EnumData { tag: 1, fields: vec![Value::Str(msg.into())] });
+    Value::Enum(h)
 }
 
 fn result_str_str() -> Type {
@@ -78,52 +81,54 @@ pub fn signatures() -> Vec<FnSignature> {
 
 // --- File I/O ---
 
-fn read_file_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn read_file_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::read_to_string(&path) {
-        Ok(content) => Ok(ok_val(Value::Str(content.into()))),
-        Err(e) => Ok(err_val(&e.to_string())),
+        Ok(content) => Ok(ok_val(ctx, Value::Str(content.into()))),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
-fn read_lines_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn read_lines_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::read_to_string(&path) {
         Ok(content) => {
             let lines: Vec<Value> = content.lines().map(|l| Value::Str(l.into())).collect();
-            Ok(ok_val(Value::Array(Rc::new(RefCell::new(lines)))))
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            let arr = vm.arrays.insert(ArrayData { values: lines });
+            Ok(ok_val(ctx, Value::Array(arr)))
         }
-        Err(e) => Ok(err_val(&e.to_string())),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
-fn write_file_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn write_file_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     let content = args.get(1).and_then(|v| v.as_str()).unwrap_or_default();
     match fs::write(&path, &content) {
-        Ok(()) => Ok(ok_val(Value::Nil)),
-        Err(e) => Ok(err_val(&e.to_string())),
+        Ok(()) => Ok(ok_val(ctx, Value::Nil)),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
-fn append_file_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn append_file_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     let content = args.get(1).and_then(|v| v.as_str()).unwrap_or_default();
     use std::io::Write;
     match fs::OpenOptions::new().append(true).create(true).open(&path) {
         Ok(mut file) => {
             if let Err(e) = writeln!(file, "{}", content) {
-                return Ok(err_val(&e.to_string()));
+                return Ok(err_val(ctx, &e.to_string()));
             }
-            Ok(ok_val(Value::Nil))
+            Ok(ok_val(ctx, Value::Nil))
         }
-        Err(e) => Ok(err_val(&e.to_string())),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
 // --- Directory operations ---
 
-fn list_dir_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn list_dir_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::read_dir(&path) {
         Ok(entries) => {
@@ -135,12 +140,14 @@ fn list_dir_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
                             result.push(Value::Str(name.into()));
                         }
                     }
-                    Err(e) => return Ok(err_val(&e.to_string())),
+                    Err(e) => return Ok(err_val(ctx, &e.to_string())),
                 }
             }
-            Ok(ok_val(Value::Array(Rc::new(RefCell::new(result)))))
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            let arr = vm.arrays.insert(ArrayData { values: result });
+            Ok(ok_val(ctx, Value::Array(arr)))
         }
-        Err(e) => Ok(err_val(&e.to_string())),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
@@ -154,35 +161,35 @@ fn is_file_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(std::path::Path::new(&path).is_file()))
 }
 
-fn create_dir_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn create_dir_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::create_dir(&path) {
-        Ok(()) => Ok(ok_val(Value::Nil)),
-        Err(e) => Ok(err_val(&e.to_string())),
+        Ok(()) => Ok(ok_val(ctx, Value::Nil)),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
-fn create_dirs_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn create_dirs_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::create_dir_all(&path) {
-        Ok(()) => Ok(ok_val(Value::Nil)),
-        Err(e) => Ok(err_val(&e.to_string())),
+        Ok(()) => Ok(ok_val(ctx, Value::Nil)),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
-fn remove_file_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn remove_file_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::remove_file(&path) {
-        Ok(()) => Ok(ok_val(Value::Nil)),
-        Err(e) => Ok(err_val(&e.to_string())),
+        Ok(()) => Ok(ok_val(ctx, Value::Nil)),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 
-fn remove_dir_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn remove_dir_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
     match fs::remove_dir(&path) {
-        Ok(()) => Ok(ok_val(Value::Nil)),
-        Err(e) => Ok(err_val(&e.to_string())),
+        Ok(()) => Ok(ok_val(ctx, Value::Nil)),
+        Err(e) => Ok(err_val(ctx, &e.to_string())),
     }
 }
 

@@ -1,73 +1,146 @@
 use std::any::{Any, TypeId};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
-/// Data stored in a closure value: function index and captured upvalues.
-#[derive(Debug, Clone)]
+use crate::error::Result;
+use crate::slab::Handle;
+
+/// A native Rust function that can be called from Zenlang.
+pub type NativeFn = Rc<dyn Fn(&mut crate::vm::VMContext, &[Value]) -> Result<Value>>;
+
+// ── Handle-based heap data types (no Rc/RefCell) ──────────────────────
+
+/// A mutable array of values.
+pub struct ArrayData {
+    pub values: Vec<Value>,
+}
+
+impl Clone for ArrayData {
+    fn clone(&self) -> Self {
+        Self { values: self.values.clone() }
+    }
+}
+
+/// A struct value with named fields.
+pub struct StructData {
+    pub values: Vec<Value>,
+    pub field_names: Vec<String>,
+}
+
+impl Clone for StructData {
+    fn clone(&self) -> Self {
+        Self { values: self.values.clone(), field_names: self.field_names.clone() }
+    }
+}
+
+impl StructData {
+    pub fn field_index(&self, name: &str) -> Option<usize> {
+        self.field_names.iter().position(|n| n == name)
+    }
+    pub fn get_field(&self, name: &str) -> Option<&Value> {
+        self.field_index(name).map(|i| &self.values[i])
+    }
+    pub fn get_field_mut(&mut self, name: &str) -> Option<&mut Value> {
+        self.field_index(name).map(move |i| &mut self.values[i])
+    }
+}
+
+/// An enum value with tag and field data.
+pub struct EnumData {
+    pub tag: u16,
+    pub fields: Vec<Value>,
+}
+
+impl Clone for EnumData {
+    fn clone(&self) -> Self {
+        Self { tag: self.tag, fields: self.fields.clone() }
+    }
+}
+
+/// A closure with captured upvalues.
 pub struct ClosureData {
     pub fn_idx: usize,
     pub upvalues: Vec<Value>,
 }
 
-/// Saved execution state for a suspended generator (coroutine).
-#[derive(Debug, Clone)]
+impl Clone for ClosureData {
+    fn clone(&self) -> Self {
+        Self { fn_idx: self.fn_idx, upvalues: self.upvalues.clone() }
+    }
+}
+
+/// Saved execution state for a suspended generator.
 pub struct GeneratorState {
-    /// Which function this generator is executing.
     pub function_idx: usize,
-    /// Next instruction to execute (saved on yield).
     pub ip: usize,
-    /// If `true`, first_call — no saved locals yet.
     pub first_call: bool,
-    /// If `true`, the generator has finished (returned, not yielded).
     pub exhausted: bool,
-    /// Saved local variables (populated after first yield).
     pub locals: Vec<Value>,
 }
 
-use crate::error::Result;
+impl Clone for GeneratorState {
+    fn clone(&self) -> Self {
+        Self {
+            function_idx: self.function_idx,
+            ip: self.ip,
+            first_call: self.first_call,
+            exhausted: self.exhausted,
+            locals: self.locals.clone(),
+        }
+    }
+}
 
-/// A native Rust function that can be called from Zenlang.
-pub type NativeFn = Rc<dyn Fn(&mut crate::vm::VMContext, &[Value]) -> Result<Value>>;
+/// A mutable key-value map.
+pub struct MapData {
+    pub entries: HashMap<MapKey, Value>,
+}
 
-/// Wrapper around a foreign (Rust) object stored in the VM.
+impl Clone for MapData {
+    fn clone(&self) -> Self {
+        Self { entries: self.entries.clone() }
+    }
+}
+
+/// Weak reference target kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WeakKind {
+    Struct,
+    Array,
+    Map,
+}
+
+/// A weak reference to a heap-allocated value.
+pub struct WeakData {
+    pub kind: WeakKind,
+    pub target: Handle,
+    pub type_name: String,
+}
+
+impl Clone for WeakData {
+    fn clone(&self) -> Self {
+        Self { kind: self.kind, target: self.target, type_name: self.type_name.clone() }
+    }
+}
+
+/// Wrapper around a foreign (Rust) object.
 pub struct ForeignObject {
     pub type_id: TypeId,
     pub type_name: &'static str,
-    pub data: Rc<RefCell<dyn Any>>,
+    pub data: Box<dyn Any>,
 }
 
 impl ForeignObject {
-    /// Wrap a Rust value as a foreign object with the given type name.
     pub fn new<T: 'static>(type_name: &'static str, data: T) -> Self {
-        Self {
-            type_id: TypeId::of::<T>(),
-            type_name,
-            data: Rc::new(RefCell::new(data)),
-        }
+        Self { type_id: TypeId::of::<T>(), type_name, data: Box::new(data) }
     }
 
-    /// Try to borrow the inner data as `T`. Returns `None` if the type doesn't match.
-    pub fn downcast<T: 'static>(&self) -> Option<std::cell::Ref<'_, T>> {
-        let r = self.data.borrow();
-        if (*r).is::<T>() {
-            Some(std::cell::Ref::map(r, |d| d.downcast_ref::<T>().unwrap()))
-        } else {
-            None
-        }
+    pub fn downcast<T: 'static>(&self) -> Option<&T> {
+        self.data.downcast_ref::<T>()
     }
 
-    /// Try to mutably borrow the inner data as `T`. Returns `None` if the type doesn't match.
-    pub fn downcast_mut<T: 'static>(&self) -> Option<std::cell::RefMut<'_, T>> {
-        let r = self.data.borrow_mut();
-        if (*r).is::<T>() {
-            Some(std::cell::RefMut::map(r, |d| {
-                d.downcast_mut::<T>().unwrap()
-            }))
-        } else {
-            None
-        }
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.data.downcast_mut::<T>()
     }
 }
 
@@ -79,24 +152,13 @@ impl fmt::Debug for ForeignObject {
 
 impl Clone for ForeignObject {
     fn clone(&self) -> Self {
-        // Create a new Rc pointing to the same data
-        Self {
-            type_id: self.type_id,
-            type_name: self.type_name,
-            data: self.data.clone(),
-        }
+        unimplemented!("ForeignObject clone requires type-specific cloning; use VM foreign_slab")
     }
 }
 
-impl PartialEq for ForeignObject {
-    fn eq(&self, other: &Self) -> bool {
-        self.type_id == other.type_id && Rc::ptr_eq(&self.data, &other.data)
-    }
-}
+// ── MapKey ────────────────────────────────────────────────────────────
 
-/// A hashable key for `Value::Map`. Only a subset of `Value` variants can be
-/// used as map keys (ints, strings, bools) — floats, arrays, structs, etc.
-/// don't have stable hashing/equality suitable for map keys.
+/// A hashable key for `Value::Map`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MapKey {
     Int(i64),
@@ -105,7 +167,6 @@ pub enum MapKey {
 }
 
 impl MapKey {
-    /// Convert a `Value` into a `MapKey`, if it's a supported key type.
     pub fn from_value(v: &Value) -> Option<MapKey> {
         match v {
             Value::Int(n) => Some(MapKey::Int(*n)),
@@ -115,7 +176,6 @@ impl MapKey {
         }
     }
 
-    /// Convert this key back into a `Value` (e.g. for `map_keys`/iteration).
     pub fn to_value(&self) -> Value {
         match self {
             MapKey::Int(n) => Value::Int(*n),
@@ -125,157 +185,31 @@ impl MapKey {
     }
 }
 
-/// A struct value with named fields. Uses a `Vec<Value>` for O(1) indexed
-/// field access (the index is resolved at compile time when the struct type
-/// is known) and a shared `Vec<String>` for name↔index mapping. This is
-/// significantly faster and more memory-efficient than a `HashMap` for the
-/// common case (small-to-medium structs with compile-time-known field access).
-///
-/// When the shape changes across a hot reload, field access falls back to a
-/// linear scan of `field_names` (the `Rc`'d Vec), which is still fast for
-/// the modest number of fields typical in game-entity structs.
-#[derive(Debug, Clone)]
-pub struct StructData {
-    /// Field values, stored in struct-declaration order.
-    pub values: Vec<Value>,
-    /// Shared field-name vector. This `Rc` is typically shared across all
-    /// instances of the same struct type so that name→index resolution (used
-    /// for the dynamic fallback path after hot-reload) doesn't allocate per
-    /// instance.
-    pub field_names: Rc<Vec<String>>,
-}
-
-impl PartialEq for StructData {
-    fn eq(&self, other: &Self) -> bool {
-        self.field_names == other.field_names && self.values == other.values
-    }
-}
-
-impl StructData {
-    /// Look up a field by name, returning its index and a reference to the value.
-    /// Returns `None` if no such field exists.
-    pub fn field_index(&self, name: &str) -> Option<usize> {
-        self.field_names.iter().position(|n| n == name)
-    }
-
-    /// Get a field value by name (dynamic/fallback path).
-    pub fn get_field(&self, name: &str) -> Option<&Value> {
-        self.field_index(name).map(|i| &self.values[i])
-    }
-
-    /// Get a field value by name, mutably (dynamic/fallback path).
-    pub fn get_field_mut(&mut self, name: &str) -> Option<&mut Value> {
-        self.field_index(name).map(move |i| &mut self.values[i])
-    }
-}
-
-/// A weak reference to a heap-allocated Zenlang value. Weak references do not
-/// prevent the value from being deallocated, which breaks reference cycles
-/// (e.g. parent→child and child→parent references in a scene graph).
-///
-/// Create one via `make_weak(value)` and retrieve the original (if still alive)
-/// via `upgrade(weak)`, which returns `Option<T>`.
-#[derive(Debug, Clone)]
-pub enum WeakTarget {
-    /// Weak reference to a struct with its type name.
-    Struct(std::rc::Weak<RefCell<StructData>>, String),
-    /// Weak reference to an array.
-    Array(std::rc::Weak<RefCell<Vec<Value>>>),
-    /// Weak reference to a map.
-    Map(std::rc::Weak<RefCell<HashMap<MapKey, Value>>>),
-}
-
-impl WeakTarget {
-    /// Try to upgrade this weak reference. Returns `Some(value)` if the target
-    /// is still alive, `None` if it has been dropped.
-    pub fn upgrade(&self) -> Option<Value> {
-        match self {
-            WeakTarget::Struct(weak, name) => {
-                weak.upgrade().map(|rc| Value::Struct(rc, name.clone()))
-            }
-            WeakTarget::Array(weak) => {
-                weak.upgrade().map(|rc| Value::Array(rc))
-            }
-            WeakTarget::Map(weak) => {
-                weak.upgrade().map(|rc| Value::Map(rc))
-            }
-        }
-    }
-}
-
-impl PartialEq for WeakTarget {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (WeakTarget::Struct(a, an), WeakTarget::Struct(b, bn)) => {
-                an == bn && std::rc::Weak::ptr_eq(a, b)
-            }
-            (WeakTarget::Array(a), WeakTarget::Array(b)) => std::rc::Weak::ptr_eq(a, b),
-            (WeakTarget::Map(a), WeakTarget::Map(b)) => std::rc::Weak::ptr_eq(a, b),
-            _ => false,
-        }
-    }
-}
+// ── Value ─────────────────────────────────────────────────────────────
 
 /// A runtime value in the Zenlang VM.
 ///
-/// All values are boxed — integers, floats, strings, arrays, structs, enums,
-/// functions, foreign objects, and closures. The VM operates uniformly on `Value`,
-/// which enables type-erased generics without monomorphization.
-///
-/// ```rust
-/// use zenlang::Value;
-///
-/// let v = Value::Int(42);
-/// assert_eq!(v.as_int(), Some(42));
-/// assert_eq!(v.type_name(), "int");
-/// assert!(v.is_truthy());
-///
-/// let s: Value = "hello".into();
-/// assert_eq!(s.as_str(), Some("hello".to_string()));
-/// ```
+/// Mutable heap objects (arrays, structs, enums, maps, closures, generators,
+/// weak refs, foreign objects) are referenced by [`Handle`] — an index into
+/// a slab owned by the VM. This eliminates `Rc`/`RefCell` overhead for all
+/// mutable values.
 pub enum Value {
-    /// `nil` — the absence of a value.
     Nil,
-    /// `true` or `false`.
     Bool(bool),
-    /// 64-bit signed integer.
     Int(i64),
-    /// 64-bit float (also stores `f32` values from the source).
     Float(f64),
-    /// Reference-counted string. Strings are immutable.
     Str(Rc<str>),
-    /// A mutable array of values.
-    Array(Rc<RefCell<Vec<Value>>>),
-    /// A struct with named fields. Uses `StructData` with a `Vec<Value>` for
-    /// fast indexed access and a shared `Vec<String>` for name↔index mapping.
-    /// The `String` holds the struct type name for method dispatch.
-    Struct(Rc<RefCell<StructData>>, String),
-    /// An enum value with a tag (variant index) and field data.
-    Enum {
-        tag: u16,
-        data: Rc<RefCell<Vec<Value>>>,
-    },
-    /// A compiled script function identified by its index into the VM's function table.
+    Array(Handle),
+    Struct(Handle, String),
+    Enum(Handle),
     Function(usize),
-    /// A native Rust function registered via the interop system.
     NativeFunction(NativeFn),
-    /// A foreign (Rust) object registered via the type registry.
-    Foreign(Rc<RefCell<ForeignObject>>),
-    /// A closure with captured upvalues.
-    Closure(Rc<RefCell<ClosureData>>),
-    /// A range `start..end` (exclusive) or `start..=end` (inclusive).
+    Foreign(Handle),
+    Closure(Handle),
     Range(i64, i64, bool),
-    /// A mutable key-value map. Keys are restricted to `int`, `str`, and
-    /// `bool` (see `MapKey`) since `float`/`array`/`struct` etc. don't have
-    /// stable hashing/equality suitable for map keys.
-    Map(Rc<RefCell<HashMap<MapKey, Value>>>),
-    /// A weak reference to a heap-allocated value. Does not prevent the target
-    /// from being deallocated, enabling safe cycle-breaking in parent/child
-    /// references. Use `make_weak(value)` to create and `upgrade(weak)` to
-    /// retrieve the original (returns `Option<T>`).
-    Weak(Rc<RefCell<WeakTarget>>),
-    /// A suspended generator (coroutine) that yields values.
-    Generator(Rc<RefCell<GeneratorState>>),
+    Map(Handle),
+    Weak(Handle),
+    Generator(Handle),
 }
 
 impl fmt::Debug for Value {
@@ -286,33 +220,17 @@ impl fmt::Debug for Value {
             Value::Int(n) => write!(f, "Int({})", n),
             Value::Float(n) => write!(f, "Float({})", n),
             Value::Str(s) => write!(f, "Str({:?})", s),
-            Value::Array(_) => write!(f, "Array(...)"),
-            Value::Struct(_, name) => write!(f, "Struct({})", name),
-            Value::Enum { tag, .. } => write!(f, "Enum({})", tag),
+            Value::Array(h) => write!(f, "Array({})", h.index),
+            Value::Struct(h, name) => write!(f, "Struct({}, {})", h.index, name),
+            Value::Enum(h) => write!(f, "Enum({})", h.index),
             Value::Function(idx) => write!(f, "Function({})", idx),
             Value::NativeFunction(_) => write!(f, "NativeFunction(...)"),
-            Value::Foreign(obj) => write!(f, "{:?}", obj.borrow()),
-            Value::Closure(c) => write!(
-                f,
-                "Closure(fn={}, up_count={})",
-                c.borrow().fn_idx,
-                c.borrow().upvalues.len()
-            ),
+            Value::Foreign(h) => write!(f, "Foreign({})", h.index),
+            Value::Closure(h) => write!(f, "Closure({})", h.index),
             Value::Range(s, e, inc) => write!(f, "Range({}, {}, {})", s, e, inc),
-            Value::Map(m) => write!(f, "Map({} entries)", m.borrow().len()),
-            Value::Weak(target) => match &*target.borrow() {
-                WeakTarget::Struct(_, name) => write!(f, "Weak({})", name),
-                WeakTarget::Array(_) => write!(f, "Weak(array)"),
-                WeakTarget::Map(_) => write!(f, "Weak(map)"),
-            },
-            Value::Generator(g) => {
-                let state = g.borrow();
-                if state.exhausted {
-                    write!(f, "Generator(exhausted)")
-                } else {
-                    write!(f, "Generator(fn={}, suspended)", state.function_idx)
-                }
-            }
+            Value::Map(h) => write!(f, "Map({})", h.index),
+            Value::Weak(h) => write!(f, "Weak({})", h.index),
+            Value::Generator(h) => write!(f, "Generator({})", h.index),
         }
     }
 }
@@ -325,24 +243,23 @@ impl Clone for Value {
             Value::Int(n) => Value::Int(*n),
             Value::Float(n) => Value::Float(*n),
             Value::Str(s) => Value::Str(s.clone()),
-            Value::Array(a) => Value::Array(a.clone()),
-            Value::Struct(s, name) => Value::Struct(s.clone(), name.clone()),
-            Value::Enum { tag, data } => Value::Enum {
-                tag: *tag,
-                data: data.clone(),
-            },
+            Value::Array(h) => Value::Array(*h),
+            Value::Struct(h, n) => Value::Struct(*h, n.clone()),
+            Value::Enum(h) => Value::Enum(*h),
             Value::Function(idx) => Value::Function(*idx),
             Value::NativeFunction(f) => Value::NativeFunction(f.clone()),
-            Value::Foreign(r) => Value::Foreign(r.clone()),
-            Value::Closure(c) => Value::Closure(c.clone()),
+            Value::Foreign(h) => Value::Foreign(*h),
+            Value::Closure(h) => Value::Closure(*h),
             Value::Range(s, e, inc) => Value::Range(*s, *e, *inc),
-            Value::Map(m) => Value::Map(m.clone()),
-            Value::Weak(w) => Value::Weak(w.clone()),
-            Value::Generator(g) => Value::Generator(g.clone()),
+            Value::Map(h) => Value::Map(*h),
+            Value::Weak(h) => Value::Weak(*h),
+            Value::Generator(h) => Value::Generator(*h),
         }
     }
 }
 
+/// Identity-based equality for heap values: two handles are equal only if
+/// they point to the same slab slot. Primitive values compare structurally.
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -351,33 +268,22 @@ impl PartialEq for Value {
             (Value::Int(a), Value::Int(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => a.as_ref() == b.as_ref(),
-            (Value::Array(a), Value::Array(b)) => *a.borrow() == *b.borrow(),
-            (Value::Struct(a, an), Value::Struct(b, bn)) => an == bn && *a.borrow() == *b.borrow(),
-            (Value::Enum { tag: ta, data: da }, Value::Enum { tag: tb, data: db }) => {
-                ta == tb && *da.borrow() == *db.borrow()
-            }
+            (Value::Array(a), Value::Array(b)) => a == b,
+            (Value::Struct(a, an), Value::Struct(b, bn)) => an == bn && a == b,
+            (Value::Enum(a), Value::Enum(b)) => a == b,
             (Value::Function(a), Value::Function(b)) => a == b,
-            (Value::Foreign(a), Value::Foreign(b)) => *a.borrow() == *b.borrow(),
-            (Value::Closure(a), Value::Closure(b)) => {
-                let ca = a.borrow();
-                let cb = b.borrow();
-                ca.fn_idx == cb.fn_idx && ca.upvalues == cb.upvalues
-            }
+            (Value::Foreign(a), Value::Foreign(b)) => a == b,
+            (Value::Closure(a), Value::Closure(b)) => a == b,
             (Value::Range(a, b, c), Value::Range(d, e, f)) => a == d && b == e && c == f,
-            (Value::Map(a), Value::Map(b)) => *a.borrow() == *b.borrow(),
-            (Value::Weak(a), Value::Weak(b)) => *a.borrow() == *b.borrow(),
-            (Value::Generator(a), Value::Generator(b)) => {
-                let ga = a.borrow();
-                let gb = b.borrow();
-                ga.function_idx == gb.function_idx && ga.ip == gb.ip && ga.exhausted == gb.exhausted
-            }
+            (Value::Map(a), Value::Map(b)) => a == b,
+            (Value::Weak(a), Value::Weak(b)) => a == b,
+            (Value::Generator(a), Value::Generator(b)) => a == b,
             _ => false,
         }
     }
 }
 
 impl Value {
-    /// Return a human-readable name for this value's runtime type.
     pub fn type_name(&self) -> &'static str {
         match self {
             Value::Nil => "nil",
@@ -387,10 +293,10 @@ impl Value {
             Value::Str(_) => "str",
             Value::Array(_) => "array",
             Value::Struct(_, _) => "struct",
-            Value::Enum { .. } => "enum",
+            Value::Enum(_) => "enum",
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",
-            Value::Foreign(obj) => obj.borrow().type_name,
+            Value::Foreign(_) => "foreign",
             Value::Closure(_) => "closure",
             Value::Range(..) => "range",
             Value::Map(_) => "map",
@@ -399,7 +305,6 @@ impl Value {
         }
     }
 
-    /// Returns `true` if this value is truthy: `nil` is false, `bool` defers to the value, everything else is true.
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Nil => false,
@@ -408,15 +313,10 @@ impl Value {
         }
     }
 
-    /// Extract the value as an `i64`. Returns `None` if it's not an `Int`.
     pub fn as_int(&self) -> Option<i64> {
-        match self {
-            Value::Int(n) => Some(*n),
-            _ => None,
-        }
+        match self { Value::Int(n) => Some(*n), _ => None }
     }
 
-    /// Extract the value as an `f64`. Ints are implicitly convertible to float. Returns `None` otherwise.
     pub fn as_float(&self) -> Option<f64> {
         match self {
             Value::Float(n) => Some(*n),
@@ -425,31 +325,19 @@ impl Value {
         }
     }
 
-    /// Extract the value as a `bool`. Returns `None` if it's not a `Bool`.
     pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            Value::Bool(b) => Some(*b),
-            _ => None,
-        }
+        match self { Value::Bool(b) => Some(*b), _ => None }
     }
 
-    /// Extract the value as a `String`. Returns `None` if it's not a `Str`.
     pub fn as_str(&self) -> Option<String> {
-        match self {
-            Value::Str(s) => Some(s.to_string()),
-            _ => None,
-        }
+        match self { Value::Str(s) => Some(s.to_string()), _ => None }
     }
 }
 
 impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        Value::Str(s.into())
-    }
+    fn from(s: &str) -> Self { Value::Str(s.into()) }
 }
 
 impl From<String> for Value {
-    fn from(s: String) -> Self {
-        Value::Str(s.into())
-    }
+    fn from(s: String) -> Self { Value::Str(s.into()) }
 }

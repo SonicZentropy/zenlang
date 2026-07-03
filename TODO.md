@@ -23,12 +23,12 @@ Would JIT help? Yes — but there are caveats.
 
 | Approach | Effort | Speedup | Best for |
 |---|---|---|---|
-| **1. Faster interpreter** (direct threading, better inline caching) | weeks | ~1.5–2× | General code |
-| **2. Cranelift method JIT** (compile bytecode functions to native, remove dispatch) | 1–2 months | ~2–4× | General code |
-| **3. Tracing JIT** (LuaJIT-style, profile + specialize) | 6+ months | ~10–50× on numeric code | Game/math-heavy scripts |
-
-**If I were building this**, I'd start with a Cranelift-based method JIT (option 2). It's the best effort-to-reward ratio: Cranelift exists, is Rust-native, and handles register allocation and codegen for you. You'd decompile `BytecodeFn` → Cranelift IR → native. This removes the dispatch loop and gives the CPU's frontend a break.
-
-The tracing JIT (option 3) would give bigger headline numbers but requires fundamentally redesigning `Value` (NaN-tagging at minimum) and months of work. Save it for later.
+| **1. Cranelift method JIT** (compile bytecode functions to native, remove dispatch) | 1–2 months | ~2–4× | General code |
 
 **Bottom line**: Zenlang's bytecode is actually a pretty good target for JIT — it's clean, simple, and small (~50 ops). The value representation (`Rc<RefCell<24-variant-enum>`) is the real pain point, not the bytecode format.
+
+
+Next Steps
+- Run full integration suite with examples: `cargo run --example cross_call` and `cargo run --example foreign_types`
+- Consider adding convenience methods (e.g. `VM::alloc_array`, `VM::alloc_foreign`) to the public API for external users
+- The 3 pre-existing parser test failures (`test_nested_scopes`, `test_enum_match`, `test_map_operations`) are unrelated — `::` enum path syntax and `+` after block expr need parser work

@@ -2,14 +2,13 @@
 ///
 /// Run with: cargo run --example foreign_types
 
-use std::rc::Rc;
-
 use zenlang::compiler::compile;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
 use zenlang::resolver::resolve_with_natives;
 use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
+use zenlang::value::ForeignObject;
 use zenlang::vm::VMContext;
 use zenlang::{Value, VM, ZenForeign, zen_methods};
 
@@ -43,12 +42,12 @@ fn main() -> zenlang::Result<()> {
     Player::register_zen_methods(&mut vm);
 
     // Register a native function to create a Player from the script side
-    vm.register_native("create_player", Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
+    vm.register_native("create_player", std::rc::Rc::new(|ctx: &mut VMContext, args: &[Value]| {
         let name = args.first().and_then(|v| v.as_str()).unwrap_or_default();
         let player = Player::new(&name);
-        Ok(Value::Foreign(Rc::new(std::cell::RefCell::new(
-            zenlang::value::ForeignObject::new("Player", player),
-        ))))
+        let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+        let h = vm.foreigns.insert(ForeignObject::new("Player", player));
+        Ok(Value::Foreign(h))
     }));
 
     let mut names = vm.native_names();

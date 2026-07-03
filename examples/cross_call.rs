@@ -3,14 +3,13 @@
 ///
 /// Run with: cargo run --example cross_call
 
-use std::rc::Rc;
-
 use zenlang::compiler::compile;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
 use zenlang::resolver::resolve_with_natives;
 use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
+use zenlang::value::ArrayData;
 use zenlang::vm::VMContext;
 use zenlang::{Value, VM};
 
@@ -19,21 +18,18 @@ fn main() -> zenlang::Result<()> {
     register_builtins(&mut vm);
 
     // --- Rust-provided function #1: compute stats ---
-    vm.register_native("compute_stats", Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
+    vm.register_native("compute_stats", std::rc::Rc::new(|ctx: &mut VMContext, args: &[Value]| {
         let base = args.first().and_then(|v| v.as_int()).unwrap_or(0);
         let level = args.get(1).and_then(|v| v.as_int()).unwrap_or(1);
         let hp = base * 10 + level * 5;
         let atk = base + level * 2;
-        // Return a struct-like value — scripts destructure the result
-        // We use an array as a simple way to return multiple values
-        Ok(Value::Array(Rc::new(std::cell::RefCell::new(vec![
-            Value::Int(hp),
-            Value::Int(atk),
-        ]))))
+        let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+        let h = vm.arrays.insert(ArrayData { values: vec![Value::Int(hp), Value::Int(atk)] });
+        Ok(Value::Array(h))
     }));
 
     // --- Rust-provided function #2: damage formula ---
-    vm.register_native("damage_formula", Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
+    vm.register_native("damage_formula", std::rc::Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
         let atk = args.first().and_then(|v| v.as_int()).unwrap_or(0);
         let def = args.get(1).and_then(|v| v.as_int()).unwrap_or(0);
         let multiplier = args.get(2).and_then(|v| v.as_float()).unwrap_or(1.0);

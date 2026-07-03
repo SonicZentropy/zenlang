@@ -39,99 +39,99 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
             let getter_expr = match field_ty {
                 FieldType::String => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Str(p.#field_name.clone().into())))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Str(p.#field_name.clone().into())))
                         }
                     }
                 }
                 FieldType::I64 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name)))
                         }
                     }
                 }
                 FieldType::I32 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::I16 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::I8 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::U64 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::U32 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::U16 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::U8 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Int(p.#field_name as i64)))
                         }
                     }
                 }
                 FieldType::F64 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Float(p.#field_name)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Float(p.#field_name)))
                         }
                     }
                 }
                 FieldType::F32 => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Float(p.#field_name as f64)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Float(p.#field_name as f64)))
                         }
                     }
                 }
                 FieldType::Bool => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Bool(p.#field_name)))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(::zenlang::value::Value::Bool(p.#field_name)))
                         }
                     }
                 }
                 FieldType::Value => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(p.#field_name.clone()))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(p.#field_name.clone()))
                         }
                     }
                 }
                 FieldType::ForeignReference => {
                     quote! {
-                        |obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
-                            ::zenlang::interop::with_foreign::<#name, _, _>(obj, |p| ::std::result::Result::Ok(p.#field_name.clone()))
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| ::std::result::Result::Ok(p.#field_name.clone()))
                         }
                     }
                 }
@@ -152,111 +152,111 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
             let setter_expr = match field_ty {
                 FieldType::String => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let s = val.as_str().map(|s| s.to_string()).unwrap_or_default();
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = s; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = s; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::I64 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0);
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::I32 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as i32;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::I16 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as i16;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::I8 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as i8;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::U64 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as u64;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::U32 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as u32;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::U16 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as u16;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::U8 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_int().unwrap_or(0) as u8;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::F64 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_float().unwrap_or(0.0);
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::F32 => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_float().unwrap_or(0.0) as f32;
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::Bool => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
                             let v = val.as_bool().unwrap_or(false);
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = v; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::Value => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = val; ::std::result::Result::Ok(()) })
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = val; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
                 FieldType::ForeignReference => {
                     quote! {
-                        |obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
-                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(obj, |p| { p.#field_name = val; ::std::result::Result::Ok(()) })
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                            ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = val; ::std::result::Result::Ok(()) })
                         }
                     }
                 }
@@ -479,9 +479,10 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         method_registrations.push(quote! {
             def.method(#method_name, ::std::rc::Rc::new(
-                |_ctx: &mut ::zenlang::vm::VMContext , args: &[::zenlang::value::Value]| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                |ctx: &mut ::zenlang::vm::VMContext , args: &[::zenlang::value::Value]| -> ::zenlang::error::Result<::zenlang::value::Value> {
                     #(#param_extractions)*
-                    let result = #self_accessor(&args[0], |s| {
+                    let vm: &::zenlang::VM = unsafe { &*ctx.raw_vm };
+                    let result = #self_accessor(vm, &args[0], |s| {
                         #return_conversion
                     })?;
                     ::std::result::Result::Ok(result)

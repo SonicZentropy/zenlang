@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::Result;
 use crate::error::Error;
-use crate::value::Value;
+use crate::value::{ArrayData, Value};
 use crate::vm::{VM, VMContext};
 
 fn as_f64(v: Option<&Value>) -> Result<f64> {
@@ -22,10 +22,9 @@ fn as_f64(v: Option<&Value>) -> Result<f64> {
     })
 }
 
-fn vec_components(v: &Value) -> Result<Vec<f64>> {
+fn vec_components(vm: &VM, v: &Value) -> Result<Vec<f64>> {
     match v {
-        Value::Array(a) => a
-            .borrow()
+        Value::Array(h) => vm.arrays.get(*h).values
             .iter()
             .map(|c| {
                 c.as_float().ok_or_else(|| Error::Script {
@@ -39,10 +38,11 @@ fn vec_components(v: &Value) -> Result<Vec<f64>> {
     }
 }
 
-fn make_vec(components: Vec<f64>) -> Value {
-    Value::Array(Rc::new(RefCell::new(
-        components.into_iter().map(Value::Float).collect(),
-    )))
+fn make_vec(vm: &mut VM, components: Vec<f64>) -> Value {
+    let h = vm.arrays.insert(ArrayData {
+        values: components.into_iter().map(Value::Float).collect(),
+    });
+    Value::Array(h)
 }
 
 // --- Trig / scalar math ---
@@ -137,55 +137,67 @@ fn rand_seed_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 // --- Vector helpers (Vec2 = [x, y], Vec3 = [x, y, z]) ---
 
-fn vec2_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn vec2_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let x = as_f64(args.first())?;
     let y = as_f64(args.get(1))?;
-    Ok(make_vec(vec![x, y]))
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    Ok(make_vec(vm, vec![x, y]))
 }
 
-fn vec3_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn vec3_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let x = as_f64(args.first())?;
     let y = as_f64(args.get(1))?;
     let z = as_f64(args.get(2))?;
-    Ok(make_vec(vec![x, y, z]))
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    Ok(make_vec(vm, vec![x, y, z]))
 }
 
-fn vec_add_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let a = vec_components(args.first().unwrap_or(&Value::Nil))?;
-    let b = vec_components(args.get(1).unwrap_or(&Value::Nil))?;
-    Ok(make_vec(a.iter().zip(&b).map(|(x, y)| x + y).collect()))
+fn vec_add_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &VM = unsafe { &*ctx.raw_vm };
+    let a = vec_components(vm, args.first().unwrap_or(&Value::Nil))?;
+    let b = vec_components(vm, args.get(1).unwrap_or(&Value::Nil))?;
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    Ok(make_vec(vm, a.iter().zip(&b).map(|(x, y)| x + y).collect()))
 }
 
-fn vec_sub_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let a = vec_components(args.first().unwrap_or(&Value::Nil))?;
-    let b = vec_components(args.get(1).unwrap_or(&Value::Nil))?;
-    Ok(make_vec(a.iter().zip(&b).map(|(x, y)| x - y).collect()))
+fn vec_sub_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &VM = unsafe { &*ctx.raw_vm };
+    let a = vec_components(vm, args.first().unwrap_or(&Value::Nil))?;
+    let b = vec_components(vm, args.get(1).unwrap_or(&Value::Nil))?;
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    Ok(make_vec(vm, a.iter().zip(&b).map(|(x, y)| x - y).collect()))
 }
 
-fn vec_scale_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let a = vec_components(args.first().unwrap_or(&Value::Nil))?;
+fn vec_scale_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &VM = unsafe { &*ctx.raw_vm };
+    let a = vec_components(vm, args.first().unwrap_or(&Value::Nil))?;
     let s = as_f64(args.get(1))?;
-    Ok(make_vec(a.iter().map(|x| x * s).collect()))
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    Ok(make_vec(vm, a.iter().map(|x| x * s).collect()))
 }
 
-fn vec_dot_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let a = vec_components(args.first().unwrap_or(&Value::Nil))?;
-    let b = vec_components(args.get(1).unwrap_or(&Value::Nil))?;
+fn vec_dot_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &VM = unsafe { &*ctx.raw_vm };
+    let a = vec_components(vm, args.first().unwrap_or(&Value::Nil))?;
+    let b = vec_components(vm, args.get(1).unwrap_or(&Value::Nil))?;
     Ok(Value::Float(a.iter().zip(&b).map(|(x, y)| x * y).sum()))
 }
 
-fn vec_len_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let a = vec_components(args.first().unwrap_or(&Value::Nil))?;
+fn vec_len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &VM = unsafe { &*ctx.raw_vm };
+    let a = vec_components(vm, args.first().unwrap_or(&Value::Nil))?;
     Ok(Value::Float(a.iter().map(|x| x * x).sum::<f64>().sqrt()))
 }
 
-fn vec_normalize_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    let a = vec_components(args.first().unwrap_or(&Value::Nil))?;
+fn vec_normalize_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &VM = unsafe { &*ctx.raw_vm };
+    let a = vec_components(vm, args.first().unwrap_or(&Value::Nil))?;
     let len = a.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
     if len == 0.0 {
-        return Ok(make_vec(a));
+        return Ok(make_vec(vm, a));
     }
-    Ok(make_vec(a.iter().map(|x| x / len).collect()))
+    Ok(make_vec(vm, a.iter().map(|x| x / len).collect()))
 }
 
 pub fn register(vm: &mut VM) {

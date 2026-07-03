@@ -424,7 +424,14 @@ fn format_val(val: &Value) -> String {
         Value::Function(idx) => format!("fn<{idx}>"),
         Value::NativeFunction(_) => "<native>".into(),
         Value::Range(s, e, inc) => format!("Range({}, {}, {})", s, e, inc),
-        _ => "{..}".into(),
+        Value::Array(h) => format!("Array({})", h.index),
+        Value::Struct(h, name) => format!("Struct({}, {})", h.index, name),
+        Value::Enum(h) => format!("Enum({})", h.index),
+        Value::Map(h) => format!("Map({})", h.index),
+        Value::Closure(h) => format!("Closure({})", h.index),
+        Value::Foreign(h) => format!("Foreign({})", h.index),
+        Value::Weak(h) => format!("Weak({})", h.index),
+        Value::Generator(h) => format!("Generator({})", h.index),
     }
 }
 

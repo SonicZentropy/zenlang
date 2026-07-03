@@ -13,6 +13,7 @@ pub mod parser;
 pub mod parser_test;
 pub mod prelude;
 pub mod resolver;
+pub mod slab;
 pub mod span;
 pub mod stdlib;
 pub mod symbol;

@@ -1496,7 +1496,7 @@ fn const_hash(val: &Value) -> u64 {
         Value::Function(idx) => 5 ^ (*idx as u64),
         Value::Array(_)
         | Value::Struct(..)
-        | Value::Enum { .. }
+        | Value::Enum(_)
         | Value::NativeFunction(_)
         | Value::Foreign(_)
         | Value::Closure(_)

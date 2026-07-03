@@ -4,28 +4,29 @@ use std::rc::Rc;
 
 use crate::error::Result;
 use crate::value::{NativeFn, Value};
+use crate::vm::VM;
 
 /// Accessor for a field on a foreign type.
 pub struct FieldAccessor {
-    pub get: Rc<dyn Fn(&Value) -> Result<Value>>,
-    pub set: Rc<dyn Fn(&mut Value, Value) -> Result<()>>,
+    pub get: Rc<dyn Fn(&VM, &Value) -> Result<Value>>,
+    pub set: Rc<dyn Fn(&mut VM, &mut Value, Value) -> Result<()>>,
 }
 
 impl FieldAccessor {
     pub fn new<G, S>(getter: G, setter: S) -> Self
     where
-        G: Fn(&Value) -> Result<Value> + 'static,
-        S: Fn(&mut Value, Value) -> Result<()> + 'static,
+        G: Fn(&VM, &Value) -> Result<Value> + 'static,
+        S: Fn(&mut VM, &mut Value, Value) -> Result<()> + 'static,
     {
         Self { get: Rc::new(getter), set: Rc::new(setter) }
     }
 
-    pub fn get(&self, obj: &Value) -> Result<Value> {
-        (self.get)(obj)
+    pub fn get(&self, vm: &VM, obj: &Value) -> Result<Value> {
+        (self.get)(vm, obj)
     }
 
-    pub fn set(&self, obj: &mut Value, val: Value) -> Result<()> {
-        (self.set)(obj, val)
+    pub fn set(&self, vm: &mut VM, obj: &mut Value, val: Value) -> Result<()> {
+        (self.set)(vm, obj, val)
     }
 }
 
@@ -50,8 +51,8 @@ impl ForeignTypeDef {
 
     pub fn field<G, S>(&mut self, name: &str, getter: G, setter: S) -> &mut Self
     where
-        G: Fn(&Value) -> Result<Value> + 'static,
-        S: Fn(&mut Value, Value) -> Result<()> + 'static,
+        G: Fn(&VM, &Value) -> Result<Value> + 'static,
+        S: Fn(&mut VM, &mut Value, Value) -> Result<()> + 'static,
     {
         self.fields.insert(name.to_string(), FieldAccessor::new(getter, setter));
         self
@@ -105,39 +106,39 @@ impl ForeignTypeRegistry {
     }
 
     /// Look up and get a field value from a foreign type.
-    pub fn get_field(&self, type_id: &TypeId, field: &str, obj: &Value) -> Option<Result<Value>> {
+    pub fn get_field(&self, vm: &VM, type_id: &TypeId, field: &str, obj: &Value) -> Option<Result<Value>> {
         self.types.get(type_id).and_then(|def| {
-            def.fields.get(field).map(|accessor| accessor.get(obj))
+            def.fields.get(field).map(|accessor| accessor.get(vm, obj))
         })
     }
 
     /// Look up and set a field value on a foreign type.
     pub fn set_field(
         &self,
+        vm: &mut VM,
         type_id: &TypeId,
         field: &str,
         obj: &mut Value,
         val: Value,
     ) -> Option<Result<()>> {
         self.types.get(type_id).and_then(|def| {
-            def.fields.get(field).map(|accessor| accessor.set(obj, val))
+            def.fields.get(field).map(|accessor| accessor.set(vm, obj, val))
         })
     }
 }
 
 /// Helper to downcast a Value::Foreign to a concrete type and apply a closure.
-pub fn with_foreign<T, R, F>(val: &Value, f: F) -> Result<R>
+pub fn with_foreign<T, R, F>(vm: &VM, val: &Value, f: F) -> Result<R>
 where
     T: 'static,
     F: FnOnce(&T) -> Result<R>,
 {
     match val {
-        Value::Foreign(obj) => {
-            let data = obj.borrow();
-            let r = data.data.borrow();
-            let inner: &T = r.downcast_ref::<T>().ok_or_else(|| {
+        Value::Foreign(h) => {
+            let fo = vm.foreigns.get(*h);
+            let inner: &T = fo.downcast::<T>().ok_or_else(|| {
                 crate::error::Error::Runtime {
-                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), data.type_name),
+                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), fo.type_name),
                     stack_trace: Vec::new(),
                 }
             })?;
@@ -153,21 +154,19 @@ where
 /// Helper to downcast a Value::Foreign to a concrete type and apply a mutating closure.
 ///
 /// Unlike `with_foreign_mut`, this takes `&Value` (not `&mut Value`), relying on
-/// the `Rc<RefCell<...>>` interior mutability to provide a `&mut T`. This is
-/// useful in method dispatchers where the receiver comes from an `&[Value]` slice.
-pub fn with_foreign_value_mut<T, R, F>(val: &Value, f: F) -> Result<R>
+/// interior mutability of the slab to provide a `&mut T`. This is useful in method
+/// dispatchers where the receiver comes from an `&[Value]` slice.
+pub fn with_foreign_value_mut<T, R, F>(vm: &VM, val: &Value, f: F) -> Result<R>
 where
     T: 'static,
     F: FnOnce(&mut T) -> Result<R>,
 {
     match val {
-        Value::Foreign(obj) => {
-            let cloned = Rc::clone(obj);
-            let data = cloned.borrow_mut();
-            let mut r = data.data.borrow_mut();
-            let inner: &mut T = r.downcast_mut::<T>().ok_or_else(|| {
+        Value::Foreign(h) => {
+            let type_name = vm.foreigns.get(*h).type_name;
+            let inner: &mut T = vm.foreigns.get_mut(*h).downcast_mut::<T>().ok_or_else(|| {
                 crate::error::Error::Runtime {
-                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), data.type_name),
+                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), type_name),
                     stack_trace: Vec::new(),
                 }
             })?;
@@ -179,18 +178,20 @@ where
         }),
     }
 }
-pub fn with_foreign_mut<T, R, F>(val: &mut Value, f: F) -> Result<R>
+
+/// Helper to downcast a Value::Foreign to a concrete type and apply a mutating closure.
+/// Takes `&mut Value` and `&mut VM` for full mutable access.
+pub fn with_foreign_mut<T, R, F>(vm: &mut VM, val: &mut Value, f: F) -> Result<R>
 where
     T: 'static,
     F: FnOnce(&mut T) -> Result<R>,
 {
     match val {
-        Value::Foreign(obj) => {
-            let data = obj.borrow_mut();
-            let mut r = data.data.borrow_mut();
-            let inner: &mut T = r.downcast_mut::<T>().ok_or_else(|| {
+        Value::Foreign(h) => {
+            let type_name = vm.foreigns.get(*h).type_name;
+            let inner: &mut T = vm.foreigns.get_mut(*h).downcast_mut::<T>().ok_or_else(|| {
                 crate::error::Error::Runtime {
-                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), data.type_name),
+                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), type_name),
                     stack_trace: Vec::new(),
                 }
             })?;
