@@ -294,8 +294,27 @@ impl VM {
             .map(|frame| source_loc_from_frame(&self.functions, frame.function_idx, frame.ip))
             .collect();
         stack_trace.reverse(); // innermost frame first
+        let msg = msg.into();
+        let trace_str: String = stack_trace
+            .iter()
+            .enumerate()
+            .map(|(i, loc)| {
+                let fn_name = if i < self.frames.len() {
+                    let idx = self.frames[self.frames.len() - 1 - i].function_idx;
+                    &self.functions[idx].name
+                } else {
+                    "?"
+                };
+                format!("  {}: at {} (in {})", i, loc, fn_name)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         Error::Runtime {
-            msg: msg.into(),
+            msg: if stack_trace.is_empty() {
+                msg
+            } else {
+                format!("{}\nstack trace:\n{}", msg, trace_str)
+            },
             stack_trace,
         }
     }
