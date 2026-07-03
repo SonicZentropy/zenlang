@@ -111,7 +111,7 @@ impl<'a> TypeChecker<'a> {
                     }
                     ty
                 } else {
-                    Type::Unit
+                    Type::Any
                 };
                 // Restore the binding with the inferred type
                 if let Some(entry) = removed {
@@ -187,7 +187,7 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
                 for param in params {
-                    let ty = param.type_ann.clone().unwrap_or(Type::Unit);
+                    let ty = param.type_ann.clone().unwrap_or(Type::Any);
                     self.symbols.remove_from_current_scope(&param.name);
                     let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
                 }
@@ -252,7 +252,7 @@ impl<'a> TypeChecker<'a> {
                             let ty = if param.type_ann.is_none() && param.name == "self" {
                                 Type::Named(type_name.clone())
                             } else {
-                                param.type_ann.clone().unwrap_or(Type::Unit)
+                                param.type_ann.clone().unwrap_or(Type::Any)
                             };
                             if self.symbols.lookup(&param.name).is_none() {
                                 let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
@@ -486,11 +486,11 @@ impl<'a> TypeChecker<'a> {
                     // statically validate the call, so let it through —
                     // the VM will raise a runtime error if it's genuinely
                     // not callable.
-                    Type::Unit => {
+                    Type::Any => {
                         for arg in args {
                             self.check_expr(arg);
                         }
-                        Type::Unit
+                        Type::Any
                     }
                     _ => {
                         for arg in args {
@@ -601,16 +601,16 @@ impl<'a> TypeChecker<'a> {
                             }
                         }
                     }
-                    // `Type::Unit` is also used as the type-erased "compatible
-                    // with anything" placeholder for generic/native values
+                    // `Type::Any` is the type-erased "compatible with
+                    // anything" placeholder for generic/native values
                     // (see native_fn_sigs()); method calls on such values
                     // (e.g. `.next()` on an iterator returned by `iter()`)
                     // can't be statically validated, so allow them through.
-                    Type::Unit => {
+                    Type::Any => {
                         for arg in args {
                             self.check_expr(arg);
                         }
-                        Type::Unit
+                        Type::Any
                     }
                     _ => {
                         for arg in args {
@@ -648,11 +648,11 @@ impl<'a> TypeChecker<'a> {
                             Type::Unit
                         }
                     }
-                    // `Type::Unit` is used as the type-erased placeholder for
+                    // `Type::Any` is the type-erased placeholder for
                     // foreign values and generic native returns. Field access
                     // on such values can't be statically validated, so allow
                     // it through (field access will be resolved at runtime).
-                    Type::Unit => Type::Unit,
+                    Type::Any => Type::Any,
                     _ => {
                         self.error(format!(
                             "cannot access field on type '{}'",
@@ -668,11 +668,11 @@ impl<'a> TypeChecker<'a> {
                 match &ot {
                     Type::Array(inner) => *inner.clone(),
                     Type::Str => Type::Str,
-                    // Ranges, maps, and other type-erased (`Type::Unit`)
+                    // Ranges, maps, and other type-erased (`Type::Any`)
                     // values are indexable at runtime but their element type
-                    // can't be known statically here; `Type::Unit` is the
-                    // codebase's "compatible with anything" placeholder.
-                    _ => Type::Unit,
+                    // can't be known statically here; `Type::Any` is the
+                    // "compatible with anything" placeholder.
+                    _ => Type::Any,
                 }
             }
             Expr::Block(stmts) => {
@@ -693,10 +693,10 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::If { cond, then, else_ } => {
                 let ct = self.check_expr(cond);
-                // `Type::Unit` covers type-erased values (e.g. the result of
+                // `Type::Any` covers type-erased values (e.g. the result of
                 // calling an untyped callback parameter) that can't be
                 // statically proven boolean; let the VM enforce it at runtime.
-                if !matches!(ct, Type::Bool | Type::Unit) {
+                if !matches!(ct, Type::Bool | Type::Any) {
                     self.error("if condition must be bool");
                 }
                 let tt = self.check_expr(then);
@@ -712,7 +712,7 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::While { cond, body } => {
                 let ct = self.check_expr(cond);
-                if !matches!(ct, Type::Bool | Type::Unit) {
+                if !matches!(ct, Type::Bool | Type::Any) {
                     self.error("while condition must be bool");
                 }
                 self.check_expr(body);
@@ -728,12 +728,12 @@ impl<'a> TypeChecker<'a> {
                         Type::Str => Type::Str,
                         // Ranges (as a value, not an inline literal), maps,
                         // custom struct/foreign iterators, and anything else
-                        // type-erased (`Type::Unit`) can't have their element
-                        // type known statically here — `Type::Unit` is the
-                        // codebase's "compatible with anything" placeholder,
-                        // so uses of the loop variable aren't spuriously
-                        // rejected by later type checks.
-                        _ => Type::Unit,
+                        // type-erased (`Type::Any`) can't have their element
+                        // type known statically here — `Type::Any` is the
+                        // "compatible with anything" placeholder, so uses of
+                        // the loop variable aren't spuriously rejected by
+                        // later type checks.
+                        _ => Type::Any,
                     },
                 };
                 // Remove any existing binding (from resolver) and re-insert
@@ -790,7 +790,7 @@ impl<'a> TypeChecker<'a> {
                     match &arm.pattern {
                         Pattern::Ident(name) => {
                             if self.symbols.lookup(name).is_none() {
-                                let _ = self.symbols.define(name, SymKind::Variable(Type::Unit));
+                                let _ = self.symbols.define(name, SymKind::Variable(Type::Any));
                             }
                         }
                         Pattern::EnumVariant {
@@ -847,13 +847,13 @@ impl<'a> TypeChecker<'a> {
                                         variant_name
                                     ));
                                 }
-                            } else if matches!(mt, Type::Unit) {
+                            } else if matches!(mt, Type::Any) {
                                 // The matched value's type is type-erased
                                 // (e.g. the result of a method call on a
                                 // generically-typed receiver, like
                                 // `it.next()` on an iterator). We can't
                                 // statically validate the variant/bindings,
-                                // so bind each capture as `Type::Unit` and
+                                // so bind each capture as `Type::Any` and
                                 // let the runtime handle the actual dispatch
                                 // — consistent with the rest of the
                                 // type-erased-generics design.
@@ -863,7 +863,7 @@ impl<'a> TypeChecker<'a> {
                                     }
                                     self.symbols.remove_from_current_scope(binding);
                                     let _ =
-                                        self.symbols.define(binding, SymKind::Variable(Type::Unit));
+                                        self.symbols.define(binding, SymKind::Variable(Type::Any));
                                 }
                             } else {
                                 self.error("cannot match enum variant on non-enum type");
@@ -917,9 +917,20 @@ impl<'a> TypeChecker<'a> {
                         }
                     }
                 }
-                // All arms should have compatible types
-                let first = arm_types.first().cloned().unwrap_or(Type::Unit);
-                for at in &arm_types {
+                // All arms should have compatible types.
+                // Diverging arms (return/break/continue) are excluded from the
+                // compatibility check — they never produce a value and should
+                // not constrain the match type.  This mirrors Rust's treatment
+                // of the never type `!`.
+                let diverges = |body: &Expr| matches!(body,
+                    Expr::Return(..) | Expr::Break | Expr::Continue
+                );
+                let non_diverging: Vec<Type> = arm_types.iter().zip(arms.iter())
+                    .filter(|(_, arm)| !diverges(&arm.body))
+                    .map(|(ty, _)| ty.clone())
+                    .collect();
+                let first = non_diverging.first().cloned().unwrap_or(Type::Unit);
+                for at in &non_diverging {
                     if !self.types_compatible(&first, at) {
                         self.error("match arms must have compatible types");
                     }
@@ -980,7 +991,7 @@ impl<'a> TypeChecker<'a> {
                 for elem in elems {
                     elem_types.push(self.check_expr(elem));
                 }
-                let inner = elem_types.first().cloned().unwrap_or(Type::Unit);
+                let inner = elem_types.first().cloned().unwrap_or(Type::Any);
                 Type::Array(Box::new(inner))
             }
             Expr::Range { start, end, .. } => {
@@ -995,7 +1006,7 @@ impl<'a> TypeChecker<'a> {
             } => {
                 self.symbols.enter_scope();
                 for param in params {
-                    let ty = param.type_ann.clone().unwrap_or(Type::Unit);
+                    let ty = param.type_ann.clone().unwrap_or(Type::Any);
                     if self.symbols.lookup(&param.name).is_none() {
                         let _ = self.symbols.define(&param.name, SymKind::Variable(ty));
                     }
@@ -1005,7 +1016,7 @@ impl<'a> TypeChecker<'a> {
                 Type::Fn {
                     params: params
                         .iter()
-                        .map(|p| p.type_ann.clone().unwrap_or(Type::Unit))
+                        .map(|p| p.type_ann.clone().unwrap_or(Type::Any))
                         .collect(),
                     ret: Box::new(ret),
                 }
@@ -1019,8 +1030,10 @@ impl<'a> TypeChecker<'a> {
         let a = self.resolve_named(a);
         let b = self.resolve_named(b);
         match (&a, &b) {
-            // Unit (from foreign field access, unknown at compile time) is compatible with everything
-            (Type::Unit, _) | (_, Type::Unit) => true,
+            // `any` is compatible with everything — the dynamic type wildcard
+            (Type::Any, _) | (_, Type::Any) => true,
+            // Unit type: only compatible with itself
+            (Type::Unit, Type::Unit) => true,
             // Generic type parameters are compatible with any type (type erasure)
             (Type::Generic(_), _) | (_, Type::Generic(_)) => true,
             (Type::I64, Type::I64) => true,
@@ -1078,6 +1091,7 @@ impl<'a> TypeChecker<'a> {
             Type::Bool => "bool".into(),
             Type::Str => "str".into(),
             Type::Unit => "()".into(),
+            Type::Any => "any".into(),
             Type::Named(s) => s.to_string(),
             Type::Generic(s) => s.to_string(),
             Type::Array(inner) => format!("[{}]", self.type_display(inner)),

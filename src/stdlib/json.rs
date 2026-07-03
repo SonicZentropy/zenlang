@@ -181,14 +181,14 @@ pub fn signatures() -> Vec<crate::symbol::FnSignature> {
         crate::symbol::FnSignature {
             type_params: vec![],
             name: "to_json".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Str),
         },
         crate::symbol::FnSignature {
             type_params: vec![],
             name: "from_json".into(),
             params: vec![("json".into(), Type::Str)],
-            return_type: Some(Type::Unit),
+            return_type: Some(Type::Any),
         },
     ]
 }

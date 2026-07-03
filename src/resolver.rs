@@ -26,7 +26,7 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
                 name: name.clone(),
                 type_params: vec![],
                 params: vec![],
-                return_type: Some(crate::ast::Type::Unit),
+                return_type: Some(crate::ast::Type::Any),
             };
             let _ = resolver.symbols.define(name, SymKind::Function(sig));
         }
@@ -37,7 +37,7 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
         name: "Option".into(),
         type_params: vec![option_param],
         variants: vec![
-            ("Some".into(), vec![Type::Unit]), // Unit acts as generic placeholder (compatible with everything)
+            ("Some".into(), vec![Type::Any]), // Any acts as generic placeholder (compatible with everything)
             ("None".into(), vec![]),
         ],
     };
@@ -59,8 +59,8 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
         name: "Result".into(),
         type_params: vec![result_t_param, result_e_param],
         variants: vec![
-            ("Ok".into(), vec![Type::Unit]), // Unit acts as generic placeholder
-            ("Err".into(), vec![Type::Unit]), // Unit acts as generic placeholder
+            ("Ok".into(), vec![Type::Any]),  // Any acts as generic placeholder
+            ("Err".into(), vec![Type::Any]), // Any acts as generic placeholder
         ],
     };
     let _ = resolver.symbols.define("Result", SymKind::Enum(result_def.clone()));

@@ -42,6 +42,10 @@ pub enum Type {
     Str,
     /// `()` — unit type.
     Unit,
+    /// `any` — dynamically typed, compatible with everything.
+    /// Used as the wildcard for type-erased values, unannotated parameters,
+    /// and native function signatures that accept any type.
+    Any,
     /// A named type reference, e.g. `MyStruct` or `Option`.
     Named(CompactString),
     /// A generic type parameter, e.g. `T` in `fn foo<T>(x: T)`.

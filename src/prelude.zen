@@ -52,7 +52,7 @@ fn enumerate(iterable) {
     let mut i = 0;
     loop {
         match it.next() {
-            Some(v) => { push(result, [i, v]); i = i + 1; }
+            Some(v) => { let cur = i; i = i + 1; push(result, [cur, v]); }
             None => { break; }
         }
     }
@@ -66,7 +66,7 @@ fn take(iterable, n) {
     loop {
         if i >= n { break; }
         match it.next() {
-            Some(v) => { push(result, v); i = i + 1; }
+            Some(v) => { i = i + 1; push(result, v); }
             None => { break; }
         }
     }

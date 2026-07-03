@@ -146,7 +146,7 @@ impl SymbolTable {
     }
 
     /// Update the type of an existing variable binding (used by type checker
-    /// to refine from `Type::Unit` to the inferred type).
+    /// to refine from `Type::Any` to the inferred type).
     pub fn update_variable_type(&mut self, name: &str, ty: Type) {
         // Walk scopes from innermost outward, update first variable match
         let mut scope = self.current_scope;

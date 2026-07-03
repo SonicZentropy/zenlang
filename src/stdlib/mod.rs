@@ -106,7 +106,7 @@ pub fn native_names() -> Vec<String> {
 
 /// Return accurate type signatures for all native functions.
 pub fn native_fn_sigs() -> Vec<FnSignature> {
-    // Unit param type = compatible with everything (acts as type variable)
+    // `Type::Any` param type = compatible with everything (dynamic/native values)
     let mut sigs = vec![
         FnSignature {
             type_params: vec![],
@@ -117,25 +117,25 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
         FnSignature {
             type_params: vec![],
             name: "assert".into(),
-            params: vec![("cond".into(), Type::Unit)],
+            params: vec![("cond".into(), Type::Any)],
             return_type: Some(Type::Unit),
         },
         FnSignature {
             type_params: vec![],
             name: "assert_eq".into(),
-            params: vec![("a".into(), Type::Unit), ("b".into(), Type::Unit)],
+            params: vec![("a".into(), Type::Any), ("b".into(), Type::Any)],
             return_type: Some(Type::Unit),
         },
         FnSignature {
             type_params: vec![],
             name: "type_of".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Str),
         },
         FnSignature {
             type_params: vec![],
             name: "len".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::I64),
         },
         contains_impl_sig(),
@@ -194,120 +194,120 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
         FnSignature {
             type_params: vec![],
             name: "push".into(),
-            params: vec![("arr".into(), Type::Unit), ("val".into(), Type::Unit)],
+            params: vec![("arr".into(), Type::Any), ("val".into(), Type::Any)],
             return_type: Some(Type::Unit),
         },
         FnSignature {
             type_params: vec![],
             name: "pop".into(),
-            params: vec![("arr".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("arr".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "insert".into(),
             params: vec![
-                ("arr".into(), Type::Unit),
+                ("arr".into(), Type::Any),
                 ("idx".into(), Type::I64),
-                ("val".into(), Type::Unit),
+                ("val".into(), Type::Any),
             ],
             return_type: Some(Type::Unit),
         },
         FnSignature {
             type_params: vec![],
             name: "remove".into(),
-            params: vec![("arr".into(), Type::Unit), ("idx".into(), Type::I64)],
-            return_type: Some(Type::Unit),
+            params: vec![("arr".into(), Type::Any), ("idx".into(), Type::I64)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "to_int".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::I64),
         },
         FnSignature {
             type_params: vec![],
             name: "to_float".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::F64),
         },
         FnSignature {
             type_params: vec![],
             name: "to_str".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Str),
         },
         FnSignature {
             type_params: vec![],
             name: "is_some".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Bool),
         },
         FnSignature {
             type_params: vec![],
             name: "is_none".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Bool),
         },
         FnSignature {
             type_params: vec![],
             name: "is_ok".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Bool),
         },
         FnSignature {
             type_params: vec![],
             name: "is_err".into(),
-            params: vec![("val".into(), Type::Unit)],
+            params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Bool),
         },
         FnSignature {
             type_params: vec![],
             name: "unwrap".into(),
-            params: vec![("val".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("val".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "unwrap_or".into(),
-            params: vec![("val".into(), Type::Unit), ("default".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("val".into(), Type::Any), ("default".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "expect".into(),
-            params: vec![("val".into(), Type::Unit), ("msg".into(), Type::Str)],
-            return_type: Some(Type::Unit),
+            params: vec![("val".into(), Type::Any), ("msg".into(), Type::Str)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "make_weak".into(),
-            params: vec![("val".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("val".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "upgrade".into(),
-            params: vec![("val".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("val".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "iter".into(),
-            params: vec![("val".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("val".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "next".into(),
-            params: vec![("gen".into(), Type::Unit)],
-            return_type: Some(Type::Unit),
+            params: vec![("gen".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
         FnSignature {
             type_params: vec![],
             name: "set_timeout".into(),
             params: vec![
-                ("callback".into(), Type::Unit),
+                ("callback".into(), Type::Any),
                 ("seconds".into(), Type::F64),
             ],
             return_type: Some(Type::I64),
@@ -316,7 +316,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "set_interval".into(),
             params: vec![
-                ("callback".into(), Type::Unit),
+                ("callback".into(), Type::Any),
                 ("seconds".into(), Type::F64),
             ],
             return_type: Some(Type::I64),
@@ -331,22 +331,22 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "after".into(),
             params: vec![
-                ("seconds".into(), Type::Unit),
-                ("callback".into(), Type::Unit),
+                ("seconds".into(), Type::Any),
+                ("callback".into(), Type::Any),
             ],
             return_type: Some(Type::I64),
         },
         FnSignature {
             type_params: vec![],
             name: "every_frame".into(),
-            params: vec![("callback".into(), Type::Unit)],
+            params: vec![("callback".into(), Type::Any)],
             return_type: Some(Type::Unit),
         },
     ];
     sigs.extend(fs::signatures());
     sigs.extend(json::signatures());
-    sigs.extend(log::signatures());
     sigs.extend(map::signatures());
+    sigs.extend(log::signatures());
     sigs.extend(math::signatures());
     sigs
 }
