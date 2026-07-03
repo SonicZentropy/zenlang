@@ -166,8 +166,11 @@ impl Resolver {
                 if let Err(e) = self.symbols.define(name, SymKind::Enum(def)) {
                     self.error(e);
                 }
-                // Register each variant as a constructor in the current scope (qualified name only;
-                // bare names are reserved for the prelude to avoid collisions with user enums).
+                // Register each variant as a constructor in the current scope, both bare and
+                // qualified. The bare name allows ergonomic `Foo(42)` usage in expressions and
+                // patterns; the qualified name `MyEnum::Foo(42)` disambiguates. If the bare name
+                // clashes with an existing symbol (e.g. prelude `Some`/`None`), the existing
+                // binding wins — users should use the qualified form in that case.
                 for (tag, variant) in variants.iter().enumerate() {
                     let cons = SymKind::EnumConstructor {
                         enum_name: name.to_string(),
@@ -175,6 +178,7 @@ impl Resolver {
                         tag: tag as u16,
                         fields: self.resolve_types_in_vec(&variant.fields, type_params),
                     };
+                    let _ = self.symbols.define(&variant.name, cons.clone());
                     if let Err(e) = self.symbols.define(&format!("{}::{}", name, variant.name), cons) {
                         self.error(e);
                     }

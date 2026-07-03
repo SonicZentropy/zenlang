@@ -1,33 +1,44 @@
 # To tackle in order.  After completing each task, mark it as done.
 
-Would JIT help? Yes — but there are caveats.
+. Here are the most impactful Rust/Zenlang interop and QoL features I'd recommend, roughly in priority order:
 
-### What JIT would buy you
+**1. JSON serialization (`to_json`/`from_json`)**
+- `serde_json` is already a dependency (used for LSP/DAP)
+- Implement `Serialize`/`Deserialize` for `Value`, `MapKey`, etc.
+- Expose as native functions: `to_json(value)` → `str`, `from_json(str)` → `Value`
+- Enables data persistence, config files, network communication
+- Scope: contained — implement traits + 2 native functions
 
-1. **10–50× on numeric loops** — The interpreter currently dispatches on 24 `Value` variants for every arithmetic op. A tracing JIT (LuaJIT-style) would observe "these are always `f64`" and emit native `addsd`/`mulsd`, skipping boxing, dispatch, and refcount traffic entirely.
+**2. Closure callbacks from native functions**
+- Currently all iterator adapters (`map`, `filter`, `fold`) are written in Zenlang because native Rust functions can't call script closures
+- `VM::call_value()` already exists — what's missing is a safe method on `VMContext`
+- Would allow prelude functions to be moved to Rust (performance) and enable rich callback-based APIs
+- Scope: moderate — needs reentrancy safety in the VM
 
-2. **2–4× on general code** — A simpler method JIT (compile whole functions via Cranelift) eliminates bytecode dispatch overhead. That's decent but unspectacular.
+**3. `ForeignObject::clone` implementation**
+- Currently `unimplemented!()` — cloning a foreign value crashes at runtime
+- Requires type-specific cloning via `Box<dyn Clone>` or a `Clone` trait object on `ForeignObject`
+- Scope: small but enables cloning any value tree containing foreign types
 
-3. **Inlining** — The interpreter has full frame-setup/teardown on every call. A JIT can inline small functions, which the current architecture cannot.
+**4. Auto-register constructors in `#[zen_methods]`**
+- Currently `new()` and other associated functions (`Self` return, no `&self`) are NOT registered
+- Must manually register them as native functions
+- Scope: moderate — needs macro to detect `Self` return type and generate native fn registration
 
-### The hard parts
+**5. `TryFrom<Value>` impls for Rust types**
+- Currently manual `.as_int()`, `.as_float()`, etc. everywhere
+- Standard `TryFrom<Value> for i64`, `String`, `f64`, `bool` would make interop code cleaner
+- Could also add `From<T>` for constructing `Value` from common Rust types
+- Scope: small
 
-| Problem | Why it's harder than LuaJIT |
-|---|---|
-| **24-value `Value` enum** | LuaJIT has only **2** type tags (number vs. GC object) with NaN-tagging. Zenlang needs 5+ bits just to discriminate variants. Type guards are fatter, side exits are more frequent, and trace recording is more fragile. |
-| **`Rc<RefCell<>>` everywhere** | Reference counting and runtime borrow-checking dominate execution time. A JIT can't optimize these away — the semantics must be preserved. Hot paths that touch shared mutable state won't speed up much. |
-| **No existing IR** | You'd need to build a CFG + SSA IR from bytecode or from the AST + TypeMap. This is non-trivial. |
-| **Foreign function bridge** | All ~40 native functions take `&mut VMContext` and can mutate any VM state. The JIT must either emit a call to them (preserving the VM contract) or know the semantics of specific natives. |
+**6. Easier `Value::Struct` construction from Rust (builder API)**
+- Currently must manually create `StructData { values, field_names }`
+- A builder like `StructBuilder::new("Point").field("x", 10).field("y", 20).build()` would be cleaner
+- Scope: small
 
-### What I'd recommend in priority order
+**7. Compile-time type checking for native function signatures**
+- Currently `native_fn_sigs()` uses `Type::Unit` as wildcard — no type safety
+- Could add a proc macro to generate signatures from native function definitions
+- Scope: moderate
 
-| Approach | Effort | Speedup | Best for |
-|---|---|---|---|
-| **1. Cranelift method JIT** (compile bytecode functions to native, remove dispatch) | 1–2 months | ~2–4× | General code |
-
-**Bottom line**: Zenlang's bytecode is actually a pretty good target for JIT — it's clean, simple, and small (~50 ops). The value representation (`Rc<RefCell<24-variant-enum>`) is the real pain point, not the bytecode format.
-
-
-Next Steps
-- Consider adding convenience methods (e.g. `VM::alloc_array`, `VM::alloc_foreign`) to the public API for external users
-- The 3 pre-existing parser test failures (`test_nested_scopes`, `test_enum_match`, `test_map_operations`) are unrelated — `::` enum path syntax and `+` after block expr need parser work
+Any of these catch your eye? I'd personally start with **JSON serialization** — it's contained, `serde_json` is already available, and it unlocks real-world usage (save/load game state, config files, network messaging).
