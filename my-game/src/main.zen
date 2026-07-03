@@ -1,5 +1,0 @@
-// Zenlang script
-// Entry point — the result of the top-level expression is the script's return value.
-let greeting = "Hello from Zenlang!";
-print(greeting);
-42
