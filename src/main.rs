@@ -193,9 +193,9 @@ fn run_single_test(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
 /// Run the full test suite, returning (passed, failed) counts.
 fn run_test_suite(
     test_files: &[camino::Utf8PathBuf],
-    label: &str,
+    _label: &str,
 ) -> zenlang::Result<(usize, usize)> {
-    let total = test_files.len();
+    let _total = test_files.len();
     let mut passed = 0usize;
     let mut failed = 0usize;
 

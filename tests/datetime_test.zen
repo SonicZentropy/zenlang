@@ -1,0 +1,6 @@
+let t = now();
+assert(type_of(t) == "float");
+let s = format(t, "%Y-%m-%d");
+assert(type_of(s) == "str");
+assert(len(s) == 10);
+print("datetime test passed");

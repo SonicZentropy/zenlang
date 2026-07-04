@@ -16,6 +16,7 @@ use crate::value::{EnumData, Value, WeakData, WeakKind};
 use crate::vm::{VM, VMContext};
 use crate::zen_native_fn;
 
+mod datetime;
 mod fs;
 mod iter;
 mod json;
@@ -30,6 +31,9 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("assert", Rc::new(assert_impl));
     vm.register_native("assert_eq", Rc::new(assert_eq_impl));
     vm.register_native("type_of", Rc::new(type_of_impl));
+
+    // Date/time
+    datetime::register(vm);
 
     // File system, path, directory operations
     fs::register(vm);
@@ -526,6 +530,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             return_type: Some(Type::Unit),
         },
     ];
+    sigs.extend(datetime::signatures());
     sigs.extend(fs::signatures());
     sigs.extend(json::signatures());
     sigs.extend(map::signatures());
