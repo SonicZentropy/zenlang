@@ -7,7 +7,7 @@ A quick-reference cheatsheet for common tasks in Zen.
 ### Hello World
 
 ```rust
-print("Hello, Zenlang!");
+print("Hello, Zen!");
 ```
 
 ### Bindings
@@ -329,7 +329,7 @@ zip(["a", "b"], [1, 2]);          // [["a",1],["b",2]]
 use std::json::*;
 
 let m = map_new();
-map_set(m, "name", "Zenlang");
+map_set(m, "name", "Zen");
 let json = encode(m);
 let data = decode(json);
 ```
@@ -820,7 +820,7 @@ Hot reload preserves **global variable values** across recompilations. Function 
 
 ```toml
 [dependencies]
-zenlang = "0.1.0"
+zenlang = "0.3.0"
 ```
 
 ## Common Patterns

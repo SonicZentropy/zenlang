@@ -717,7 +717,6 @@ fn unwrap_or_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 // --- Generator/Coroutine ---
 
 fn set_timeout_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
-    eprintln!("DEBUG set_timeout_impl called with {} args", args.len());
     if args.len() < 2 {
         return Err(crate::error::Error::Script {
             msg: "set_timeout requires a callback and a delay in seconds".into(),

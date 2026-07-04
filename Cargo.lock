@@ -1294,18 +1294,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "url",
- "zenlang-macros 0.1.0",
-]
-
-[[package]]
-name = "zenlang-macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2e37d3fe30a236f5def633aeb0476ebfd3035950ed5dd91b20ff4893849c810"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "zenlang-macros",
 ]
 
 [[package]]

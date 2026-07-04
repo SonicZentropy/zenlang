@@ -1,5 +1,5 @@
 // ============================================================
-// Zenlang Language Tour — demonstrates every language feature
+// Zen Language Tour — demonstrates every language feature
 // ============================================================
 
 // Top-level declarations (type, struct, enum, trait, impl, fn, const, type alias)
@@ -32,6 +32,11 @@ fn fib(n) -> i64 {
     if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
 }
 fn add(a, b) { a + b }
+fn counter() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
 
 fn tr_ok() -> Result<i64, str> { Ok(42) }
 fn tr_double() -> Result<i64, str> {
@@ -161,22 +166,22 @@ fn main() {
 
     // 15. Arrays
     let mut arr = [10, 20, 30];
-    assert(len(arr) == 3);
+    assert(arr.len() == 3);
     assert(arr[1] == 20);
-    push(arr, 40);
-    assert(len(arr) == 4);
+    arr.push(40);
+    assert(arr.len() == 4);
     assert(arr[3] == 40);
-    let last = pop(arr);
+    let last = arr.pop();
     assert(last == 40);
-    assert(len(arr) == 3);
+    assert(arr.len() == 3);
 
     // 16. Strings
-    assert(len("Hello") == 5);
-    assert(contains("Hello Zenlang", "Zen"));
-    assert(trim("  spaced  ") == "spaced");
-    assert(to_upper("abc") == "ABC");
-    assert(to_lower("XYZ") == "xyz");
-    assert(substring("hello", 0, 2) == "he");
+    assert("Hello".len() == 5);
+    assert("Hello Zen".contains("Zen"));
+    assert("  spaced  ".trim() == "spaced");
+    assert("abc".to_upper() == "ABC");
+    assert("XYZ".to_lower() == "xyz");
+    assert("hello".substring(0, 2) == "he");
 
     // 17. String Interpolation
     let si_name = "Zen";
@@ -235,6 +240,9 @@ fn main() {
     let mut rsum = 0;
     for ri in 0..=3 { rsum = rsum + ri; }
     assert(rsum == 6);
+    let rg = 0..5;
+    assert(rg.len() == 5);
+    assert(rg.contains(3));
 
     // 26. Iterators
     let mut isum = 0;
@@ -251,5 +259,54 @@ fn main() {
     assert(it.next() == Some(8));
     assert(it.next() == None);
 
-    print("Zenlang tour complete!");
+    print("section 27...");
+    // 27. Maps (dictionary)
+    let mut mp = map_new();
+    mp.set("x", 10);
+    mp.set("y", 20);
+    assert(mp.has("x"));
+    assert(mp.get("x") == Some(10));
+    assert(mp.len() == 2);
+    mp.clear();
+    assert(mp.is_empty());
+
+    // 28. Field shorthand & Spread
+    let fx = 5;
+    let fy = 10;
+    let sh = Point { x: fx, y: fy };  // could also write: Point { fx, fy }
+    assert(sh.x == 5);
+    assert(sh.y == 10);
+    let sp = Point { x: 99, ..sh };   // spread: inherit y from sh
+    assert(sp.x == 99);
+    assert(sp.y == 10);
+
+    print("section 29...");
+    // 29. any / unknown types
+    let dyn_val: any = 42;
+    assert(dyn_val == 42);
+    let safe: unknown = "hello";
+    // Field access / method calls on unknown are blocked at compile time:
+    //   safe.len()   // TYPE ERROR
+    //   safe.trim()  // TYPE ERROR
+    // Narrow via type_of to inspect:
+    assert(type_of(safe) == "str");
+
+    print("section 30...");
+    // 30. Generators
+    let g = counter();
+    assert(next(g) == Some(1));
+    assert(next(g) == Some(2));
+    assert(next(g) == Some(3));
+
+    print("section 31...");
+    // 31. While let
+    let items = [1, 2, 3];
+    let mut it2 = iter(items);
+    let mut ws = 0;
+    while let Some(v) = it2.next() {
+        ws = ws + v;
+    }
+    assert(ws == 6);
+
+    print("Zen tour complete!");
 }

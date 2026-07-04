@@ -1,0 +1,9 @@
+fn counter() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+fn main() {
+    let g = counter();
+    print(next(g));
+}

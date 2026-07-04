@@ -352,7 +352,7 @@ Add Zen to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-zenlang = "0.1.0"
+zenlang = "0.3.0"
 ```
 
 ### One-Shot

@@ -1438,6 +1438,10 @@ impl<'a> Parser<'a> {
                 self.advance();
                 Ok(Type::Any)
             }
+            TokenKind::Ident(s) if s == "unknown" => {
+                self.advance();
+                Ok(Type::Unknown)
+            }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
                 // Check for generic type arguments: Type<T, U>

@@ -8,7 +8,7 @@ use zenlang::hotreload::HotReloader;
 use zenlang::{Error, VM};
 
 #[derive(Parser)]
-#[command(name = "zenc", version, about = "Zenlang scripting language")]
+#[command(name = "zenc", version, about = "Zen scripting language")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -27,9 +27,9 @@ enum Command {
     Disasm { path: camino::Utf8PathBuf },
     /// Type-check only (no execution)
     Check { path: camino::Utf8PathBuf },
-    /// Create a new Zenlang project
+    /// Create a new Zen project
     New { name: String },
-    /// Build (type-check) a Zenlang project
+    /// Build (type-check) a Zen project
     Build { path: Option<camino::Utf8PathBuf> },
     /// Start the LSP language server (stdin/stdout)
     Lsp,
@@ -275,9 +275,9 @@ fn cmd_new(name: &str) -> zenlang::Result<()> {
     let src_dir = dir.join("src");
     std::fs::create_dir_all(&src_dir).map_err(|e| Error::Io { source: e })?;
 
-    let main_zen = r#"// Zenlang script
+    let main_zen = r#"// Zen script
 // Entry point — the result of the top-level expression is the script's return value.
-let greeting = "Hello from Zenlang!";
+let greeting = "Hello from Zen!";
 print(greeting);
 42
 "#;
