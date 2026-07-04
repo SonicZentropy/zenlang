@@ -796,8 +796,7 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
                 |ctx: &mut ::zenlang::vm::VMContext, args: &[::zenlang::value::Value]| -> ::zenlang::error::Result<::zenlang::value::Value> {
                     let vm: &mut ::zenlang::VM = unsafe { &mut *ctx.raw_vm };
                     let obj = #name::default();
-                    let h = vm.foreigns.insert(::zenlang::value::ForeignObject::new(#type_name, obj));
-                    ::std::result::Result::Ok(::zenlang::value::Value::Foreign(h))
+                    ::std::result::Result::Ok(vm.wrap_foreign(#type_name, obj))
                 }
             ));
         }
@@ -969,8 +968,7 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         #(#param_extractions)*
                         let obj = #self_ty::#method_ident(#(#param_idents)*);
                         let vm: &mut ::zenlang::VM = unsafe { &mut *ctx.raw_vm };
-                        let h = vm.foreigns.insert(::zenlang::value::ForeignObject::new(#type_name_str, obj));
-                        ::std::result::Result::Ok(::zenlang::value::Value::Foreign(h))
+                        ::std::result::Result::Ok(vm.wrap_foreign(#type_name_str, obj))
                     }
                 ));
             });
