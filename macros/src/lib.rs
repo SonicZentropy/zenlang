@@ -220,6 +220,246 @@ impl syn::parse::Parse for ZenNativeFnArgs {
 /// // Generated impl:
 /// // Player::register_zen_foreign(&mut vm);
 /// ```
+/// Generate the getter body for an `Option<T>` field value.
+fn option_getter_expr(inner: &FieldType, field_name: &syn::Ident, _struct_name: &syn::Ident) -> proc_macro2::TokenStream {
+    match inner {
+        FieldType::String => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Str(val.clone().into()))
+        },
+        FieldType::I64 => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Int(*val))
+        },
+        FieldType::I32 | FieldType::I16 | FieldType::I8 => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Int(*val as i64))
+        },
+        FieldType::U64 | FieldType::U32 | FieldType::U16 | FieldType::U8 => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Int(*val as i64))
+        },
+        FieldType::F64 => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Float(*val))
+        },
+        FieldType::F32 => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Float(*val as f64))
+        },
+        FieldType::Bool => quote! {
+            ::std::result::Result::Ok(::zenlang::value::Value::Bool(*val))
+        },
+        FieldType::Value => quote! {
+            ::std::result::Result::Ok(val.clone())
+        },
+        _ => syn::Error::new_spanned(
+            &syn::Ident::new("type", proc_macro2::Span::call_site()),
+            format!("unsupported Option inner type for field '{}'", field_name),
+        )
+        .to_compile_error(),
+    }
+}
+
+/// Generate the setter body for an `Option<T>` field value.
+fn option_setter_expr(inner: &FieldType, field_name: &syn::Ident, struct_name: &syn::Ident) -> proc_macro2::TokenStream {
+    match inner {
+        FieldType::String => quote! {
+            let s = val.as_str().map(|s| s.to_string()).unwrap_or_default();
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(s); ::std::result::Result::Ok(()) })
+        },
+        FieldType::I64 => quote! {
+            let v = val.as_int().unwrap_or(0);
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::I32 => quote! {
+            let v = val.as_int().unwrap_or(0) as i32;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::I16 => quote! {
+            let v = val.as_int().unwrap_or(0) as i16;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::I8 => quote! {
+            let v = val.as_int().unwrap_or(0) as i8;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::U64 => quote! {
+            let v = val.as_int().unwrap_or(0) as u64;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::U32 => quote! {
+            let v = val.as_int().unwrap_or(0) as u32;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::U16 => quote! {
+            let v = val.as_int().unwrap_or(0) as u16;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::U8 => quote! {
+            let v = val.as_int().unwrap_or(0) as u8;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::F64 => quote! {
+            let v = val.as_float().unwrap_or(0.0);
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::F32 => quote! {
+            let v = val.as_float().unwrap_or(0.0) as f32;
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::Bool => quote! {
+            let v = val.as_bool().unwrap_or(false);
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(v); ::std::result::Result::Ok(()) })
+        },
+        FieldType::Value => quote! {
+            ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(val); ::std::result::Result::Ok(()) })
+        },
+        _ => syn::Error::new_spanned(
+            &syn::Ident::new("type", proc_macro2::Span::call_site()),
+            format!("unsupported Option inner type for field '{}'", field_name),
+        )
+        .to_compile_error(),
+    }
+}
+
+/// Generate parameter extraction for an `Option<T>` method parameter.
+fn option_param_conv(inner: &FieldType, pname: &syn::Ident, fi: usize) -> proc_macro2::TokenStream {
+    let fi_lit = fi;
+    match inner {
+        FieldType::String => quote! {
+            let #pname: ::std::option::Option<String> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(::std::convert::Into::<String>::into(args[#fi_lit].as_str().unwrap_or_default()))
+            };
+        },
+        FieldType::I64 => quote! {
+            let #pname: ::std::option::Option<i64> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0))
+            };
+        },
+        FieldType::I32 => quote! {
+            let #pname: ::std::option::Option<i32> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as i32)
+            };
+        },
+        FieldType::I16 => quote! {
+            let #pname: ::std::option::Option<i16> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as i16)
+            };
+        },
+        FieldType::I8 => quote! {
+            let #pname: ::std::option::Option<i8> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as i8)
+            };
+        },
+        FieldType::U64 => quote! {
+            let #pname: ::std::option::Option<u64> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as u64)
+            };
+        },
+        FieldType::U32 => quote! {
+            let #pname: ::std::option::Option<u32> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as u32)
+            };
+        },
+        FieldType::U16 => quote! {
+            let #pname: ::std::option::Option<u16> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as u16)
+            };
+        },
+        FieldType::U8 => quote! {
+            let #pname: ::std::option::Option<u8> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_int().unwrap_or(0) as u8)
+            };
+        },
+        FieldType::F64 => quote! {
+            let #pname: ::std::option::Option<f64> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_float().unwrap_or(0.0))
+            };
+        },
+        FieldType::F32 => quote! {
+            let #pname: ::std::option::Option<f32> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_float().unwrap_or(0.0) as f32)
+            };
+        },
+        FieldType::Bool => quote! {
+            let #pname: ::std::option::Option<bool> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].as_bool().unwrap_or(false))
+            };
+        },
+        FieldType::Value => quote! {
+            let #pname: ::std::option::Option<::zenlang::value::Value> = if args[#fi_lit] == ::zenlang::value::Value::Nil {
+                ::std::option::Option::None
+            } else {
+                ::std::option::Option::Some(args[#fi_lit].clone())
+            };
+        },
+        _ => quote! {
+            let #pname = args[#fi_lit].clone();
+        },
+    }
+}
+
+/// Generate return value conversion for an `Option<T>` return type.
+fn option_return_conv(
+    inner: &FieldType,
+    method_ident: &syn::Ident,
+    param_idents: &[proc_macro2::TokenStream],
+) -> proc_macro2::TokenStream {
+    let result = quote! { s.#method_ident(#(#param_idents)*) };
+    let inner_conv = match inner {
+        FieldType::String => quote! {
+            ::zenlang::value::Value::Str(v.into())
+        },
+        FieldType::I64 => quote! {
+            ::zenlang::value::Value::Int(v)
+        },
+        FieldType::I32 | FieldType::I16 | FieldType::I8
+        | FieldType::U64 | FieldType::U32 | FieldType::U16 | FieldType::U8 => quote! {
+            ::zenlang::value::Value::Int(v as i64)
+        },
+        FieldType::F64 => quote! {
+            ::zenlang::value::Value::Float(v)
+        },
+        FieldType::F32 => quote! {
+            ::zenlang::value::Value::Float(v as f64)
+        },
+        FieldType::Bool => quote! {
+            ::zenlang::value::Value::Bool(v)
+        },
+        FieldType::Value => quote! {
+            v
+        },
+        _ => quote! {
+            v
+        },
+    };
+    quote! {
+        match #result {
+            ::std::option::Option::Some(v) => ::std::result::Result::Ok(#inner_conv),
+            ::std::option::Option::None => ::std::result::Result::Ok(::zenlang::value::Value::Nil),
+        }
+    }
+}
+
 /// Extract the Zenlang type name from `#[foreign(name = "...")]` attribute.
 fn foreign_type_name(input: &DeriveInput) -> String {
     for attr in &input.attrs {
@@ -237,6 +477,17 @@ fn foreign_type_name(input: &DeriveInput) -> String {
     }
     // Default to the Rust struct name
     input.ident.to_string()
+}
+
+/// Check for `#[foreign(default)]` attribute to auto-generate a default constructor.
+fn has_foreign_default_attr(input: &DeriveInput) -> bool {
+    input.attrs.iter().any(|attr| {
+        if !attr.path().is_ident("foreign") {
+            return false;
+        }
+        attr.parse_args::<syn::Ident>()
+            .is_ok_and(|ident| ident == "default")
+    })
 }
 
 #[proc_macro_derive(ZenForeign, attributes(foreign))]
@@ -371,6 +622,19 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
                         }
                     }
                 }
+                FieldType::Option(ref inner) => {
+                    let inner_getter = option_getter_expr(inner, field_name, name);
+                    quote! {
+                        |vm: &::zenlang::VM, obj: &::zenlang::value::Value| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                            ::zenlang::interop::with_foreign::<#name, _, _>(vm, obj, |p| {
+                                match &p.#field_name {
+                                    ::std::option::Option::Some(val) => { #inner_getter }
+                                    ::std::option::Option::None => ::std::result::Result::Ok(::zenlang::value::Value::Nil),
+                                }
+                            })
+                        }
+                    }
+                }
                 FieldType::Unknown => {
                     return syn::Error::new_spanned(
                         ty,
@@ -495,6 +759,18 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
                         }
                     }
                 }
+                FieldType::Option(ref inner) => {
+                    let inner_setter = option_setter_expr(inner, field_name, name);
+                    quote! {
+                        |vm: &mut ::zenlang::VM, obj: &mut ::zenlang::value::Value, val: ::zenlang::value::Value| -> ::zenlang::error::Result<()> {
+                            if val == ::zenlang::value::Value::Nil {
+                                ::zenlang::interop::with_foreign_mut::<#name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::None; ::std::result::Result::Ok(()) })
+                            } else {
+                                #inner_setter
+                            }
+                        }
+                    }
+                }
                 FieldType::Unknown => {
                     return syn::Error::new_spanned(
                         ty,
@@ -514,11 +790,27 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let default_constructor = if has_foreign_default_attr(&input) {
+        quote! {
+            vm.register_native(#type_name, ::std::rc::Rc::new(
+                |ctx: &mut ::zenlang::vm::VMContext, args: &[::zenlang::value::Value]| -> ::zenlang::error::Result<::zenlang::value::Value> {
+                    let vm: &mut ::zenlang::VM = unsafe { &mut *ctx.raw_vm };
+                    let obj = #name::default();
+                    let h = vm.foreigns.insert(::zenlang::value::ForeignObject::new(#type_name, obj));
+                    ::std::result::Result::Ok(::zenlang::value::Value::Foreign(h))
+                }
+            ));
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         impl #name {
             pub fn register_zen_foreign(vm: &mut ::zenlang::VM) {
                 vm.register_type::<#name>(#type_name)
                     #(#field_registrations)*;
+                #default_constructor
             }
         }
     };
@@ -636,11 +928,15 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         FieldType::Value | FieldType::ForeignReference => {
                             quote! { let #pname = args[#fi].clone(); }
                         }
+                        FieldType::Option(inner) => {
+                            let opt_conv = option_param_conv(&inner, &pname, fi);
+                            opt_conv
+                        }
                         FieldType::Unknown => {
-                            syn::Error::new_spanned(
+                            return syn::Error::new_spanned(
                                 ty,
                                 format!(
-                                    "unsupported field type '{}' in ZenForeign struct '{}'",
+                                    "unsupported field type '{}' in constructor of '{}'",
                                     quote!(#ty),
                                     quote!(#self_ty)
                                 ),
@@ -745,8 +1041,12 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     FieldType::Value | FieldType::ForeignReference => {
                         quote! { let #pname = args[#fi].clone(); }
                     }
+                    FieldType::Option(inner) => {
+                        let opt_conv = option_param_conv(&inner, &pname, fi);
+                        opt_conv
+                    }
                     FieldType::Unknown => {
-                        syn::Error::new_spanned(
+                        return syn::Error::new_spanned(
                             ty,
                             format!(
                                 "unsupported field type '{}' in ZenForeign struct '{}'",
@@ -760,8 +1060,8 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
             })
             .collect();
 
-        let param_idents: Vec<_> = (1..=param_types.len())
-            .map(|i| {
+            let param_idents: Vec<_> = (1..=param_types.len())
+                .map(|i| {
                 let id = syn::Ident::new(&format!("p{}", i), proc_macro2::Span::call_site());
                 quote! { #id }
             })
@@ -821,6 +1121,10 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     quote! {
                         ::std::result::Result::Ok(s.#method_ident(#(#param_idents)*))
                     }
+                }
+                FieldType::Option(inner) => {
+                    let opt_ret = option_return_conv(&inner, method_ident, &param_idents);
+                    opt_ret
                 }
                 FieldType::Unknown => {
                     return syn::Error::new_spanned(
@@ -888,11 +1192,50 @@ enum FieldType {
     Bool,
     Value,
     ForeignReference,
+    Option(Box<FieldType>),
     Unknown,
+}
+
+/// Extract the inner type from `Option<T>` string representations.
+fn option_inner_type(ty_str: &str) -> Option<FieldType> {
+    for prefix in &[
+        "Option <",
+        "Option<",
+        "std :: option :: Option <",
+        "std :: option :: Option<",
+        "core :: option :: Option <",
+        "core :: option :: Option<",
+    ] {
+        if let Some(rest) = ty_str.strip_prefix(prefix) {
+            let inner_str = rest.trim_end_matches('>').trim();
+            return Some(match inner_str {
+                "String" | "std :: string :: String" | "alloc :: string :: String" => {
+                    FieldType::Option(Box::new(FieldType::String))
+                }
+                "i64" => FieldType::Option(Box::new(FieldType::I64)),
+                "i32" => FieldType::Option(Box::new(FieldType::I32)),
+                "i16" => FieldType::Option(Box::new(FieldType::I16)),
+                "i8" => FieldType::Option(Box::new(FieldType::I8)),
+                "u64" => FieldType::Option(Box::new(FieldType::U64)),
+                "u32" => FieldType::Option(Box::new(FieldType::U32)),
+                "u16" => FieldType::Option(Box::new(FieldType::U16)),
+                "u8" => FieldType::Option(Box::new(FieldType::U8)),
+                "f64" => FieldType::Option(Box::new(FieldType::F64)),
+                "f32" => FieldType::Option(Box::new(FieldType::F32)),
+                "bool" => FieldType::Option(Box::new(FieldType::Bool)),
+                s if s.contains("Value") => FieldType::Option(Box::new(FieldType::Value)),
+                _ => return None,
+            });
+        }
+    }
+    None
 }
 
 fn ty_to_field_type(ty: &Type) -> FieldType {
     let ty_str = quote!(#ty).to_string();
+    if let Some(ft) = option_inner_type(&ty_str) {
+        return ft;
+    }
     match ty_str.as_str() {
         "String"
         | "std :: string :: String"
