@@ -64,13 +64,14 @@ impl syn::parse::Parse for ForeignTypeInput {
 #[proc_macro]
 pub fn foreign_type(input: TokenStream) -> TokenStream {
     let ft_input = parse_macro_input!(input as ForeignTypeInput);
-    let _name = &ft_input.name;
+    let name = &ft_input.name;
     let strukt = &ft_input.strukt;
     let struct_name = &strukt.ident;
     let impl_block = &ft_input.impl_block;
 
     let expanded = quote! {
         #[derive(Clone, Debug, ::zenlang::ZenForeign)]
+        #[foreign(name = #name)]
         #strukt
 
         #[::zenlang::zen_methods]
@@ -219,10 +220,30 @@ impl syn::parse::Parse for ZenNativeFnArgs {
 /// // Generated impl:
 /// // Player::register_zen_foreign(&mut vm);
 /// ```
-#[proc_macro_derive(ZenForeign)]
+/// Extract the Zenlang type name from `#[foreign(name = "...")]` attribute.
+fn foreign_type_name(input: &DeriveInput) -> String {
+    for attr in &input.attrs {
+        if attr.path().is_ident("foreign") {
+            if let syn::Meta::NameValue(nv) = &attr.meta {
+                if nv.path.is_ident("name") {
+                    if let syn::Expr::Lit(expr_lit) = &nv.value {
+                        if let syn::Lit::Str(s) = &expr_lit.lit {
+                            return s.value();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Default to the Rust struct name
+    input.ident.to_string()
+}
+
+#[proc_macro_derive(ZenForeign, attributes(foreign))]
 pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
+    let type_name = foreign_type_name(&input);
 
     let fields = match &input.data {
         Data::Struct(ds) => match &ds.fields {
@@ -496,7 +517,7 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #name {
             pub fn register_zen_foreign(vm: &mut ::zenlang::VM) {
-                vm.register_type::<#name>(stringify!(#name))
+                vm.register_type::<#name>(#type_name)
                     #(#field_registrations)*;
             }
         }
