@@ -678,11 +678,22 @@ impl<'a> Parser<'a> {
                 };
             } else if matches!(tok, TokenKind::OpenParen) {
                 self.advance();
-                let args = self.arg_list()?;
+                let (args, partial_params) = self.partial_arg_list()?;
                 self.expect(TokenKind::CloseParen)?;
-                expr = Expr::Call {
-                    func: Box::new(expr),
-                    args,
+                expr = if partial_params.is_empty() {
+                    Expr::Call {
+                        func: Box::new(expr),
+                        args,
+                    }
+                } else {
+                    Expr::Lambda {
+                        params: partial_params,
+                        return_type: None,
+                        body: Box::new(Expr::Call {
+                            func: Box::new(expr),
+                            args,
+                        }),
+                    }
                 };
             } else if matches!(tok, TokenKind::Pipe) {
                 self.advance();
@@ -712,12 +723,24 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let field = self.expect_ident()?;
                 if self.r#match(TokenKind::OpenParen) {
-                    let args = self.arg_list()?;
+                    let (args, partial_params) = self.partial_arg_list()?;
                     self.expect(TokenKind::CloseParen)?;
-                    expr = Expr::MethodCall {
-                        obj: Box::new(expr),
-                        method: field.into(),
-                        args,
+                    expr = if partial_params.is_empty() {
+                        Expr::MethodCall {
+                            obj: Box::new(expr),
+                            method: field.into(),
+                            args,
+                        }
+                    } else {
+                        Expr::Lambda {
+                            params: partial_params,
+                            return_type: None,
+                            body: Box::new(Expr::MethodCall {
+                                obj: Box::new(expr),
+                                method: field.into(),
+                                args,
+                            }),
+                        }
                     };
                 } else {
                     expr = Expr::Field {
@@ -1255,12 +1278,24 @@ impl<'a> Parser<'a> {
             if self.r#match(TokenKind::Dot) {
                 let field = self.expect_ident()?;
                 if self.r#match(TokenKind::OpenParen) {
-                    let args = self.arg_list()?;
+                    let (args, partial_params) = self.partial_arg_list()?;
                     self.expect(TokenKind::CloseParen)?;
-                    expr = Expr::MethodCall {
-                        obj: Box::new(expr),
-                        method: field.into(),
-                        args,
+                    expr = if partial_params.is_empty() {
+                        Expr::MethodCall {
+                            obj: Box::new(expr),
+                            method: field.into(),
+                            args,
+                        }
+                    } else {
+                        Expr::Lambda {
+                            params: partial_params,
+                            return_type: None,
+                            body: Box::new(Expr::MethodCall {
+                                obj: Box::new(expr),
+                                method: field.into(),
+                                args,
+                            }),
+                        }
                     };
                 } else {
                     expr = Expr::Field {
@@ -1269,11 +1304,22 @@ impl<'a> Parser<'a> {
                     };
                 }
             } else if self.r#match(TokenKind::OpenParen) {
-                let args = self.arg_list()?;
+                let (args, partial_params) = self.partial_arg_list()?;
                 self.expect(TokenKind::CloseParen)?;
-                expr = Expr::Call {
-                    func: Box::new(expr),
-                    args,
+                expr = if partial_params.is_empty() {
+                    Expr::Call {
+                        func: Box::new(expr),
+                        args,
+                    }
+                } else {
+                    Expr::Lambda {
+                        params: partial_params,
+                        return_type: None,
+                        body: Box::new(Expr::Call {
+                            func: Box::new(expr),
+                            args,
+                        }),
+                    }
                 };
             } else if self.r#match(TokenKind::OpenBracket) {
                 let index = self.expression(Precedence::Lowest)?;
@@ -1545,6 +1591,35 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(args)
+    }
+
+    /// Parse a call argument list with partial-application support.
+    /// `_` placeholders are replaced with fresh idents `__p0`, `__p1`, etc.
+    /// Returns the (args, params) — if params is non-empty, the caller
+    /// should wrap the call expression in a Lambda.
+    fn partial_arg_list(&mut self) -> Result<(Vec<Expr>, Vec<Param>)> {
+        let mut args = Vec::new();
+        let mut params = Vec::new();
+        if self.check(&TokenKind::CloseParen) {
+            return Ok((args, params));
+        }
+        loop {
+            if self.check(&TokenKind::Underscore) {
+                self.advance();
+                let name: CompactString = format!("__p{}", params.len()).into();
+                params.push(Param {
+                    name: name.clone(),
+                    type_ann: None,
+                });
+                args.push(Expr::Ident(name));
+            } else {
+                args.push(self.expression(Precedence::Lowest)?);
+            }
+            if !self.r#match(TokenKind::Comma) {
+                break;
+            }
+        }
+        Ok((args, params))
     }
 
     fn expect_ident(&mut self) -> Result<String> {

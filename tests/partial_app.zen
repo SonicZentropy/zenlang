@@ -1,0 +1,26 @@
+// Partial application: f(_, arg) → |__p0| f(__p0, arg)
+fn add(a: i64, b: i64) -> i64 { a + b }
+
+let add5 = add(_, 5);
+assert_eq(add5(10), 15);
+
+fn div(a: i64, b: i64) -> i64 { a / b }
+
+let half = div(_, 2);
+assert_eq(half(10), 5);
+
+fn sub(a: i64, b: i64) -> i64 { a - b }
+
+let dec = sub(_, 1);
+assert_eq(dec(5), 4);
+
+// No underscores — regular call
+assert_eq(add(3, 4), 7);
+
+// Partial app with pipe
+let result = 100 |> div(_, 5);
+assert_eq(result, 20);
+
+// Pipe without partial app still works
+let doubled = [1, 2, 3] |> map(|x| x * 2) |> collect();
+assert_eq(doubled, [2, 4, 6]);
