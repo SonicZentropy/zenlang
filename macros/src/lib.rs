@@ -1,8 +1,91 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Data, DeriveInput, Fields, FnArg, ImplItem, ItemImpl, ReturnType, Type, parse_macro_input,
+    Data, DeriveInput, Fields, FnArg, ImplItem, ItemImpl, ItemStruct, ReturnType, Type,
+    parse_macro_input,
 };
+
+/// Structured input for the `foreign_type!` macro.
+struct ForeignTypeInput {
+    name: String,
+    strukt: ItemStruct,
+    impl_block: ItemImpl,
+}
+
+impl syn::parse::Parse for ForeignTypeInput {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        // Parse `name: "TypeName",`
+        let name_kw: syn::Ident = input.parse()?;
+        if name_kw != "name" {
+            return Err(syn::Error::new(name_kw.span(), "expected `name`"));
+        }
+        input.parse::<syn::Token![:]>()?;
+        let name_lit: syn::LitStr = input.parse()?;
+        input.parse::<syn::Token![,]>()?;
+
+        // Parse the struct definition
+        let strukt: ItemStruct = input.parse()?;
+
+        // Parse the impl block
+        let impl_block: ItemImpl = input.parse()?;
+
+        Ok(ForeignTypeInput {
+            name: name_lit.value(),
+            strukt,
+            impl_block,
+        })
+    }
+}
+
+/// Unified macro to define a foreign type with a single entry point.
+///
+/// Expands to the struct with `#[derive(Clone, Debug, ZenForeign)]`,
+/// the `impl` block with `#[zen_methods]`, and a combined
+/// `register_zen(vm)` that calls both.
+///
+/// # Syntax
+/// ```ignore
+/// foreign_type! {
+///     name: "Player",
+///     struct Player {
+///         name: String,
+///         health: i32,
+///         max_health: i32,
+///     }
+///     impl Player {
+///         fn new(name: &str) -> Self { ... }
+///         fn heal_percent(&self) -> f64 { ... }
+///     }
+/// }
+/// ```
+///
+/// Generates `Player::register_zen(&mut vm)` that registers
+/// both fields and methods in one call.
+#[proc_macro]
+pub fn foreign_type(input: TokenStream) -> TokenStream {
+    let ft_input = parse_macro_input!(input as ForeignTypeInput);
+    let _name = &ft_input.name;
+    let strukt = &ft_input.strukt;
+    let struct_name = &strukt.ident;
+    let impl_block = &ft_input.impl_block;
+
+    let expanded = quote! {
+        #[derive(Clone, Debug, ::zenlang::ZenForeign)]
+        #strukt
+
+        #[::zenlang::zen_methods]
+        #impl_block
+
+        impl #struct_name {
+            /// Register both fields and methods with the VM.
+            pub fn register_zen(vm: &mut ::zenlang::VM) {
+                Self::register_zen_foreign(vm);
+                Self::register_zen_methods(vm);
+            }
+        }
+    };
+    expanded.into()
+}
 
 /// Attribute macro to generate a `FnSignature` for a native function.
 ///
