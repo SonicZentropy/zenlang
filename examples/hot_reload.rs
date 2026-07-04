@@ -9,7 +9,6 @@ use std::io::Write;
 
 use zenlang::VM;
 use zenlang::hotreload::HotReloader;
-use zenlang::stdlib::{native_names, register_builtins};
 
 fn main() -> zenlang::Result<()> {
     // Create a temp directory with a script file
@@ -29,19 +28,9 @@ fn main() {
     file.write_all(initial_source.as_bytes()).unwrap();
     drop(file);
 
-    // Initial compile (exactly like the embedding pipeline)
-    let source = std::fs::read_to_string(&script_path).unwrap();
-    let tokens = zenlang::lexer::Lexer::new(&source).tokenize()?;
-    let mut program = zenlang::parser::Parser::new(&source, &tokens).parse()?;
-    let names = native_names();
-    let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &names)?;
-    let types = zenlang::typeck::check(&program, &mut symbols)?;
-    let (fns, global_names) =
-        zenlang::compiler::compile(&program, &types, &symbols, &names, &source)?;
-
+    // Initial compile via VM
     let mut vm = VM::new();
-    register_builtins(&mut vm);
-    vm.load_bytecode(fns, global_names);
+    vm.load_file(&script_path)?;
     let result = vm.run_main()?;
     println!("first run: {:?}", result); // Counter: 1
 

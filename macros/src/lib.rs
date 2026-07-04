@@ -1169,7 +1169,7 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[allow(non_snake_case)]
             pub fn register_zen_methods(vm: &mut ::zenlang::VM) {
                 let tid = ::std::any::TypeId::of::<#self_ty>();
-                if let Some(def) = ::std::rc::Rc::make_mut(&mut vm.foreign_registry).get_mut(&tid) {
+                if let Some(def) = ::std::rc::Rc::make_mut(vm.foreign_registry_mut()).get_mut(&tid) {
                     #(#method_registrations)*
                 }
                 #(#constructor_registrations)*

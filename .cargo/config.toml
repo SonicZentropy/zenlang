@@ -1,0 +1,56 @@
+# Build optimizations for zenlang
+
+[build]
+# Faster incremental builds
+incremental = true
+# Use mold linker for faster linking (Linux/macOS with mold installed)
+# Uncomment the appropriate target below:
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# [target.aarch64-apple-darwin]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/mold"]
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+rustdocflags = ["-Clinker=rust-lld.exe"]
+rustflags = [
+  # Nightly
+  "-Zshare-generics=y", # This needs to be off if you use dynamic linking on Windows.
+  # "-Zthreads=0",
+]
+
+
+
+[profile.dev]
+# Optimize dependencies in dev builds (much faster runtime)
+opt-level = 1
+# Faster compilation at cost of binary size
+lto = false
+# Keep debug info for profiling
+debug = true
+
+[profile.dev.package."*"]
+# Optimize all dependencies aggressively in dev mode
+opt-level = 3
+
+[profile.release]
+# Maximum optimization
+opt-level = 3
+# Link-time optimization for better runtime performance
+lto = "thin"
+# Strip debug symbols for smaller binaries
+strip = "debuginfo"
+# Use codegen-units=1 for maximum optimization (slower compile)
+codegen-units = 1
+
+[profile.release.build-override]
+# Optimize build scripts too
+opt-level = 3
+
+[profile.profraw]
+# Profile-guided optimization profile
+inherits = "release"
+instrument-coverage = true

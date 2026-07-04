@@ -1,21 +1,14 @@
-/// Register custom Rust functions callable from Zenlang scripts.
+/// Register custom Rust functions callable from Zen scripts.
 ///
 /// Run with: cargo run --example custom_natives
 use std::cell::Cell;
 use std::rc::Rc;
 
-use zenlang::compiler::compile;
-use zenlang::lexer::Lexer;
-use zenlang::parser::Parser;
-use zenlang::resolver::resolve_with_natives;
-use zenlang::stdlib::register_builtins;
-use zenlang::typeck::check;
 use zenlang::vm::VMContext;
 use zenlang::{VM, Value};
 
 fn main() -> zenlang::Result<()> {
     let mut vm = VM::new();
-    register_builtins(&mut vm);
 
     // Register a custom native function: double(x) -> x * 2
     vm.register_native(
@@ -49,14 +42,6 @@ fn main() -> zenlang::Result<()> {
         }),
     );
 
-    // Build the list of all native names for the resolver/compiler
-    let mut names = vm.native_names();
-    for n in &zenlang::stdlib::native_names() {
-        if !names.contains(n) {
-            names.push(n.clone());
-        }
-    }
-
     let source = "\
 let a = double(21);
 let b = add3(1, 2, 3);
@@ -66,13 +51,7 @@ let c2 = tick();
 [a, b, c0, c1, c2]
 ";
 
-    let tokens = Lexer::new(source).tokenize()?;
-    let mut program = Parser::new(source, &tokens).parse()?;
-    let mut symbols = resolve_with_natives(&mut program, &names)?;
-    let types = check(&program, &mut symbols)?;
-    let (fns, global_names) = compile(&program, &types, &symbols, &names, source)?;
-
-    vm.load_bytecode(fns, global_names);
+    vm.load(source)?;
     let result = vm.run_main()?;
     println!("result: {:?}", result);
     assert_eq!(count.get(), 3);

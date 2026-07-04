@@ -10,14 +10,8 @@ use edict::component::Component;
 use edict::entity::EntityId;
 use edict::world::World;
 
-use zenlang::compiler::compile;
 use zenlang::error::Result;
 use zenlang::interop::{with_foreign, with_foreign_mut};
-use zenlang::lexer::Lexer;
-use zenlang::parser::Parser;
-use zenlang::resolver::resolve_with_natives;
-use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
-use zenlang::typeck::check;
 use zenlang::value::ForeignObject;
 use zenlang::vm::VMContext;
 use zenlang::{VM, Value};
@@ -399,24 +393,10 @@ fn setup() -> Game {
     }));
 
     let mut vm = VM::new();
-    register_builtins(&mut vm);
     register_natives(&mut vm, &ecs, &frame_state);
     register_entity_type(&mut vm, &ecs);
 
-    let mut names = vm.native_names();
-    for n in stdlib_names() {
-        if !names.contains(&n) {
-            names.push(n);
-        }
-    }
-
-    let tokens = Lexer::new(SCRIPT).tokenize().unwrap();
-    let mut program = Parser::new(SCRIPT, &tokens).parse().unwrap();
-    let mut symbols = resolve_with_natives(&mut program, &names).unwrap();
-    let types = check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compile(&program, &types, &symbols, &names, SCRIPT).unwrap();
-
-    vm.load_bytecode(fns, global_names);
+    vm.load(SCRIPT).unwrap();
     let _ = vm.run_main();
 
     Game {

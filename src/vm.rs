@@ -175,6 +175,33 @@ pub struct DebugState {
     pub skip_offset: Option<(usize, usize)>,
 }
 
+/// Configuration for compiling Zen source code.
+///
+/// Passed to [`VM::load_with`] and [`VM::exec_with`] to customize compilation
+/// behavior.
+pub struct CompileConfig {
+    /// Enable type checking (default: `true`).
+    pub type_check: bool,
+    /// Inject the prelude (built-in imports) before compilation (default: `true`).
+    pub with_prelude: bool,
+    /// Base path for module resolution (default: `None` — no module loading).
+    /// Set to the parent directory of the script file to enable `import` statements.
+    pub module_path: Option<std::path::PathBuf>,
+    /// Display name for the source in error messages (default: `"<script>"`).
+    pub source_name: String,
+}
+
+impl Default for CompileConfig {
+    fn default() -> Self {
+        Self {
+            type_check: true,
+            with_prelude: true,
+            module_path: None,
+            source_name: "<script>".into(),
+        }
+    }
+}
+
 fn source_loc_from_frame(
     functions: &[BytecodeFn],
     function_idx: usize,
@@ -195,12 +222,12 @@ struct TimerEntry {
 }
 
 pub struct VM {
-    pub stack: Vec<Value>,
+    pub(crate) stack: Vec<Value>,
     frames: Vec<CallFrame>,
-    pub globals: Vec<Value>,
-    pub functions: Vec<BytecodeFn>,
-    pub global_names: Vec<String>,
-    pub function_name_map: HashMap<String, usize>,
+    pub(crate) globals: Vec<Value>,
+    pub(crate) functions: Vec<BytecodeFn>,
+    pub(crate) global_names: Vec<String>,
+    pub(crate) function_name_map: HashMap<String, usize>,
     natives: HashMap<String, usize>,
     native_fns: Vec<(String, NativeFn)>,
     pub foreign_registry: Rc<ForeignTypeRegistry>,
@@ -212,22 +239,39 @@ pub struct VM {
     pending_timers: Vec<TimerEntry>,
     frame_callbacks: Vec<Value>,
     timer_id_counter: u64,
-    pub debug_state: DebugState,
+    pub(crate) debug_state: DebugState,
     return_to_depth: Option<usize>,
 
     // ── Slabs for heap-allocated objects ──
-    pub arrays: Slab<ArrayData>,
-    pub structs: Slab<StructData>,
-    pub enums: Slab<EnumData>,
-    pub maps: Slab<MapData>,
-    pub closures: Slab<ClosureData>,
-    pub generators: Slab<GeneratorState>,
-    pub foreigns: Slab<ForeignObject>,
-    pub weaks: Slab<WeakData>,
+    pub(crate) arrays: Slab<ArrayData>,
+    pub(crate) structs: Slab<StructData>,
+    pub(crate) enums: Slab<EnumData>,
+    pub(crate) maps: Slab<MapData>,
+    pub(crate) closures: Slab<ClosureData>,
+    pub(crate) generators: Slab<GeneratorState>,
+    pub(crate) foreigns: Slab<ForeignObject>,
+    pub(crate) weaks: Slab<WeakData>,
 }
 
 impl VM {
+    /// Create a new VM with standard builtin functions registered.
     pub fn new() -> Self {
+        let mut vm = Self::empty();
+        crate::stdlib::register_builtins(&mut vm);
+        vm
+    }
+
+    /// Create a VM with a custom foreign type registry.
+    pub fn new_with_registry(registry: Rc<ForeignTypeRegistry>) -> Self {
+        let mut vm = Self::empty();
+        vm.foreign_registry = registry;
+        crate::stdlib::register_builtins(&mut vm);
+        vm
+    }
+
+    /// Create an empty VM without any builtins or registration.
+    /// Used internally for testing and custom setup.
+    pub(crate) fn empty() -> Self {
         Self {
             stack: Vec::new(),
             frames: Vec::new(),
@@ -267,10 +311,75 @@ impl VM {
         }
     }
 
-    pub fn new_with_registry(registry: Rc<ForeignTypeRegistry>) -> Self {
-        let mut vm = Self::new();
-        vm.foreign_registry = registry;
-        vm
+    /// One-shot: compile, load, and run `__main__`.
+    ///
+    /// Equivalent to `load(source)` followed by `run_main()`.
+    pub fn exec(&mut self, source: &str) -> Result<Value> {
+        self.exec_with(source, &CompileConfig::default())
+    }
+
+    /// One-shot: compile, load, and run `__main__` with custom configuration.
+    pub fn exec_with(&mut self, source: &str, config: &CompileConfig) -> Result<Value> {
+        self.load_with(source, config)?;
+        self.run_main()
+    }
+
+    /// Compile and load bytecode into the VM, adding to the existing scope.
+    ///
+    /// Merges the VM's registered native functions with the standard library
+    /// builtins so user-registered natives are visible to the resolver.
+    pub fn load(&mut self, source: &str) -> Result<()> {
+        self.load_with(source, &CompileConfig::default())
+    }
+
+    /// Compile and load bytecode with custom configuration.
+    pub fn load_with(&mut self, source: &str, config: &CompileConfig) -> Result<()> {
+        let stdlib_names = crate::stdlib::native_names();
+        let mut full_names = self.native_names();
+        for n in &stdlib_names {
+            if !full_names.contains(n) {
+                full_names.push(n.clone());
+            }
+        }
+
+        let tokens = crate::lexer::Lexer::new(source).tokenize()?;
+        let mut program = crate::parser::Parser::new(source, &tokens).parse()?;
+
+        if let Some(path) = &config.module_path {
+            crate::mod_resolver::resolve_modules(&mut program, path)?;
+        }
+        if config.with_prelude {
+            crate::prelude::inject(&mut program)?;
+        }
+
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &full_names)?;
+
+        let types = if config.type_check {
+            crate::typeck::check(&program, &mut symbols)?
+        } else {
+            crate::typeck::TypeMap::new()
+        };
+
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &full_names, source)?;
+
+        self.load_bytecode(fns, global_names);
+        Ok(())
+    }
+
+    /// Read a file, compile, and load it into the VM.
+    ///
+    /// Uses the file's parent directory as the module resolution base path.
+    pub fn load_file(&mut self, path: impl AsRef<std::path::Path>) -> Result<()> {
+        let path = path.as_ref();
+        let source = std::fs::read_to_string(path).map_err(|e| Error::Io { source: e })?;
+        let config = CompileConfig {
+            module_path: path.parent().map(|p| p.to_path_buf()),
+            source_name: path.to_string_lossy().into(),
+            ..Default::default()
+        };
+        self.load_with(&source, &config)
     }
 
     pub fn set_debug(&mut self, enabled: bool) {
@@ -517,6 +626,51 @@ impl VM {
         self.populate_globals();
     }
 
+    /// Compile and reload, preserving existing global variable values.
+    ///
+    /// Useful for REPL and hot-reload scenarios where you want to replace
+    /// function definitions without losing runtime state.
+    pub fn reload(&mut self, source: &str, config: &CompileConfig) -> Result<()> {
+        let stdlib_names = crate::stdlib::native_names();
+        let mut full_names = self.native_names();
+        for n in &stdlib_names {
+            if !full_names.contains(n) {
+                full_names.push(n.clone());
+            }
+        }
+
+        let tokens = crate::lexer::Lexer::new(source).tokenize()?;
+        let mut program = crate::parser::Parser::new(source, &tokens).parse()?;
+
+        if let Some(path) = &config.module_path {
+            crate::mod_resolver::resolve_modules(&mut program, path)?;
+        }
+        if config.with_prelude {
+            crate::prelude::inject(&mut program)?;
+        }
+
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &full_names)?;
+
+        let types = if config.type_check {
+            crate::typeck::check(&program, &mut symbols)?
+        } else {
+            crate::typeck::TypeMap::new()
+        };
+
+        let (fns, global_names) =
+            crate::compiler::compile(&program, &types, &symbols, &full_names, source)?;
+
+        self.reload_functions(fns, global_names)
+    }
+
+    /// Print a disassembly of all loaded functions to stdout.
+    pub fn disassemble(&self) {
+        for func in &self.functions {
+            func.disassemble();
+        }
+    }
+
     fn populate_globals(&mut self) {
         self.globals.clear();
         for name in &self.global_names {
@@ -554,6 +708,21 @@ impl VM {
     ///     }
     /// }));
     /// ```
+    /// Access the foreign type registry for the `#[zen_methods]` macro.
+    /// Not intended for direct use.
+    #[doc(hidden)]
+    pub fn foreign_registry_mut(&mut self) -> &mut Rc<ForeignTypeRegistry> {
+        &mut self.foreign_registry
+    }
+
+    /// Create a `Value::Array` from a vector of values.
+    ///
+    /// This is the safe alternative to directly accessing VM internals.
+    pub fn make_array(&mut self, values: Vec<Value>) -> Value {
+        let h = self.arrays.insert(ArrayData { values });
+        Value::Array(h)
+    }
+
     /// Wrap a Rust value into a `Value::Foreign` for use in script.
     ///
     /// This is the safe alternative to manually accessing `ctx.raw_vm` and
@@ -1860,54 +2029,20 @@ impl VM {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::compiler;
-    use crate::lexer::Lexer;
-    use crate::parser::Parser;
 
     fn run(source: &str) -> Value {
-        let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(source, &tokens);
-        let mut program = parser.parse().unwrap();
-        let native_names = crate::stdlib::native_names();
-        let mut symbols =
-            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
-        let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) =
-            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
-        crate::stdlib::register_builtins(&mut vm);
-        vm.load_bytecode(fns, global_names);
-        vm.run_main().unwrap()
+        vm.exec(source).unwrap()
     }
 
     fn try_run(source: &str) -> crate::error::Result<Value> {
-        let tokens = Lexer::new(source).tokenize()?;
-        let parser = Parser::new(source, &tokens);
-        let mut program = parser.parse()?;
-        let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
-        let types = crate::typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) =
-            compiler::compile(&program, &types, &symbols, &native_names, source)?;
         let mut vm = VM::new();
-        crate::stdlib::register_builtins(&mut vm);
-        vm.load_bytecode(fns, global_names);
-        vm.run_main()
+        vm.exec(source)
     }
 
     pub fn run_program(source: &str) -> crate::error::Result<Value> {
-        let tokens = Lexer::new(source).tokenize()?;
-        let parser = Parser::new(source, &tokens);
-        let mut program = parser.parse()?;
-        let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
-        let types = crate::typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) =
-            compiler::compile(&program, &types, &symbols, &native_names, source)?;
         let mut vm = VM::new();
-        crate::stdlib::register_builtins(&mut vm);
-        vm.load_bytecode(fns, global_names);
-        vm.run_main()
+        vm.exec(source)
     }
 
     #[test]
@@ -2109,8 +2244,8 @@ pub mod tests {
                 call_with_42(double)
             }
         "#;
-        let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(source, &tokens);
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let parser = crate::parser::Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut native_names = crate::stdlib::native_names();
         native_names.push("call_with_42".into());
@@ -2118,7 +2253,7 @@ pub mod tests {
             crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
         let (fns, global_names) =
-            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         vm.register_native(
             "call_with_42",
@@ -2140,8 +2275,8 @@ pub mod tests {
                 call_with_42(|x| x * 3)
             }
         "#;
-        let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(source, &tokens);
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let parser = crate::parser::Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut native_names = crate::stdlib::native_names();
         native_names.push("call_with_42".into());
@@ -2149,7 +2284,7 @@ pub mod tests {
             crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
         let (fns, global_names) =
-            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         vm.register_native(
             "call_with_42",
@@ -2172,8 +2307,8 @@ pub mod tests {
                 call_with_2(add)
             }
         "#;
-        let tokens = Lexer::new(source).tokenize().unwrap();
-        let parser = Parser::new(source, &tokens);
+        let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
+        let parser = crate::parser::Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let mut native_names = crate::stdlib::native_names();
         native_names.push("call_with_2".into());
@@ -2181,7 +2316,7 @@ pub mod tests {
             crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
         let (fns, global_names) =
-            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+            crate::compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         vm.register_native(
             "call_with_2",

@@ -1,12 +1,6 @@
-/// Register Rust types with fields and methods accessible from Zenlang scripts.
+/// Register Rust types with fields and methods accessible from Zen scripts.
 ///
 /// Run with: cargo run --example foreign_types
-use zenlang::compiler::compile;
-use zenlang::lexer::Lexer;
-use zenlang::parser::Parser;
-use zenlang::resolver::resolve_with_natives;
-use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
-use zenlang::typeck::check;
 use zenlang::vm::VMContext;
 use zenlang::{VM, Value, ZenForeign, zen_methods};
 
@@ -37,7 +31,6 @@ impl Player {
 
 fn main() -> zenlang::Result<()> {
     let mut vm = VM::new();
-    register_builtins(&mut vm);
 
     // Auto-generated field + method registration
     Player::register_zen_foreign(&mut vm);
@@ -54,13 +47,6 @@ fn main() -> zenlang::Result<()> {
         }),
     );
 
-    let mut names = vm.native_names();
-    for n in &stdlib_names() {
-        if !names.contains(n) {
-            names.push(n.clone());
-        }
-    }
-
     let source = "\
 let p = create_player(\"Aria\");
 print(\"Name:\", p.name);
@@ -74,13 +60,7 @@ print(\"HP% now:\", pct2);
 pct2
 ";
 
-    let tokens = Lexer::new(source).tokenize()?;
-    let mut program = Parser::new(source, &tokens).parse()?;
-    let mut symbols = resolve_with_natives(&mut program, &names)?;
-    let types = check(&program, &mut symbols)?;
-    let (fns, global_names) = compile(&program, &types, &symbols, &names, source)?;
-
-    vm.load_bytecode(fns, global_names);
+    vm.load(source)?;
     let result = vm.run_main()?;
     println!("final: {:?}", result);
 

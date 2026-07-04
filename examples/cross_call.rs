@@ -2,19 +2,11 @@
 /// and scripts define functions/globals that Rust reads after execution.
 ///
 /// Run with: cargo run --example cross_call
-use zenlang::compiler::compile;
-use zenlang::lexer::Lexer;
-use zenlang::parser::Parser;
-use zenlang::resolver::resolve_with_natives;
-use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
-use zenlang::typeck::check;
-use zenlang::value::ArrayData;
 use zenlang::vm::VMContext;
 use zenlang::{VM, Value};
 
 fn main() -> zenlang::Result<()> {
     let mut vm = VM::new();
-    register_builtins(&mut vm);
 
     // --- Rust-provided function #1: compute stats ---
     vm.register_native(
@@ -25,10 +17,7 @@ fn main() -> zenlang::Result<()> {
             let hp = base * 10 + level * 5;
             let atk = base + level * 2;
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-            let h = vm.arrays.insert(ArrayData {
-                values: vec![Value::Int(hp), Value::Int(atk)],
-            });
-            Ok(Value::Array(h))
+            Ok(vm.make_array(vec![Value::Int(hp), Value::Int(atk)]))
         }),
     );
 
@@ -45,13 +34,6 @@ fn main() -> zenlang::Result<()> {
         }),
     );
 
-    let mut names = vm.native_names();
-    for n in &stdlib_names() {
-        if !names.contains(n) {
-            names.push(n.clone());
-        }
-    }
-
     // Script calls Rust natives and returns a summary
     let source = "\
 let stats = compute_stats(12, 3);
@@ -62,13 +44,7 @@ print(\"HP:\", hp, \"ATK:\", atk, \"DMG:\", dmg);
 dmg
 ";
 
-    let tokens = Lexer::new(source).tokenize()?;
-    let mut program = Parser::new(source, &tokens).parse()?;
-    let mut symbols = resolve_with_natives(&mut program, &names)?;
-    let types = check(&program, &mut symbols)?;
-    let (fns, global_names) = compile(&program, &types, &symbols, &names, source)?;
-
-    vm.load_bytecode(fns, global_names);
+    vm.load(source)?;
     let result = vm.run_main()?;
     println!("damage dealt: {:?}", result);
     // (12 + 3*2) = 18 atk; (18 - 8*0.5) = 14 raw; 14 * 1.5 = 21
