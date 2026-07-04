@@ -39,6 +39,3 @@ path = "src/main.rs"
 [dev-dependencies]
 pretty_assertions = "1"
 tempfile = "3"
-
-[patch.crates-io]
-arena-b = { path = "patches/arena-b" }
