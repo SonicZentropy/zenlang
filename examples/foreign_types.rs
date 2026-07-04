@@ -7,7 +7,6 @@ use zenlang::parser::Parser;
 use zenlang::resolver::resolve_with_natives;
 use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
-use zenlang::value::ForeignObject;
 use zenlang::vm::VMContext;
 use zenlang::{VM, Value, ZenForeign, zen_methods};
 
@@ -51,8 +50,7 @@ fn main() -> zenlang::Result<()> {
             let name = args.first().and_then(|v| v.as_str()).unwrap_or_default();
             let player = Player::new(&name);
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-            let h = vm.foreigns.insert(ForeignObject::new("Player", player));
-            Ok(Value::Foreign(h))
+            Ok(vm.wrap_foreign("Player", player))
         }),
     );
 

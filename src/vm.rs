@@ -554,6 +554,22 @@ impl VM {
     ///     }
     /// }));
     /// ```
+    /// Wrap a Rust value into a `Value::Foreign` for use in script.
+    ///
+    /// This is the safe alternative to manually accessing `ctx.raw_vm` and
+    /// calling `vm.foreigns.insert(ForeignObject::new(...))`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let player = Player { name: "Aria".into(), health: 100 };
+    /// let val = vm.wrap_foreign("Player", player);
+    /// ```
+    pub fn wrap_foreign<T: Clone + 'static>(&mut self, type_name: &'static str, val: T) -> Value {
+        let h = self.foreigns.insert(ForeignObject::new(type_name, val));
+        Value::Foreign(h)
+    }
+
     pub fn register_native(&mut self, name: &str, f: NativeFn) {
         let idx = self.native_fns.len();
         self.natives.insert(name.to_string(), idx);
