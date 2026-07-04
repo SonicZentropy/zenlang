@@ -71,3 +71,22 @@ Closures can be passed to iterator adapters:
 ```rust
 let doubled = map([1, 2, 3], |x| x * 2);
 ```
+
+## Partial Application
+
+Use `_` as a placeholder in a call to create a partial application. The result is a lambda that fills in the missing argument.
+
+```rust
+let double = map(_, |x| x * 2);    // |__p0| map(__p0, |x| x * 2)
+double([1, 2, 3])                   // [2, 4, 6]
+```
+
+Combine with the pipe operator `|>` for readable data pipelines:
+
+```rust
+[1, 2, 3]
+    |> map(_, |x| x * 2)
+    |> filter(_, |x| x > 2)
+    |> collect()
+// → [4, 6]
+```

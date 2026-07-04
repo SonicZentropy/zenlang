@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::error::{Error, Result};
+use crate::interop::ForeignTypeDef;
 use crate::slab::Handle;
 use crate::value::{ArrayData, ForeignObject, Value};
 use crate::vm::{VM, VMContext};
@@ -1653,43 +1654,106 @@ pub fn collect_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 // Registration
 // ---------------------------------------------------------------------------
 
-/// Register all iterator foreign types and their `next` methods with the VM.
+/// Register all iterator foreign types and their methods with the VM.
 pub fn register(vm: &mut VM) {
     // Existing iterators
-    vm.register_type::<ArrayIterState>("ArrayIter")
-        .method("next", Rc::new(array_iter_next));
-    vm.register_type::<RangeIterState>("RangeIter")
-        .method("next", Rc::new(range_iter_next));
-    vm.register_type::<StrIterState>("StrIter")
-        .method("next", Rc::new(str_iter_next));
-    vm.register_type::<MapIterState>("MapIter")
-        .method("next", Rc::new(map_iter_next));
+    add_iter_methods(
+        vm.register_type::<ArrayIterState>("ArrayIter")
+            .method("next", Rc::new(array_iter_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<RangeIterState>("RangeIter")
+            .method("next", Rc::new(range_iter_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<StrIterState>("StrIter")
+            .method("next", Rc::new(str_iter_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<MapIterState>("MapIter")
+            .method("next", Rc::new(map_iter_next)),
+    );
 
     // Lazy adapters
-    vm.register_type::<LazyMapIter>("LazyMapIter")
-        .method("next", Rc::new(lazy_map_next));
-    vm.register_type::<LazyFilterIter>("LazyFilterIter")
-        .method("next", Rc::new(lazy_filter_next));
-    vm.register_type::<LazyTakeIter>("LazyTakeIter")
-        .method("next", Rc::new(lazy_take_next));
-    vm.register_type::<LazySkipIter>("LazySkipIter")
-        .method("next", Rc::new(lazy_skip_next));
-    vm.register_type::<LazyChainIter>("LazyChainIter")
-        .method("next", Rc::new(lazy_chain_next));
-    vm.register_type::<LazyZipIter>("LazyZipIter")
-        .method("next", Rc::new(lazy_zip_next));
-    vm.register_type::<LazyEnumerateIter>("LazyEnumerateIter")
-        .method("next", Rc::new(lazy_enumerate_next));
-    vm.register_type::<LazyStepByIter>("LazyStepByIter")
-        .method("next", Rc::new(lazy_step_by_next));
-    vm.register_type::<LazyCycleIter>("LazyCycleIter")
-        .method("next", Rc::new(lazy_cycle_next));
-    vm.register_type::<LazyInspectIter>("LazyInspectIter")
-        .method("next", Rc::new(lazy_inspect_next));
-    vm.register_type::<LazyFlattenIter>("LazyFlattenIter")
-        .method("next", Rc::new(lazy_flatten_next));
-    vm.register_type::<LazyFlatMapIter>("LazyFlatMapIter")
-        .method("next", Rc::new(lazy_flat_map_next));
-    vm.register_type::<LazyScanIter>("LazyScanIter")
-        .method("next", Rc::new(lazy_scan_next));
+    add_iter_methods(
+        vm.register_type::<LazyMapIter>("LazyMapIter")
+            .method("next", Rc::new(lazy_map_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyFilterIter>("LazyFilterIter")
+            .method("next", Rc::new(lazy_filter_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyTakeIter>("LazyTakeIter")
+            .method("next", Rc::new(lazy_take_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazySkipIter>("LazySkipIter")
+            .method("next", Rc::new(lazy_skip_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyChainIter>("LazyChainIter")
+            .method("next", Rc::new(lazy_chain_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyZipIter>("LazyZipIter")
+            .method("next", Rc::new(lazy_zip_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyEnumerateIter>("LazyEnumerateIter")
+            .method("next", Rc::new(lazy_enumerate_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyStepByIter>("LazyStepByIter")
+            .method("next", Rc::new(lazy_step_by_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyCycleIter>("LazyCycleIter")
+            .method("next", Rc::new(lazy_cycle_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyInspectIter>("LazyInspectIter")
+            .method("next", Rc::new(lazy_inspect_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyFlattenIter>("LazyFlattenIter")
+            .method("next", Rc::new(lazy_flatten_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyFlatMapIter>("LazyFlatMapIter")
+            .method("next", Rc::new(lazy_flat_map_next)),
+    );
+    add_iter_methods(
+        vm.register_type::<LazyScanIter>("LazyScanIter")
+            .method("next", Rc::new(lazy_scan_next)),
+    );
+}
+
+fn add_iter_methods(def: &mut ForeignTypeDef) -> &mut ForeignTypeDef {
+    def.method("map", Rc::new(map_impl))
+        .method("filter", Rc::new(filter_impl))
+        .method("take", Rc::new(take_impl))
+        .method("skip", Rc::new(skip_impl))
+        .method("chain", Rc::new(chain_impl))
+        .method("zip", Rc::new(zip_impl))
+        .method("enumerate", Rc::new(enumerate_impl))
+        .method("step_by", Rc::new(step_by_impl))
+        .method("cycle", Rc::new(cycle_impl))
+        .method("inspect", Rc::new(inspect_impl))
+        .method("flatten", Rc::new(flatten_impl))
+        .method("flat_map", Rc::new(flat_map_impl))
+        .method("scan", Rc::new(scan_impl))
+        .method("collect", Rc::new(collect_impl))
+        .method("fold", Rc::new(fold_impl))
+        .method("count", Rc::new(count_impl))
+        .method("all", Rc::new(all_impl))
+        .method("any", Rc::new(any_impl))
+        .method("find", Rc::new(find_impl))
+        .method("position", Rc::new(position_impl))
+        .method("sum", Rc::new(sum_impl))
+        .method("product", Rc::new(product_impl))
+        .method("join", Rc::new(join_impl))
+        .method("partition", Rc::new(partition_impl))
+        .method("min", Rc::new(min_impl))
+        .method("max", Rc::new(max_impl))
 }

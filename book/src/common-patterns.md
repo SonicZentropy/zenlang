@@ -328,10 +328,16 @@ random_int(1, 6);   // i64 in [1, 6]
 ```rust
 use std::iter::*;
 
-map([1, 2, 3], |x| x * 2);       // [2, 4, 6]
-filter([1, 2, 3, 4], |x| x % 2 == 0);  // [2, 4]
-reduce([1, 2, 3], |a, b| a + b, 0);    // 6
-zip(["a", "b"], [1, 2]);          // [["a",1],["b",2]]
+map([1, 2, 3], |x| x * 2);                 // lazy Iter, use collect()
+collect(filter([1, 2, 3, 4], |x| x % 2 == 0));  // [2, 4]
+fold([1, 2, 3], 0, |a, b| a + b);          // 6 (terminal, returns value)
+zip(["a", "b"], [1, 2]);                    // lazy Iter
+
+// Pipe + partial application for readable pipelines
+[1, 2, 3, 4, 5]
+    |> map(_, |x| x * 2)
+    |> filter(_, |x| x > 4)
+    |> collect();
 ```
 
 ### JSON

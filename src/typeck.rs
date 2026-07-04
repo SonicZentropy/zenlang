@@ -773,6 +773,14 @@ impl<'a> TypeChecker<'a> {
                         );
                         Type::Unit
                     }
+                    // `Type::Iter(..)` — lazy iterator with methods:
+                    // map, filter, collect, etc.
+                    Type::Iter(_) => {
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        Type::Any
+                    }
                     _ => {
                         for arg in args {
                             self.check_expr(arg);

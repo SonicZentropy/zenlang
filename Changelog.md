@@ -3,24 +3,48 @@
 ## [0.4.0] — 2026-07-04
 
 ### Language
-- Pipe operator `|>` : `x |> f` desugars to `f(x)` at parse time — no runtime overhead
+- Pipe operator `|>` : `x |> f` desugars to `f(x)` at parse time — no runtime overhead, no AST/typeck/VM changes
+  - Precedence between `Compare` and `Term`: `x |> f + g` → `(f + g)(x)`
+  - Chained pipes flow naturally: `x |> f |> g |> h` → `h(g(f(x)))`
 - Partial application `_` : `map(_, f)` desugars to `|__p0| map(__p0, f)` at parse time
-- 14 lazy iterator adapters: `map`, `filter`, `take`, `skip`, `chain`, `zip`, `enumerate`, `step_by`, `cycle`, `inspect`, `flatten`, `flat_map`, `scan` — all native Rust, zero intermediate allocations
-- 13 terminal iterator operations: `count`, `all`, `any`, `find`, `position`, `sum`, `product`, `min`, `max`, `join`, `partition`, `fold`, `collect`
+  - `f(_, x)` → `|__p0| f(__p0, x)`
+  - `f(_, _)` → `|__p0, __p1| f(__p0, __p1)`
+  - `f(x)` → unchanged (no `_` present)
+  - `let x = _` → unchanged (discard pattern, not call context)
+  - Fresh param names `__p0`, `__p1`, etc. — no collision with user names
+- **Method chaining on iterators**: `iter(arr).map(f).filter(g).collect()` — 26 methods registered on all 17 iterator types
+  - Adapter methods: `.map()`, `.filter()`, `.take()`, `.skip()`, `.chain()`, `.zip()`, `.enumerate()`, `.step_by()`, `.cycle()`, `.inspect()`, `.flatten()`, `.flat_map()`, `.scan()`
+  - Terminal methods: `.collect()`, `.fold()`, `.count()`, `.all()`, `.any()`, `.find()`, `.position()`, `.sum()`, `.product()`, `.join()`, `.partition()`, `.min()`, `.max()`
+- 14 lazy iterator adapters: `map`, `filter`, `take`, `skip`, `chain`, `zip`, `enumerate`, `step_by`, `cycle`, `inspect`, `flatten`, `flat_map`, `scan` — all native Rust `ForeignObject` types with `.next()` method, zero intermediate allocations
+  - Each adapter stores source `Handle` + closure `Value`, calls `ctx.call_value()` to re-enter the VM
+  - `LazyCycleIter` caches elements on first pass, replays from cache after source exhaustion
+  - Uses `ensure_iterator()` helper to auto-wrap arrays/ranges via `iter()` before chaining
+- 13 terminal iterator operations: `count`, `all`, `any`, `find`, `position`, `sum`, `product`, `min`/`max` (int-only), `join`, `partition`, `fold`, `collect`
+  - Each calls `ensure_iterator()` + loops `.next()` until `None`
 - `clock()` native: returns nanoseconds since epoch for benchmarking
 
 ### Type Checker
-- `Type::Iter(Box<Type>)` — new AST variant tracking lazy iterator types
-- Indexing into a `Type::Iter` is now a compile-time error: "cannot index lazy iterator; call collect() to materialize it into an array"
-- Tightened `Expr::Index` for known non-indexable types: structs, scalars, functions, and `unknown` all produce clear errors
+- `Type::Iter(Box<Type>)` — new AST variant tracking lazy iterator types; handled in `unify`, `types_compatible`, `type_display`, `resolve_var`
+- `Type::Iter(_)` arm in method-call handler — allows `.map()`, `.filter()` etc. on lazy iterator values (returns `Type::Any`)
+- Indexing into a `Type::Iter` is now a compile-time error: "cannot index lazy iterator; did you forget to call collect()?"
+- Tightened `Expr::Index` for known non-indexable types:
+  - Scalars (`i64`, `f32`, `f64`, `bool`), `unit`, and `fn` types → "type 'X' does not support indexing"
+  - `unknown` → "cannot index 'unknown'; narrow via match or cast first"
+  - `Named` (structs) → "type 'X' does not support indexing"
+  - `Any` | `Var` | `Generic` → allow through (runtime-determined)
+  - `Iter(_)` → actionable error with fix hint
 
 ### Prelude
 - All prelude iterator functions (`map`, `filter`, `fold`, etc.) migrated from Zen-language prelude to native Rust — `prelude.zen` is now a documentation placeholder
+- `prelude.rs::inject()` is a no-op; prelude is entirely native-registered functions
 - ~2x faster adapter performance vs the old eager Zen prelude (measured on 100K elements)
 
 ### Documentation
-- `book/src/stdlib-iter.md` — rewritten with full lazy adapter + terminal op reference
-- `examples/tour.zen` — updated with pipe operator and iterator chaining examples
+- `book/src/stdlib-iter.md` — rewritten with full lazy adapter + terminal op reference, pipe chaining examples
+- `book/src/operators.md` — added pipe `|>` section with examples and precedence
+- `book/src/functions.md` — added partial application `_` section
+- `book/src/common-patterns.md` — updated iterators section with lazy adapters and pipe patterns
+- `examples/tour.zen` — updated with pipe operator and partial application sections
 - All version references updated to 0.4.0
 
 ## [0.3.0] — 2026-07-04
