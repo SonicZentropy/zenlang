@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0] -
+- Method-call syntax for built-in types: arrays (`.push()`, `.pop()`, `.len()`, `.insert()`, `.remove()`, `.contains()`, `.is_empty()`, `.clear()`), strings (`.len()`, `.contains()`, `.trim()`, `.to_upper()`, `.to_lower()`, `.substring()`, `.is_empty()`, `.starts_with()`, `.ends_with()`), maps (`.set()`, `.get()`, `.has()`, `.contains_key()`, `.remove()`, `.keys()`, `.values()`, `.len()`, `.is_empty()`, `.clear()`), ranges (`.len()`, `.contains()`, `.is_empty()`)
+- Type checker: `!`, `&&`, `||` operators now accept `Type::Any` (fixes type errors on `!arr.is_empty()` etc.)
+- Type checker: `Expr::Range` returns `Type::Any` instead of `Type::Unit` (enables method calls on range values)
+- `assert_eq` now uses deep structural comparison for enum/map/array values (fixes false `assert_eq` failures on structurally equal enums)
+- Documentation: updated `collections.md`, `strings.md`, `stdlib-core.md`, `stdlib-map.md` with method-call examples
+- New example: `examples/method_calls.zen`
+
 ## [0.2.0] -
 - Compound assignment operators (`+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`)
 - Bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`) + compound assigns
