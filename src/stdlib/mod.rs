@@ -25,6 +25,7 @@ mod log;
 mod map;
 mod math;
 mod set;
+mod sorted_map;
 
 /// Register all built-in stdlib functions with the given VM.
 pub fn register_builtins(vm: &mut VM) {
@@ -96,6 +97,9 @@ pub fn register_builtins(vm: &mut VM) {
 
     // Set collection
     set::register(vm);
+
+    // SortedMap collection
+    sorted_map::register(vm);
 
     // Vector/scalar math for games (Vec2/Vec3, lerp/clamp, trig, RNG)
     math::register(vm);
@@ -546,6 +550,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
     sigs.extend(log::signatures());
     sigs.extend(math::signatures());
     sigs.extend(set::signatures());
+    sigs.extend(sorted_map::signatures());
     sigs
 }
 

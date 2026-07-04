@@ -219,11 +219,11 @@ impl Clone for ForeignObject {
 // ── MapKey ────────────────────────────────────────────────────────────
 
 /// A hashable key for `Value::Map`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MapKey {
+    Bool(bool),
     Int(i64),
     Str(Rc<str>),
-    Bool(bool),
 }
 
 impl MapKey {

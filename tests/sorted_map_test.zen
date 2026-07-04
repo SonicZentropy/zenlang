@@ -1,0 +1,33 @@
+let sm = sorted_map_new();
+sorted_map_insert(sm, "zebra", 1);
+sorted_map_insert(sm, "apple", 2);
+sorted_map_insert(sm, "mango", 3);
+
+assert(is_some(sorted_map_get(sm, "apple")));
+assert(unwrap(sorted_map_get(sm, "apple")) == 2);
+assert(is_none(sorted_map_get(sm, "kiwi")));
+assert(sorted_map_contains(sm, "mango"));
+assert(!sorted_map_contains(sm, "kiwi"));
+assert(sorted_map_len(sm) == 3);
+
+let keys = sorted_map_keys(sm);
+assert(keys[0] == "apple");
+assert(keys[1] == "mango");
+assert(keys[2] == "zebra");
+
+let values = sorted_map_values(sm);
+assert(values[0] == 2);
+assert(values[1] == 3);
+assert(values[2] == 1);
+
+let entries = sorted_map_entries(sm);
+assert(len(entries) == 3);
+
+let range = sorted_map_range(sm, "mango", "zebra");
+assert(len(range) == 2);
+
+sorted_map_remove(sm, "apple");
+assert(!sorted_map_contains(sm, "apple"));
+assert(sorted_map_len(sm) == 2);
+
+print("sorted_map test passed");
