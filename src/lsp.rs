@@ -1773,6 +1773,7 @@ fn type_display(ty: &crate::ast::Type) -> String {
         crate::ast::Type::Result(ok, err) => {
             format!("Result<{}, {}>", type_display(ok), type_display(err))
         }
+        crate::ast::Type::Iter(inner) => format!("Iter<{}>", type_display(inner)),
     }
 }
 

@@ -1,37 +1,21 @@
-//! The Zenlang prelude: a small set of standard functions written in
-//! Zenlang itself (see `prelude.zen`), rather than as native Rust functions.
+//! The Zenlang prelude.
 //!
-//! Iterator adapters like `map`/`filter`/`fold` need to call back into a
-//! script-provided closure for each element. Native Rust functions have no
-//! way to do that (`VMContext` doesn't hold a handle back into the running
-//! VM), but Zenlang closures can already call each other directly — so
-//! writing these in Zenlang sidesteps the limitation entirely.
+//! All iterator adapters (`map`, `filter`, `fold`, `collect`, etc.) are
+//! implemented as native Rust functions in `src/stdlib/iter.rs` because
+//! creating `ForeignObject`s requires `VM::foreigns.insert()`, which is not
+//! possible from Zen code.  The closures are invoked via `ctx.call_value()`.
 //!
-//! Callers that build and run a `Program` (the CLI, the REPL, hot reload)
-//! should call [`inject`] right after parsing so the prelude's functions
-//! are visible to the rest of the pipeline (resolver, typeck, compiler)
-//! exactly like any other top-level function in the script.
+//! The prelude is a no-op — it exists only as a placeholder for any future
+//! built-in functions that need to be written in Zen rather than Rust.
 
 use crate::ast::Program;
 use crate::error::Result;
-use crate::lexer::Lexer;
-use crate::parser::Parser;
-
-/// Source of the built-in prelude functions (`map`, `filter`, `fold`,
-/// `enumerate`, `take`, `zip`, `collect`).
-pub const SOURCE: &str = include_str!("prelude.zen");
 
 /// Parse the prelude and prepend its top-level declarations to `program`.
 ///
-/// Prepending (rather than appending) means a script can still shadow a
-/// prelude function by declaring its own top-level function with the same
-/// name — the resolver reports the more useful "already defined" error at
-/// the user's declaration, not the prelude's.
+/// Currently a no-op: all built-in functions are native Rust implementations
+/// registered during VM setup.
 pub fn inject(program: &mut Program) -> Result<()> {
-    let tokens = Lexer::new(SOURCE).tokenize()?;
-    let prelude_program = Parser::new(SOURCE, &tokens).parse()?;
-    let mut stmts = prelude_program.stmts;
-    stmts.append(&mut program.stmts);
-    program.stmts = stmts;
+    let _ = program;
     Ok(())
 }

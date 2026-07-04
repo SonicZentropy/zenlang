@@ -51,8 +51,32 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("max", Rc::new(max_impl));
     vm.register_native("sqrt", Rc::new(sqrt_impl));
 
-    // Iterators
+    // Iterators — lazy adapters, terminal ops, and iterator protocol
     vm.register_native("iter", Rc::new(iter::iter_impl));
+    vm.register_native("map", Rc::new(iter::map_impl));
+    vm.register_native("filter", Rc::new(iter::filter_impl));
+    vm.register_native("take", Rc::new(iter::take_impl));
+    vm.register_native("skip", Rc::new(iter::skip_impl));
+    vm.register_native("chain", Rc::new(iter::chain_impl));
+    vm.register_native("zip", Rc::new(iter::zip_impl));
+    vm.register_native("enumerate", Rc::new(iter::enumerate_impl));
+    vm.register_native("step_by", Rc::new(iter::step_by_impl));
+    vm.register_native("cycle", Rc::new(iter::cycle_impl));
+    vm.register_native("inspect", Rc::new(iter::inspect_impl));
+    vm.register_native("flatten", Rc::new(iter::flatten_impl));
+    vm.register_native("flat_map", Rc::new(iter::flat_map_impl));
+    vm.register_native("scan", Rc::new(iter::scan_impl));
+    vm.register_native("count", Rc::new(iter::count_impl));
+    vm.register_native("all", Rc::new(iter::all_impl));
+    vm.register_native("any", Rc::new(iter::any_impl));
+    vm.register_native("find", Rc::new(iter::find_impl));
+    vm.register_native("position", Rc::new(iter::position_impl));
+    vm.register_native("sum", Rc::new(iter::sum_impl));
+    vm.register_native("product", Rc::new(iter::product_impl));
+    vm.register_native("join", Rc::new(iter::join_impl));
+    vm.register_native("partition", Rc::new(iter::partition_impl));
+    vm.register_native("fold", Rc::new(iter::fold_impl));
+    vm.register_native("collect", Rc::new(iter::collect_impl));
     iter::register(vm);
 
     // Maps / dictionaries
@@ -295,6 +319,158 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             type_params: vec![],
             name: "iter".into(),
             params: vec![("val".into(), Type::Any)],
+            return_type: Some(Type::Any),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "map".into(),
+            params: vec![("iterable".into(), Type::Any), ("f".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "filter".into(),
+            params: vec![("iterable".into(), Type::Any), ("pred".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "take".into(),
+            params: vec![("iterable".into(), Type::Any), ("n".into(), Type::I64)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "skip".into(),
+            params: vec![("iterable".into(), Type::Any), ("n".into(), Type::I64)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "chain".into(),
+            params: vec![("a".into(), Type::Any), ("b".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "zip".into(),
+            params: vec![("a".into(), Type::Any), ("b".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "enumerate".into(),
+            params: vec![("iterable".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "step_by".into(),
+            params: vec![("iterable".into(), Type::Any), ("step".into(), Type::I64)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "cycle".into(),
+            params: vec![("iterable".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "inspect".into(),
+            params: vec![("iterable".into(), Type::Any), ("f".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "flatten".into(),
+            params: vec![("iterable".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "flat_map".into(),
+            params: vec![("iterable".into(), Type::Any), ("f".into(), Type::Any)],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "scan".into(),
+            params: vec![
+                ("iterable".into(), Type::Any),
+                ("init".into(), Type::Any),
+                ("f".into(), Type::Any),
+            ],
+            return_type: Some(Type::Iter(Box::new(Type::Any))),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "count".into(),
+            params: vec![("iterable".into(), Type::Any)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "all".into(),
+            params: vec![("iterable".into(), Type::Any), ("pred".into(), Type::Any)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "any".into(),
+            params: vec![("iterable".into(), Type::Any), ("pred".into(), Type::Any)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "find".into(),
+            params: vec![("iterable".into(), Type::Any), ("pred".into(), Type::Any)],
+            return_type: Some(Type::Any),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "position".into(),
+            params: vec![("iterable".into(), Type::Any), ("pred".into(), Type::Any)],
+            return_type: Some(Type::Any),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "sum".into(),
+            params: vec![("iterable".into(), Type::Any)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "product".into(),
+            params: vec![("iterable".into(), Type::Any)],
+            return_type: Some(Type::I64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "join".into(),
+            params: vec![("iterable".into(), Type::Any), ("sep".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "partition".into(),
+            params: vec![("iterable".into(), Type::Any), ("pred".into(), Type::Any)],
+            return_type: Some(Type::Any),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "fold".into(),
+            params: vec![
+                ("iterable".into(), Type::Any),
+                ("init".into(), Type::Any),
+                ("f".into(), Type::Any),
+            ],
+            return_type: Some(Type::Any),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "collect".into(),
+            params: vec![("iterable".into(), Type::Any)],
             return_type: Some(Type::Any),
         },
         FnSignature {

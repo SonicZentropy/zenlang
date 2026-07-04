@@ -179,6 +179,7 @@ impl<'a> TypeChecker<'a> {
             // Compound types — recurse
             (Type::Array(ae), Type::Array(be)) => self.unify(ae, be),
             (Type::Option(ao), Type::Option(bo)) => self.unify(ao, bo),
+            (Type::Iter(ae), Type::Iter(be)) => self.unify(ae, be),
             (Type::Result(oka, erra), Type::Result(okb, errb)) => {
                 self.unify(oka, okb) && self.unify(erra, errb)
             }
@@ -837,11 +838,35 @@ impl<'a> TypeChecker<'a> {
                 match &ot {
                     Type::Array(inner) => *inner.clone(),
                     Type::Str => Type::Str,
-                    // Ranges, maps, and other type-erased (`Type::Any`)
-                    // values are indexable at runtime but their element type
-                    // can't be known statically here; `Type::Any` is the
-                    // "compatible with anything" placeholder.
-                    _ => Type::Any,
+                    Type::Iter(_) => {
+                        self.error(
+                            "cannot index lazy iterator; call collect() to \
+                             materialize it into an array (e.g. \
+                             collect(arr |> map(_, f))[0])",
+                        );
+                        Type::Unit
+                    }
+                    // `Type::Any` and `Type::Var` / `Type::Generic` are
+                    // type-erased placeholders — indexing them may or may not
+                    // work at runtime, so we let it through.
+                    Type::Any | Type::Var(_) | Type::Generic(_) => Type::Any,
+                    // `Type::Unknown` requires narrowing before access.
+                    Type::Unknown => {
+                        self.error(
+                            "cannot index 'unknown' type; \
+                             narrow via match or cast first",
+                        );
+                        Type::Unit
+                    }
+                    // Everything else (structs, functions, scalars, etc.)
+                    // definitively does not support indexing.
+                    _ => {
+                        self.error(format!(
+                            "type '{}' does not support indexing",
+                            self.type_display(&ot),
+                        ));
+                        Type::Unit
+                    }
                 }
             }
             Expr::Block(stmts) => {
@@ -895,6 +920,7 @@ impl<'a> TypeChecker<'a> {
                     _ => match &iter_ty {
                         Type::Array(inner) => *inner.clone(),
                         Type::Str => Type::Str,
+                        Type::Iter(inner) => *inner.clone(),
                         // Ranges (as a value, not an inline literal), maps,
                         // custom struct/foreign iterators, and anything else
                         // type-erased (`Type::Any`) can't have their element
@@ -1250,6 +1276,7 @@ impl<'a> TypeChecker<'a> {
             }
             (Type::Array(a), Type::Array(b)) => self.types_compatible(a, b),
             (Type::Option(a), Type::Option(b)) => self.types_compatible(a, b),
+            (Type::Iter(a), Type::Iter(b)) => self.types_compatible(a, b),
             (Type::Result(oka, erra), Type::Result(okb, errb)) => {
                 self.types_compatible(oka, okb) && self.types_compatible(erra, errb)
             }
@@ -1397,6 +1424,7 @@ impl<'a> TypeChecker<'a> {
                 self.type_display(ok),
                 self.type_display(err)
             ),
+            Type::Iter(inner) => format!("Iter<{}>", self.type_display(inner)),
         }
     }
 }

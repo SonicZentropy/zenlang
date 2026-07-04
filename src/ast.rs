@@ -66,6 +66,9 @@ pub enum Type {
     Option(Box<Type>),
     /// `Result<T, E>` — legacy type (prefer generic `enum Result`).
     Result(Box<Type>, Box<Type>),
+    /// `Iter<T>` — a lazy iterator yielding elements of type `T`.
+    /// Produced by `map`, `filter`, etc. Call `collect()` to materialize.
+    Iter(Box<Type>),
 }
 
 // ---------- Operators ----------
