@@ -1,5 +1,5 @@
 [book]
-title = "The Zenlang Programming Language"
-authors = ["Zenlang Contributors"]
+title = "The Zen Programming Language"
+authors = ["Zen Contributors"]
 description = "A lightweight, embeddable, optionally-typed Rust-like scripting language for game engines and real-time applications"
 language = "en"
