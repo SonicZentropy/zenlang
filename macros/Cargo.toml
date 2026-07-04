@@ -2,6 +2,8 @@
 name = "zenlang-macros"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/SonicZentropy/zenlang"
 description = "Procedural macros for zenlang foreign type binding"
 
 [lib]

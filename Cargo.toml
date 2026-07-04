@@ -6,11 +6,13 @@ exclude = ["zed-extension"]
 name = "zenlang"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/SonicZentropy/zenlang"
 description = "An embedded Rust-like scripting language for game engines"
 
 [dependencies]
 arena-b = "1.0.0"
-zenlang-macros = { path = "macros" }
+zenlang-macros = "0.1.0"
 snafu = "0.8"
 derive_more = { version = "2", features = ["add", "display", "from"] }
 tracing = "0.1"
