@@ -363,3 +363,6 @@ Add `Type::Any` variant, replace wildcard `Unit` usages, clean up `types_compati
 | 5 | Default-constructor `#[foreign(default)]` | ✅ Done | `9b6c930` |
 | 6 | `ty_to_field_type` syn AST matching | ✅ Done | `7155d0a` |
 | 7 | Book documentation alignment | ✅ Done | `de276b0` |
+
+
+Add gh-pages workflow for building the MDBook
