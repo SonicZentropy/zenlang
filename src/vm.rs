@@ -610,7 +610,7 @@ impl VM {
         self.native_fns.iter().map(|(n, _)| n.clone()).collect()
     }
 
-    /// Load compiled bytecode into the VM. Converts any Rc<str> based constant
+    /// Load compiled bytecode into the VM. Converts any Rc-string based constant
     /// pool strings and heap Values to the handle-based representation.
     pub fn load_bytecode(&mut self, fns: Vec<BytecodeFn>, global_names: Vec<String>) {
         let offset = self.functions.len();
@@ -1793,11 +1793,8 @@ impl VM {
                     let gen_active = self.active_generator.is_some();
                     if gen_active {
                         self.stack.truncate(frame.bp);
-                        if self.frames.is_empty() {
-                            // generator_base_frame_count is implicit
-                            self.stack.push(result);
-                            break;
-                        }
+                        self.stack.push(result);
+                        break;
                     } else if frame.is_method || frame.is_closure {
                         self.stack.truncate(frame.bp);
                     } else if frame.bp > 0 {

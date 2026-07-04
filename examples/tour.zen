@@ -291,12 +291,26 @@ fn main() {
     // Narrow via type_of to inspect:
     assert(type_of(safe) == "str");
 
-    print("section 30...");
+    print("section 30a...");
     // 30. Generators
     let g = counter();
-    assert(next(g) == Some(1));
-    assert(next(g) == Some(2));
-    assert(next(g) == Some(3));
+    print("got generator");
+    let v1 = next(g);
+    print(v1);
+    assert(v1 == Some(1));
+    print("first yield ok");
+    let v2 = next(g);
+    assert(v2 == Some(2));
+    print("second yield ok");
+    let v3 = next(g);
+    assert(v3 == Some(3));
+    print("third yield ok");
+    let v4 = next(g);
+    print("v4 is:");
+    print(v4);
+    print(type_of(v4));
+    assert(v4 == None);
+    print("generator done");
 
     print("section 31...");
     // 31. While let

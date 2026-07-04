@@ -158,7 +158,6 @@ impl<'a> TypeChecker<'a> {
             | (Type::Unit, Type::Unit)
             | (Type::Any, _)
             | (_, Type::Any)
-            | (Type::Unknown, _)
             | (_, Type::Unknown) => true,
             // Numeric coercion
             (Type::I64, Type::F64) | (Type::F64, Type::I64) => true,

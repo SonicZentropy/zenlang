@@ -253,7 +253,7 @@ impl MapKey {
 /// A runtime value in the Zenlang VM.
 ///
 /// Mutable heap objects (arrays, structs, enums, maps, closures, generators,
-/// weak refs, foreign objects) are referenced by [`Handle`] — an index into
+/// weak refs, foreign objects) are referenced by `Handle` — an index into
 /// a slab owned by the VM. This eliminates `Rc`/`RefCell` overhead for all
 /// mutable values.
 pub enum Value {

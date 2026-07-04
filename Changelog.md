@@ -4,17 +4,31 @@
 
 ### Language
 - Method-call syntax for built-in types: arrays (`.push()`, `.pop()`, `.len()`, `.insert()`, `.remove()`, `.contains()`, `.is_empty()`, `.clear()`), strings (`.len()`, `.contains()`, `.trim()`, `.to_upper()`, `.to_lower()`, `.substring()`, `.is_empty()`, `.starts_with()`, `.ends_with()`), maps (`.set()`, `.get()`, `.has()`, `.contains_key()`, `.remove()`, `.keys()`, `.values()`, `.len()`, `.is_empty()`, `.clear()`), ranges (`.len()`, `.contains()`, `.is_empty()`)
+- `unknown` type: full parser support (`unknown` keyword from source), type unification, and proper top-type semantics (assignable from any type, requires narrowing before use)
+- Generator exhaustion fix: `next(g)` on an exhausted generator now returns `None` instead of panicking
 
 ### Type Checker
 - `!`, `&&`, `||` operators now accept `Type::Any` (fixes type errors on `!arr.is_empty()` etc.)
 - `Expr::Range` returns `Type::Any` instead of `Type::Unit` (enables method calls on range values)
+- `unknown` type: removed incorrect bidirectional compatibility — `unknown` cannot be assigned to other types without narrowing
 
 ### Runtime
 - `assert_eq` uses `VM::values_equal()` deep structural comparison instead of `PartialEq` handle identity (fixes false failures on structurally equal enum/map/array values)
+- Removed stray debug `eprintln!` from stdlib initialization
 
 ### Documentation
 - Updated `collections.md`, `strings.md`, `stdlib-core.md`, `stdlib-map.md` with method-call examples
 - New `examples/method_calls.zen`
+- New `examples/tour.zen` — comprehensive runnable tour covering method-call syntax, generators, `any`/`unknown` types, `while let`, field shorthand, spread operator, map literals
+- `book/src/primitives.md` — documented `unknown` type with narrowing examples
+- `book/src/structural-typing.md` — documented width subtyping and excess property checks
+- Removed stale `book/src/cargo-features.md` content about non-existent cargo features
+- All version references updated to 0.3.0 across README, COOKBOOK, and mdbook
+- "Zenlang" → "Zen" rename in CLI help text, templates, and all documentation headers
+
+### CLI
+- Help text improvements: consistent "Zen" branding, clearer command descriptions
+- `zenc new` templates updated with current library/binary project structure
 
 ---
 

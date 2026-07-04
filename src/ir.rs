@@ -54,6 +54,7 @@ pub enum Opcode {
 }
 
 impl Opcode {
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_byte(&self) -> u8 {
         use Opcode::*;
         match self {
