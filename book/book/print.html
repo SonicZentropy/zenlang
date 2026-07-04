@@ -1,0 +1,2177 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Zenlang Programming Language</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A lightweight, embeddable Rust-like scripting language for game engines and real-time applications">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-3e7c156f.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-3f6421ed.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Zenlang Programming Language</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p><strong>Zenlang</strong> is a lightweight, embeddable Rust-like scripting language designed for <strong>game engines and real-time applications</strong>. It is implemented in Rust and available as a library crate (<code>zenlang</code>) with a CLI binary (<code>zenc</code>).</p>
+<h2 id="design-philosophy"><a class="header" href="#design-philosophy">Design Philosophy</a></h2>
+<p>Zenlang was created for developers who want a familiar, ergonomic scripting language that integrates tightly with Rust without the overhead of a full language runtime.</p>
+<ul>
+<li><strong>Rust-like syntax</strong> — Familiar to Rust developers, reducing the learning curve for game programmers.</li>
+<li><strong>No borrow checker</strong> — Skips Rust’s ownership system to keep implementation simple and predictable at the cost of compile-time memory guarantees.</li>
+<li><strong>No GC</strong> — Uses <code>Rc</code>-based reference counting and an arena-based slab allocator. Deterministic, no stop-the-world pauses.</li>
+<li><strong>No async</strong> — Synchronous, single-threaded by design; trivially embeddable.</li>
+<li><strong>Tight bytecode VM</strong> — A register-based stack VM with ~50 opcodes; single-pass codegen, no intermediate representation.</li>
+<li><strong>Rust interop as a first-class feature</strong> — Register foreign types with fields and methods, call Rust from scripts and scripts from Rust.</li>
+<li><strong>Hot reload</strong> — Watch source files for changes, recompile, and reload while preserving global state.</li>
+</ul>
+<h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
+<ul>
+<li><strong>Game scripting</strong> — Embed Zenlang in your game engine for moddable, hot-reloadable game logic.</li>
+<li><strong>Real-time applications</strong> — Configurable instruction limits prevent runaway scripts from freezing the host.</li>
+<li><strong>Prototyping</strong> — Rapid iteration with REPL and hot reload.</li>
+<li><strong>Education</strong> — Rust-like syntax without the borrow checker makes it approachable for learners.</li>
+</ul>
+<h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
+<pre class="playground"><code class="language-rust">struct Player {
+    name: str,
+    health: i64,
+    x: f64,
+    y: f64,
+}
+
+impl Player {
+    fn is_alive(&amp;self) -&gt; bool {
+        self.health &gt; 0
+    }
+
+    fn take_damage(&amp;mut self, amount: i64) {
+        self.health = self.health - amount;
+    }
+}
+
+fn main() {
+    let p = Player {
+        name: "Hero",
+        health: 100,
+        x: 0.0,
+        y: 0.0,
+    };
+    assert(p.is_alive());
+}</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<p>This chapter covers installing Zenlang, running your first script, and using the CLI tooling.</p>
+<ul>
+<li><a href="#installation">Installation</a></li>
+<li><a href="#your-first-script">Your First Script</a></li>
+<li><a href="#cli-reference">CLI Reference</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
+<h2 id="building-from-source"><a class="header" href="#building-from-source">Building from Source</a></h2>
+<p>Zenlang is a Rust project. You’ll need the Rust toolchain installed (https://rustup.rs).</p>
+<pre><code class="language-bash">git clone https://github.com/SonicZentropy/zenlang
+cd zenlang
+cargo build --release
+</code></pre>
+<p>The <code>zenc</code> binary will be at <code>target/release/zenc</code> (or <code>target/release/zenc.exe</code> on Windows).</p>
+<h2 id="using-as-a-library"><a class="header" href="#using-as-a-library">Using as a Library</a></h2>
+<p>Add the following to your <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+zenlang = { git = "https://github.com/SonicZentropy/zenlang" }
+</code></pre>
+<h2 id="verifying-the-installation"><a class="header" href="#verifying-the-installation">Verifying the Installation</a></h2>
+<pre><code class="language-bash">zenc --help
+</code></pre>
+<p>You should see the available subcommands: <code>run</code>, <code>repl</code>, <code>check</code>, <code>disasm</code>, <code>lsp</code>, <code>new</code>, <code>build</code>, <code>dap</code>, <code>test</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="your-first-script"><a class="header" href="#your-first-script">Your First Script</a></h1>
+<p>Create a file called <code>hello.zen</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>print("Hello, Zenlang!");
+<span class="boring">}</span></code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">zenc run hello.zen
+</code></pre>
+<p>You should see <code>Hello, Zenlang!</code> printed to the terminal.</p>
+<h2 id="repl"><a class="header" href="#repl">REPL</a></h2>
+<p>Start an interactive session:</p>
+<pre><code class="language-bash">zenc repl
+</code></pre>
+<p>Try some expressions:</p>
+<pre><code>&gt; let x = 42;
+&gt; print(x * 2);
+84
+&gt; fn factorial(n) { if n &lt;= 1 { 1 } else { n * factorial(n - 1) } }
+&gt; factorial(10)
+3628800
+</code></pre>
+<h2 id="creating-a-new-project"><a class="header" href="#creating-a-new-project">Creating a New Project</a></h2>
+<pre><code class="language-bash">zenc new my_project
+cd my_project
+zenc run
+</code></pre>
+<p>This creates:</p>
+<pre><code>my_project/
+  src/
+    main.zen     # Entry point
+  zenc.json      # Project configuration
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="cli-reference"><a class="header" href="#cli-reference">CLI Reference</a></h1>
+<h2 id="zenc-run"><a class="header" href="#zenc-run"><code>zenc run</code></a></h2>
+<p>Run a script with optional hot reload.</p>
+<pre><code class="language-bash">zenc run &lt;file&gt;
+zenc run                  # Uses zenc.json entry point
+zenc run --watch &lt;file&gt;   # Watch for changes, hot reload
+</code></pre>
+<h2 id="zenc-repl"><a class="header" href="#zenc-repl"><code>zenc repl</code></a></h2>
+<p>Start an interactive REPL session with multi-line input detection.</p>
+<pre><code class="language-bash">zenc repl
+</code></pre>
+<h2 id="zenc-check"><a class="header" href="#zenc-check"><code>zenc check</code></a></h2>
+<p>Type-check a script without executing it.</p>
+<pre><code class="language-bash">zenc check &lt;file&gt;
+</code></pre>
+<h2 id="zenc-build"><a class="header" href="#zenc-build"><code>zenc build</code></a></h2>
+<p>Type-check a project via <code>zenc.json</code>.</p>
+<pre><code class="language-bash">zenc build [path]
+</code></pre>
+<h2 id="zenc-test"><a class="header" href="#zenc-test"><code>zenc test</code></a></h2>
+<p>Discover and run all <code>.zen</code> test files.</p>
+<pre><code class="language-bash">zenc test [paths...]
+</code></pre>
+<h2 id="zenc-disasm"><a class="header" href="#zenc-disasm"><code>zenc disasm</code></a></h2>
+<p>Dump bytecode with opcodes, source lines, and constants table.</p>
+<pre><code class="language-bash">zenc disasm &lt;file&gt;
+</code></pre>
+<h2 id="zenc-lsp"><a class="header" href="#zenc-lsp"><code>zenc lsp</code></a></h2>
+<p>Start the LSP language server (stdin/stdout). Used by editors.</p>
+<pre><code class="language-bash">zenc lsp
+</code></pre>
+<h2 id="zenc-dap"><a class="header" href="#zenc-dap"><code>zenc dap</code></a></h2>
+<p>Start the Debug Adapter Protocol server (stdin/stdout).</p>
+<pre><code class="language-bash">zenc dap
+</code></pre>
+<h2 id="zenc-new"><a class="header" href="#zenc-new"><code>zenc new</code></a></h2>
+<p>Scaffold a new project.</p>
+<pre><code class="language-bash">zenc new &lt;project_name&gt;
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="language-guide"><a class="header" href="#language-guide">Language Guide</a></h1>
+<p>This chapter covers every feature of the Zenlang language.</p>
+<ul>
+<li><a href="#bindings-and-constants">Bindings and Constants</a></li>
+<li><a href="#functions-and-closures">Functions and Closures</a></li>
+<li><a href="#control-flow">Control Flow</a></li>
+<li><a href="#match-expressions">Match Expressions</a></li>
+<li><a href="#structs">Structs</a></li>
+<li><a href="#enums">Enums</a></li>
+<li><a href="#impl-blocks-and-methods">Impl Blocks and Methods</a></li>
+<li><a href="#traits">Traits</a></li>
+<li><a href="#generics">Generics</a></li>
+<li><a href="#modules-and-visibility">Modules and Visibility</a></li>
+<li><a href="#generators-and-coroutines">Generators and Coroutines</a></li>
+<li><a href="#arrays-and-maps">Arrays and Maps</a></li>
+<li><a href="#strings">Strings</a></li>
+<li><a href="#operators">Operators</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="bindings-and-constants"><a class="header" href="#bindings-and-constants">Bindings and Constants</a></h1>
+<h2 id="let-bindings"><a class="header" href="#let-bindings">Let Bindings</a></h2>
+<p>Use <code>let</code> to bind a value to a name. Bindings are <strong>immutable by default</strong>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x = 42;
+let name = "Zenlang";
+let pi: f64 = 3.14159;  // with type annotation
+<span class="boring">}</span></code></pre>
+<h2 id="mutable-bindings"><a class="header" href="#mutable-bindings">Mutable Bindings</a></h2>
+<p>Use <code>let mut</code> to create a mutable binding.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut count = 0;
+count = count + 1;
+count += 5;
+<span class="boring">}</span></code></pre>
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<p>Constants are defined at the top level and evaluated at compile time.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>const MAX_SPEED = 100;
+const PI: f64 = 3.14159;
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="functions-and-closures"><a class="header" href="#functions-and-closures">Functions and Closures</a></h1>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<p>Functions are defined with the <code>fn</code> keyword. The last expression is the return value (implicit return).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn add(a, b) {
+    a + b
+}
+
+fn greet(name: str) -&gt; str {
+    "Hello, " + name + "!"
+}
+
+fn factorial(n: i64) -&gt; i64 {
+    if n &lt;= 1 { 1 } else { n * factorial(n - 1) }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="type-annotations"><a class="header" href="#type-annotations">Type Annotations</a></h3>
+<p>Parameters and return types can be annotated with <code>:</code> followed by a type.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn distance(x1: f64, y1: f64, x2: f64, y2: f64) -&gt; f64 {
+    sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
+}
+<span class="boring">}</span></code></pre>
+<h3 id="default-parameters"><a class="header" href="#default-parameters">Default Parameters</a></h3>
+<p>Parameters can have default values. Omitted arguments use the default.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn greet(name: str, greeting: str = "Hello") {
+    print("{greeting}, {name}!");
+}
+
+greet("World");               // "Hello, World!"
+greet("World", "Hi");         // "Hi, World!"
+<span class="boring">}</span></code></pre>
+<h3 id="expression-bodies"><a class="header" href="#expression-bodies">Expression Bodies</a></h3>
+<p>Single-expression functions can omit the braces:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn double(x) -&gt; x * 2;
+<span class="boring">}</span></code></pre>
+<h2 id="closures-lambdas"><a class="header" href="#closures-lambdas">Closures (Lambdas)</a></h2>
+<p>Closures are anonymous functions defined with pipe syntax <code>|params| body</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let double = |x| x * 2;
+let add = |a, b| a + b;
+<span class="boring">}</span></code></pre>
+<p>Closures capture variables from their enclosing scope by reference (via <code>Rc</code> clone).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let base = 10;
+let adder = |x| x + base;
+assert(adder(5) == 15);
+<span class="boring">}</span></code></pre>
+<p>Closures can be passed to iterator adapters:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let doubled = map([1, 2, 3], |x| x * 2);
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="control-flow"><a class="header" href="#control-flow">Control Flow</a></h1>
+<h2 id="if--else"><a class="header" href="#if--else">if / else</a></h2>
+<p><code>if</code> is an expression — it returns a value.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x = if cond { 1 } else { 2 };
+<span class="boring">}</span></code></pre>
+<p>The <code>else</code> branch is required when used as an expression, unless the type is <code>void</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if cond {
+    do_something();
+}
+<span class="boring">}</span></code></pre>
+<p>Chaining:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let label = if x &lt; 0 {
+    "negative"
+} else if x == 0 {
+    "zero"
+} else {
+    "positive"
+};
+<span class="boring">}</span></code></pre>
+<h2 id="while-loops"><a class="header" href="#while-loops">While Loops</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut i = 0;
+while i &lt; 10 {
+    print(i);
+    i = i + 1;
+}
+<span class="boring">}</span></code></pre>
+<p><code>break</code> and <code>continue</code> are supported inside loops:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>loop {
+    if done { break; }
+    if skip { continue; }
+    process();
+}
+<span class="boring">}</span></code></pre>
+<h2 id="for-loops"><a class="header" href="#for-loops">For Loops</a></h2>
+<p>Iterate over ranges, arrays, strings, maps, and custom iterators.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exclusive range
+for i in 0..5 { print(i); }
+
+// Inclusive range
+for i in 0..=5 { print(i); }
+
+// Arrays
+for x in [1, 2, 3] { sum = sum + x; }
+
+// Strings (iterates characters)
+for c in "hello" { print(c); }
+
+// Maps (iterates [key, value] pairs)
+for kv in my_map { print(kv); }
+
+// Custom iterators
+for x in Counter { current: 0, max: 5 } { print(x); }
+<span class="boring">}</span></code></pre>
+<h2 id="if-let--while-let"><a class="header" href="#if-let--while-let">if let / while let</a></h2>
+<p>Sugar for match expressions that bind a single pattern.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if let Some(v) = opt {
+    print(v);
+} else {
+    print("none");
+}
+
+while let Some(v) = iter {
+    print(v);
+}
+<span class="boring">}</span></code></pre>
+<h2 id="try-operator-"><a class="header" href="#try-operator-">Try Operator <code>?</code></a></h2>
+<p>The <code>?</code> operator unwraps <code>Result</code> values, returning early on <code>Err</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn try_unwrap() -&gt; Result&lt;i64, str&gt; {
+    let x = try_ok()?;
+    Ok(x)
+}
+<span class="boring">}</span></code></pre>
+<p>This desugars to:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match try_ok() {
+    Ok(val) =&gt; val,
+    Err(e) =&gt; return Err(e),
+}
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="match-expressions"><a class="header" href="#match-expressions">Match Expressions</a></h1>
+<p><code>match</code> is a powerful pattern-matching expression.</p>
+<h2 id="matching-literals"><a class="header" href="#matching-literals">Matching Literals</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let val = match x {
+    1 =&gt; "one",
+    2 =&gt; "two",
+    _ =&gt; "other",   // wildcard
+};
+<span class="boring">}</span></code></pre>
+<h2 id="matching-enums"><a class="header" href="#matching-enums">Matching Enums</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum Shape {
+    Circle(i64),
+    Rect(i64, i64),
+}
+
+let area = match shape {
+    Circle(r) =&gt; 3.14 * r * r,
+    Rect(w, h) =&gt; w * h,
+};
+<span class="boring">}</span></code></pre>
+<h2 id="match-guards"><a class="header" href="#match-guards">Match Guards</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match value {
+    n if n &gt; 5 =&gt; "big",
+    n if n &gt; 0 =&gt; "small",
+    _ =&gt; "zero or negative",
+};
+<span class="boring">}</span></code></pre>
+<h2 id="matching-options"><a class="header" href="#matching-options">Matching Options</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match result {
+    Ok(val) =&gt; print(val),
+    Err(msg) =&gt; print("error: " + msg),
+};
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="structs"><a class="header" href="#structs">Structs</a></h1>
+<p>Define structured data with named fields.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Point {
+    x: i64,
+    y: i64,
+}
+<span class="boring">}</span></code></pre>
+<h2 id="construction"><a class="header" href="#construction">Construction</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let p = Point { x: 1, y: 2 };
+<span class="boring">}</span></code></pre>
+<h3 id="shorthand-initialization"><a class="header" href="#shorthand-initialization">Shorthand Initialization</a></h3>
+<p>When variable names match field names, you can omit the value:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x = 1;
+let y = 2;
+let p = Point { x, y };
+<span class="boring">}</span></code></pre>
+<h3 id="spread-operator"><a class="header" href="#spread-operator">Spread Operator</a></h3>
+<p>Create a copy with some fields overridden:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let q = Point { x: 10, ..p };
+<span class="boring">}</span></code></pre>
+<h2 id="field-access"><a class="header" href="#field-access">Field Access</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>assert(p.x == 1);
+p.x = 10;  // requires mutable binding
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enums"><a class="header" href="#enums">Enums</a></h1>
+<p>Enums represent a type that can be one of several variants, optionally carrying data.</p>
+<h2 id="defining-enums"><a class="header" href="#defining-enums">Defining Enums</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Unit variants only
+enum Color { Red, Green, Blue }
+
+// Variants with data
+enum Shape { Circle(i64), Rect(i64, i64) }
+
+// Mixed
+enum Status { Active, Inactive, Error(str) }
+<span class="boring">}</span></code></pre>
+<h2 id="construction-1"><a class="header" href="#construction-1">Construction</a></h2>
+<p>Enum variants are constructed using call syntax:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let c = Red;
+let shape = Circle(10);
+let err = Error("something went wrong");
+<span class="boring">}</span></code></pre>
+<h2 id="pattern-matching"><a class="header" href="#pattern-matching">Pattern Matching</a></h2>
+<p>Enum variants are destructured with <code>match</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match shape {
+    Circle(radius) =&gt; assert(radius == 10),
+    Rect(w, h) =&gt; assert(w &gt; 0 &amp;&amp; h &gt; 0),
+    _ =&gt; assert(false),
+};
+<span class="boring">}</span></code></pre>
+<p>The built-in <code>Option</code> and <code>Result</code> enums work the same way:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match result {
+    Ok(val) =&gt; print(val),
+    Err(msg) =&gt; print("error: " + msg),
+};
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="impl-blocks-and-methods"><a class="header" href="#impl-blocks-and-methods">Impl Blocks and Methods</a></h1>
+<p>Methods are defined inside <code>impl</code> blocks.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Point { x: i64, y: i64 }
+
+impl Point {
+    fn area(&amp;self) -&gt; i64 {
+        self.x * self.y
+    }
+
+    fn double(&amp;mut self) {
+        self.x *= 2;
+        self.y *= 2;
+    }
+
+    fn new(x: i64, y: i64) -&gt; Point {
+        Point { x, y }
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="method-calls"><a class="header" href="#method-calls">Method Calls</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let p = Point { x: 3, y: 4 };
+assert(p.area() == 12);
+
+let mut p = Point::new(3, 4);
+p.double();
+assert(p.x == 6);
+<span class="boring">}</span></code></pre>
+<h2 id="self-parameter"><a class="header" href="#self-parameter">Self Parameter</a></h2>
+<ul>
+<li><code>&amp;self</code> — immutable reference to the receiver</li>
+<li><code>&amp;mut self</code> — mutable reference to the receiver</li>
+<li>Without <code>self</code> — static method (called with <code>Type::method()</code>)</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="traits"><a class="header" href="#traits">Traits</a></h1>
+<p>Traits define shared behavior across types.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>trait Shape {
+    fn area(&amp;self) -&gt; f64;
+    fn perimeter(&amp;self) -&gt; f64;
+}
+<span class="boring">}</span></code></pre>
+<h2 id="implementing-traits"><a class="header" href="#implementing-traits">Implementing Traits</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Circle { radius: f64 }
+
+impl Shape for Circle {
+    fn area(&amp;self) -&gt; f64 {
+        3.14159 * self.radius * self.radius
+    }
+
+    fn perimeter(&amp;self) -&gt; f64 {
+        2.0 * 3.14159 * self.radius
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="trait-methods"><a class="header" href="#trait-methods">Trait Methods</a></h2>
+<p>Trait methods are called like regular methods:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let c = Circle { radius: 5.0 };
+assert(c.area() &gt; 0.0);
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="generics"><a class="header" href="#generics">Generics</a></h1>
+<p>Zenlang supports generic type parameters with <code>&lt;T&gt;</code> syntax. Generics are <strong>type-erased</strong> — there is no monomorphization. All values are <code>Value</code> enum variants at runtime.</p>
+<h2 id="generic-functions"><a class="header" href="#generic-functions">Generic Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn identity&lt;T&gt;(x: T) -&gt; T { x }
+fn first&lt;T&gt;(arr: [T]) -&gt; T { arr[0] }
+<span class="boring">}</span></code></pre>
+<h2 id="generic-structs"><a class="header" href="#generic-structs">Generic Structs</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Wrapper&lt;T&gt; { value: T }
+
+let w = Wrapper { value: 42 };
+<span class="boring">}</span></code></pre>
+<h2 id="generic-enums"><a class="header" href="#generic-enums">Generic Enums</a></h2>
+<p>The built-in <code>Option</code> and <code>Result</code> types use generics:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum Option&lt;T&gt; { Some(T), None }
+enum Result&lt;T, E&gt; { Ok(T), Err(E) }
+<span class="boring">}</span></code></pre>
+<h2 id="generic-impl-blocks"><a class="header" href="#generic-impl-blocks">Generic Impl Blocks</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;T&gt; Vec&lt;T&gt; {
+    fn push(&amp;self, val: T) { /* ... */ }
+}
+<span class="boring">}</span></code></pre>
+<p>Because generics are type-erased, you don’t pay monomorphization costs, but you also don’t get compile-time type specialization.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="modules-and-visibility"><a class="header" href="#modules-and-visibility">Modules and Visibility</a></h1>
+<h2 id="inline-modules"><a class="header" href="#inline-modules">Inline Modules</a></h2>
+<p>Define a module inline with <code>mod</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>mod math {
+    fn add(a: i64, b: i64) -&gt; i64 { a + b }
+    fn subtract(a: i64, b: i64) -&gt; i64 { a - b }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="file-modules"><a class="header" href="#file-modules">File Modules</a></h2>
+<p>A module can be loaded from a separate file:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>mod greeting;
+<span class="boring">}</span></code></pre>
+<p>This loads <code>greeting.zen</code> from the same directory as the current file.</p>
+<h2 id="use-declarations"><a class="header" href="#use-declarations"><code>use</code> Declarations</a></h2>
+<p>Import names from other modules:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use math::add;
+use math::square;
+
+use std::io;
+<span class="boring">}</span></code></pre>
+<h2 id="visibility"><a class="header" href="#visibility">Visibility</a></h2>
+<p>Use <code>pub</code> to make items visible outside their module:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn visible_everywhere() -&gt; i64 { 42 }
+pub struct Point { x: i64, y: i64 }
+pub enum Color { Red, Green, Blue }
+pub const NAME: str = "zen";
+pub type MyResult = Result&lt;i64, str&gt;;
+pub use math::add;
+pub mod my_mod { /* ... */ }
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="generators-and-coroutines"><a class="header" href="#generators-and-coroutines">Generators and Coroutines</a></h1>
+<p>Zenlang supports generator functions that can yield multiple values over time using the <code>yield</code> keyword.</p>
+<h2 id="defining-a-generator"><a class="header" href="#defining-a-generator">Defining a Generator</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn counter() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+<span class="boring">}</span></code></pre>
+<h2 id="consuming-a-generator"><a class="header" href="#consuming-a-generator">Consuming a Generator</a></h2>
+<p>Use <code>next()</code> to advance the generator and get the next value:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let g = counter();
+assert(next(g) == Some(1));
+assert(next(g) == Some(2));
+assert(next(g) == Some(3));
+assert(next(g) == None);
+<span class="boring">}</span></code></pre>
+<h2 id="use-cases-1"><a class="header" href="#use-cases-1">Use Cases</a></h2>
+<ul>
+<li><strong>Cooperative multitasking</strong> — interleave execution of multiple scripts</li>
+<li><strong>Lazy sequences</strong> — generate values on demand</li>
+<li><strong>State machines</strong> — model stateful computations with yield points</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="arrays-and-maps"><a class="header" href="#arrays-and-maps">Arrays and Maps</a></h1>
+<h2 id="arrays"><a class="header" href="#arrays">Arrays</a></h2>
+<p>Arrays are heterogeneous, dynamically-sized sequences.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let arr = [1, 2, 3];
+push(arr, 4);         // [1, 2, 3, 4]
+let last = pop(arr);  // 4, arr is now [1, 2, 3]
+insert(arr, 1, 15);   // [1, 15, 2, 3]
+remove(arr, 1);       // 15, arr is now [1, 2, 3]
+len(arr);             // 3
+arr[0];               // 1
+<span class="boring">}</span></code></pre>
+<h2 id="maps-dictionaries"><a class="header" href="#maps-dictionaries">Maps (Dictionaries)</a></h2>
+<p>Maps are key-value dictionaries. Keys can be any value type.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let m = map_new();
+map_set(m, "hp", 100);
+map_set(m, "name", "Hero");
+
+map_get(m, "hp");       // Some(100)
+map_has(m, "hp");       // true
+map_remove(m, "hp");    // Some(100)
+map_keys(m);            // ["name"]
+map_values(m);          // ["Hero"]
+map_len(m);             // 1
+map_clear(m);
+len(m);                 // 0
+<span class="boring">}</span></code></pre>
+<h3 id="iterating-maps"><a class="header" href="#iterating-maps">Iterating Maps</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for kv in m {
+    let key = kv[0];
+    let val = kv[1];
+    print(key + ": " + to_str(val));
+}
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="strings"><a class="header" href="#strings">Strings</a></h1>
+<p>Strings are reference-counted, immutable text values.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let s = "hello";
+let name = "Zenlang";
+<span class="boring">}</span></code></pre>
+<h2 id="string-interpolation"><a class="header" href="#string-interpolation">String Interpolation</a></h2>
+<p>Strings support interpolation with <code>{expr}</code> syntax:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let name = "Zen";
+let msg = "Welcome to {name} v{1}!";
+// Result: "Welcome to Zen v1!"
+<span class="boring">}</span></code></pre>
+<p>Use <code>{{</code> and <code>}}</code> to escape literal braces.</p>
+<h2 id="string-operations"><a class="header" href="#string-operations">String Operations</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>len("hello");              // 5
+contains("hello", "ell");  // true
+trim("  hi  ");            // "hi"
+to_upper("abc");           // "ABC"
+to_lower("XYZ");           // "xyz"
+substring("hello", 0, 2);  // "he"
+<span class="boring">}</span></code></pre>
+<h2 id="iteration"><a class="header" href="#iteration">Iteration</a></h2>
+<p>Strings can be iterated character by character:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for c in "hello" {
+    print(c);
+}
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="operators"><a class="header" href="#operators">Operators</a></h1>
+<h2 id="arithmetic"><a class="header" href="#arithmetic">Arithmetic</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Operator</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>+</code></td><td>Addition</td></tr>
+<tr><td><code>-</code></td><td>Subtraction / Negation</td></tr>
+<tr><td><code>*</code></td><td>Multiplication</td></tr>
+<tr><td><code>/</code></td><td>Division</td></tr>
+<tr><td><code>%</code></td><td>Modulo</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="comparison"><a class="header" href="#comparison">Comparison</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Operator</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>==</code></td><td>Equal</td></tr>
+<tr><td><code>!=</code></td><td>Not equal</td></tr>
+<tr><td><code>&lt;</code></td><td>Less than</td></tr>
+<tr><td><code>&gt;</code></td><td>Greater than</td></tr>
+<tr><td><code>&lt;=</code></td><td>Less than or equal</td></tr>
+<tr><td><code>&gt;=</code></td><td>Greater than or equal</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="logical"><a class="header" href="#logical">Logical</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Operator</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>&amp;&amp;</code></td><td>Logical AND (short-circuit)</td></tr>
+<tr><td><code>||</code></td><td>Logical OR (short-circuit)</td></tr>
+<tr><td><code>!</code></td><td>Logical NOT</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="bitwise"><a class="header" href="#bitwise">Bitwise</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Operator</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>&amp;</code></td><td>Bitwise AND</td></tr>
+<tr><td><code>|</code></td><td>Bitwise OR</td></tr>
+<tr><td><code>^</code></td><td>Bitwise XOR</td></tr>
+<tr><td><code>~</code></td><td>Bitwise NOT</td></tr>
+<tr><td><code>&lt;&lt;</code></td><td>Left shift</td></tr>
+<tr><td><code>&gt;&gt;</code></td><td>Right shift</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="compound-assignment"><a class="header" href="#compound-assignment">Compound Assignment</a></h2>
+<pre><code>+=  -=  *=  /=  %=  &amp;=  |=  ^=  &lt;&lt;=  &gt;&gt;=
+</code></pre>
+<h2 id="other"><a class="header" href="#other">Other</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Operator</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>.</code></td><td>Field access / method call</td></tr>
+<tr><td><code>..</code></td><td>Exclusive range</td></tr>
+<tr><td><code>..=</code></td><td>Inclusive range</td></tr>
+<tr><td><code>-&gt;</code></td><td>Return type annotation</td></tr>
+<tr><td><code>=&gt;</code></td><td>Match arm separator</td></tr>
+<tr><td><code>?</code></td><td>Try (unwrap or propagate error)</td></tr>
+<tr><td><code>_</code></td><td>Wildcard pattern</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="attributes"><a class="header" href="#attributes">Attributes</a></h1>
+<p>Attributes provide metadata about functions, types, and other items.</p>
+<h2 id="allowunused"><a class="header" href="#allowunused"><code>#[allow(unused)]</code></a></h2>
+<p>Suppress warnings about unused items.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[allow(unused)]
+fn helper() {
+    // ...
+}
+<span class="boring">}</span></code></pre>
+<h2 id="test"><a class="header" href="#test"><code>#[test]</code></a></h2>
+<p>Mark a function as a test case for the test runner.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn my_test() {
+    assert(1 + 1 == 2);
+}
+
+#[test]
+fn test_fail() {
+    assert(false);  // test runner reports failure
+}
+<span class="boring">}</span></code></pre>
+<p>Tests can be discovered and run automatically with <code>zenc test</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="type-system"><a class="header" href="#type-system">Type System</a></h1>
+<p>This chapter covers the Zenlang type system.</p>
+<ul>
+<li><a href="#primitive-types">Primitive Types</a></li>
+<li><a href="#structural-typing">Structural Typing</a></li>
+<li><a href="#type-inference">Type Inference</a></li>
+<li><a href="#opaque-types">Opaque Types</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="primitive-types"><a class="header" href="#primitive-types">Primitive Types</a></h1>
+<h2 id="numeric-types"><a class="header" href="#numeric-types">Numeric Types</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th><th>Size</th></tr>
+</thead>
+<tbody>
+<tr><td><code>i64</code></td><td>Signed 64-bit integer</td><td>8 bytes</td></tr>
+<tr><td><code>f64</code></td><td>Double-precision float</td><td>8 bytes</td></tr>
+</tbody>
+</table>
+</div>
+<p>All numeric literals default to <code>i64</code> unless inferred as <code>f64</code> from context:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let a = 42;       // i64
+let b = 3.14;     // f64
+let c: f64 = 42;  // f64
+<span class="boring">}</span></code></pre>
+<h2 id="boolean"><a class="header" href="#boolean">Boolean</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Values</th></tr>
+</thead>
+<tbody>
+<tr><td><code>bool</code></td><td><code>true</code>, <code>false</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="string"><a class="header" href="#string">String</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>str</code></td><td>Reference-counted, immutable UTF-8 string</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="void"><a class="header" href="#void">Void</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>void</code></td><td>No value (unit type). Used for functions with no return value</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="structural-typing"><a class="header" href="#structural-typing">Structural Typing</a></h1>
+<p>Zenlang uses <strong>structural typing</strong> for nominal types (structs). Two struct types are compatible if they have the same field names and types, regardless of their declaration names.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Point { x: i64, y: i64 }
+struct Coord { x: i64, y: i64 }
+
+fn dist(p: Point) { /* ... */ }
+
+let c = Coord { x: 3, y: 4 };
+dist(c);  // OK — structurally compatible
+<span class="boring">}</span></code></pre>
+<p>This allows flexibility when working with different modules that define compatible shapes.</p>
+<h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
+<p>During type checking, struct types are compared by their field layout (name + type pairs), not by their declaration identity. Enum variants are identified by the enum type’s declaration identity (nominal).</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="type-inference"><a class="header" href="#type-inference">Type Inference</a></h1>
+<p>Zenlang has full type inference — type annotations are usually optional.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn add(a, b) = a + b;                // inferred: fn(i64, i64) -&gt; i64
+let items = [1, "hello", true];      // inferred: [{i64, str, bool}]
+let mut x = 42;                      // inferred: i64
+<span class="boring">}</span></code></pre>
+<p>Type annotations can be added for clarity or to override inference:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn distance(x1: f64, y1: f64, x2: f64, y2: f64) -&gt; f64 {
+    sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
+}
+<span class="boring">}</span></code></pre>
+<p>Inference works across function boundaries, so function return types are inferred from their body.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="opaque-types"><a class="header" href="#opaque-types">Opaque Types</a></h1>
+<p>Opaque types are Rust-side types exposed to Zenlang through FFI. They are registered in Rust using the <code>foreign_type!</code> macro.</p>
+<h2 id="in-script"><a class="header" href="#in-script">In Script</a></h2>
+<p>Opaque types can be constructed and their methods called, but their internal layout is hidden:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let tex = Texture::load("player.png");
+tex.set_filter(Linear);
+draw_sprite(tex, x, y);
+<span class="boring">}</span></code></pre>
+<h2 id="type-erasure"><a class="header" href="#type-erasure">Type Erasure</a></h2>
+<p>Because generic type parameters are erased at runtime, you can use opaque types generically and they will work correctly — all values are <code>Value</code> enum variants internally, and opaque types are stored as <code>Rc&lt;dyn Any&gt;</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="standard-library"><a class="header" href="#standard-library">Standard Library</a></h1>
+<p>The Zenlang standard library provides built-in functions, types, and modules available to all scripts.</p>
+<ul>
+<li><a href="#core-functions">Core Functions</a></li>
+<li><a href="#math-and-vectors">Math and Vectors</a></li>
+<li><a href="#maps">Maps</a></li>
+<li><a href="#iterators">Iterators</a></li>
+<li><a href="#json">JSON</a></li>
+<li><a href="#file-io">File I/O</a></li>
+<li><a href="#logging">Logging</a></li>
+<li><a href="#option-and-result">Option and Result</a></li>
+<li><a href="#timers-and-scheduling">Timers and Scheduling</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="core-functions"><a class="header" href="#core-functions">Core Functions</a></h1>
+<h2 id="io"><a class="header" href="#io">I/O</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>print(...)          // Print values to stdout with newline
+print_nl(...)       // Print values without newline
+read_line()         // Read a line from stdin
+assert(cond)        // Panic if condition is false
+<span class="boring">}</span></code></pre>
+<h2 id="type-utilities"><a class="header" href="#type-utilities">Type Utilities</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>to_str(val)         // Convert any value to string representation
+to_int(val)         // Convert to i64
+to_float(val)       // Convert to f64
+type_of(val)        // Return type name as string
+<span class="boring">}</span></code></pre>
+<h2 id="string-functions"><a class="header" href="#string-functions">String Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>len(val)            // Length of string, array, or map
+contains(s, sub)    // Check if string contains substring
+trim(s)             // Trim whitespace
+to_upper(s)         // Convert to uppercase
+to_lower(s)         // Convert to lowercase
+substring(s, i, j)  // Extract substring from i to j
+<span class="boring">}</span></code></pre>
+<h2 id="array-functions"><a class="header" href="#array-functions">Array Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>push(arr, val)      // Append to array
+pop(arr)            // Remove and return last element
+insert(arr, i, v)   // Insert at index
+remove(arr, i)      // Remove at index
+len(arr)            // Array length
+<span class="boring">}</span></code></pre>
+<h2 id="misc"><a class="header" href="#misc">Misc</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>exit(code)          // Exit process with code
+next(gen)           // Advance generator, returns Option
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="math-and-vectors"><a class="header" href="#math-and-vectors">Math and Vectors</a></h1>
+<h2 id="math-functions"><a class="header" href="#math-functions">Math Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>abs(x)        // Absolute value
+sqrt(x)       // Square root
+sin(x)        // Sine (radians)
+cos(x)        // Cosine (radians)
+tan(x)        // Tangent
+floor(x)      // Round down
+ceil(x)       // Round up
+round(x)      // Round to nearest
+min(a, b)     // Minimum
+max(a, b)     // Maximum
+pow(base, exp) // Exponentiation
+random()      // Random float in [0, 1)
+random_int(min, max) // Random integer in range
+<span class="boring">}</span></code></pre>
+<h2 id="vector-functions"><a class="header" href="#vector-functions">Vector Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>vec2(x, y)            // Create a 2D vector
+vec3(x, y, z)         // Create a 3D vector
+vec4(x, y, z, w)      // Create a 4D vector
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="maps"><a class="header" href="#maps">Maps</a></h1>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Function</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>map_new()</code></td><td>Create an empty map</td></tr>
+<tr><td><code>map_set(m, k, v)</code></td><td>Set key-value pair</td></tr>
+<tr><td><code>map_get(m, k)</code></td><td>Get value by key, returns <code>Option</code></td></tr>
+<tr><td><code>map_has(m, k)</code></td><td>Check if key exists</td></tr>
+<tr><td><code>map_remove(m, k)</code></td><td>Remove key-value pair</td></tr>
+<tr><td><code>map_keys(m)</code></td><td>Return array of keys</td></tr>
+<tr><td><code>map_values(m)</code></td><td>Return array of values</td></tr>
+<tr><td><code>map_len(m)</code></td><td>Return number of entries</td></tr>
+<tr><td><code>map_clear(m)</code></td><td>Remove all entries</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="example"><a class="header" href="#example">Example</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let inventory = map_new();
+map_set(inventory, "gold", 100);
+map_set(inventory, "sword", "iron");
+
+let gold = map_get(inventory, "gold");   // Some(100)
+assert(map_has(inventory, "sword"));
+assert(!map_has(inventory, "shield"));
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="iterators"><a class="header" href="#iterators">Iterators</a></h1>
+<p>The standard <code>std::iter</code> module provides iterator adapters:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::iter::*;
+
+map(arr, fn)          // Transform each element
+filter(arr, fn)       // Keep elements matching predicate
+reduce(arr, fn, init) // Fold left
+zip(a, b)             // Pair-wise combine two arrays
+<span class="boring">}</span></code></pre>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let doubled = map([1, 2, 3], |x| x * 2);
+// [2, 4, 6]
+
+let evens = filter([1, 2, 3, 4], |x| x % 2 == 0);
+// [2, 4]
+
+let sum = reduce([1, 2, 3], |a, b| a + b, 0);
+// 6
+
+let pairs = zip(["a", "b"], [1, 2]);
+// [["a", 1], ["b", 2]]
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="json"><a class="header" href="#json">JSON</a></h1>
+<p>The <code>std::json</code> module provides JSON encoding and decoding.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::json::*;
+<span class="boring">}</span></code></pre>
+<h2 id="functions-1"><a class="header" href="#functions-1">Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>encode(value)    // Convert Zenlang value to JSON string
+decode(string)   // Parse JSON string to Zenlang value
+<span class="boring">}</span></code></pre>
+<h2 id="example-1"><a class="header" href="#example-1">Example</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let data = map_new();
+map_set(data, "name", "Zenlang");
+map_set(data, "version", 1);
+map_set(data, "features", ["hot_reload", "embed"]);
+
+let json_str = encode(data);
+// {"name":"Zenlang","version":1,"features":["hot_reload","embed"]}
+
+let decoded = decode(json_str);
+assert(decoded == data);
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="file-io"><a class="header" href="#file-io">File I/O</a></h1>
+<p>The <code>std::fs</code> module provides file system operations (requires the <code>fs</code> cargo feature).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::fs::*;
+<span class="boring">}</span></code></pre>
+<h2 id="functions-2"><a class="header" href="#functions-2">Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>read(path)        // Read file to string
+write(path, str)  // Write string to file
+exists(path)      // Check if path exists
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="logging"><a class="header" href="#logging">Logging</a></h1>
+<p>The <code>std::log</code> module provides leveled logging.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::log::*;
+<span class="boring">}</span></code></pre>
+<h2 id="functions-3"><a class="header" href="#functions-3">Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>info(msg)    // Info level
+warn(msg)    // Warning level
+error(msg)   // Error level
+debug(msg)   // Debug level
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="option-and-result"><a class="header" href="#option-and-result">Option and Result</a></h1>
+<h2 id="option"><a class="header" href="#option">Option</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum Option&lt;T&gt; { Some(T), None }
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let val = Some(42);
+assert(val != None);
+
+match val {
+    Some(v) =&gt; print(v),
+    None =&gt; print("no value"),
+};
+<span class="boring">}</span></code></pre>
+<h2 id="result"><a class="header" href="#result">Result</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum Result&lt;T, E&gt; { Ok(T), Err(E) }
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn safe_div(a, b) -&gt; Result&lt;i64, str&gt; {
+    if b == 0 {
+        Err("division by zero")
+    } else {
+        Ok(a / b)
+    }
+}
+
+let result = safe_div(10, 0);
+match result {
+    Ok(val) =&gt; print(val),
+    Err(msg) =&gt; print("error: " + msg),
+};
+<span class="boring">}</span></code></pre>
+<h2 id="try-operator--1"><a class="header" href="#try-operator--1">Try Operator <code>?</code></a></h2>
+<p>The <code>?</code> operator automatically propagates errors:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn example() -&gt; Result&lt;i64, str&gt; {
+    let x = safe_div(10, 2)?;  // Ok(5) → unwraps
+    let y = safe_div(x, 0)?;   // Err → returns early
+    Ok(y)
+}
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="timers-and-scheduling"><a class="header" href="#timers-and-scheduling">Timers and Scheduling</a></h1>
+<p>The <code>std::timer</code> module provides one-shot and periodic timers.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::timer::*;
+<span class="boring">}</span></code></pre>
+<h2 id="functions-4"><a class="header" href="#functions-4">Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>set_timeout(callback, ms)      // Run callback once after ms
+set_interval(callback, ms)     // Run callback every ms
+clear_timer(id)                // Cancel a timer
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="tooling"><a class="header" href="#tooling">Tooling</a></h1>
+<p>Zenlang ships with a suite of developer tools.</p>
+<ul>
+<li><a href="#lsp-server">LSP Server</a></li>
+<li><a href="#formatter">Formatter</a></li>
+<li><a href="#debug-adapter-protocol">Debug Adapter</a></li>
+<li><a href="#disassembler">Disassembler</a></li>
+<li><a href="#test-runner">Test Runner</a></li>
+<li><a href="#zed-editor-extension">Zed Editor Extension</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="lsp-server"><a class="header" href="#lsp-server">LSP Server</a></h1>
+<p>Zenlang includes a Language Server Protocol implementation. Start it with:</p>
+<pre><code class="language-bash">zenc lsp
+</code></pre>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
+<ul>
+<li><strong>Diagnostics</strong> — Real-time type errors, syntax errors, and warnings</li>
+<li><strong>Completion</strong> — Code completion for keywords, types, and identifiers</li>
+<li><strong>Hover</strong> — Type information on hover</li>
+<li><strong>Go to Definition</strong> — Navigate to function/type definitions</li>
+<li><strong>References</strong> — Find all references to a symbol</li>
+<li><strong>Document Symbols</strong> — Outline of functions, structs, enums, traits</li>
+<li><strong>Inlay Hints</strong> — Type hints for inferred variables</li>
+</ul>
+<h2 id="editor-configuration"><a class="header" href="#editor-configuration">Editor Configuration</a></h2>
+<h3 id="vs-code"><a class="header" href="#vs-code">VS Code</a></h3>
+<p>Create <code>.vscode/settings.json</code>:</p>
+<pre><code class="language-json">{
+    "zenlang.lsp.path": "zenc",
+    "zenlang.lsp.args": ["lsp"]
+}
+</code></pre>
+<h3 id="zed"><a class="header" href="#zed">Zed</a></h3>
+<p>Use the <a href="#zed-editor-extension">Zed extension</a> which ships with LSP support built in.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="formatter"><a class="header" href="#formatter">Formatter</a></h1>
+<p>Zenlang’s formatter is built into the LSP via <code>textDocument/formatting</code> and <code>textDocument/rangeFormatting</code>.</p>
+<h2 id="features-1"><a class="header" href="#features-1">Features</a></h2>
+<ul>
+<li>Consistent indentation (2 spaces)</li>
+<li>Whitespace around operators and keywords</li>
+<li>Brace placement and alignment</li>
+<li>Line wrapping</li>
+</ul>
+<p>The formatter is code-aware, not a simple text reflow — it understands the AST.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="debug-adapter-protocol"><a class="header" href="#debug-adapter-protocol">Debug Adapter Protocol</a></h1>
+<p>Zenlang supports the Debug Adapter Protocol for step-through debugging.</p>
+<pre><code class="language-bash">zenc dap
+</code></pre>
+<h2 id="features-2"><a class="header" href="#features-2">Features</a></h2>
+<ul>
+<li><strong>Breakpoints</strong> — Set, remove, enable, disable breakpoints by line</li>
+<li><strong>Step Over / Into / Out</strong> — Navigate execution</li>
+<li><strong>Stack Traces</strong> — Call stack with source locations</li>
+<li><strong>Variables</strong> — Inspect local and global variables</li>
+<li><strong>Scopes</strong> — View variable scopes hierarchically</li>
+<li><strong>Pause</strong> — Pause execution</li>
+<li><strong>Continue</strong> — Resume execution</li>
+</ul>
+<h2 id="source-maps"><a class="header" href="#source-maps">Source Maps</a></h2>
+<p>Breakpoints work by source line. The bytecode VM maintains source location information that maps bytecode offsets back to source positions.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="disassembler"><a class="header" href="#disassembler">Disassembler</a></h1>
+<p>The <code>zenc disasm</code> command dumps compiled bytecode for inspection.</p>
+<pre><code class="language-bash">zenc disasm script.zen
+</code></pre>
+<h2 id="output-includes"><a class="header" href="#output-includes">Output Includes</a></h2>
+<ul>
+<li><strong>Opcodes</strong> — Each VM instruction with operands</li>
+<li><strong>Source Lines</strong> — Original source line for each instruction</li>
+<li><strong>Constants Table</strong> — Literal values used by the script</li>
+<li><strong>Function Table</strong> — Function signatures and entry points</li>
+<li><strong>Global Table</strong> — Global variable definitions</li>
+</ul>
+<p>This is useful for debugging the compiler and understanding how Zenlang code maps to VM instructions.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="test-runner"><a class="header" href="#test-runner">Test Runner</a></h1>
+<p>The built-in test runner discovers and executes <code>.zen</code> test files.</p>
+<pre><code class="language-bash"># Run all tests
+zenc test
+
+# Run specific files
+zenc test tests/first.zen tests/second.zen
+
+# Run with error-level output
+zenc test 2&gt;&amp;1 | Out-Null  # (Windows: squelch output)
+</code></pre>
+<h2 id="writing-tests"><a class="header" href="#writing-tests">Writing Tests</a></h2>
+<p>Tests are plain <code>.zen</code> files with <code>assert</code> calls:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// tests/math.zen
+fn test_addition() {
+    assert(1 + 1 == 2);
+}
+
+fn test_subtraction() {
+    assert(5 - 3 == 2);
+}
+<span class="boring">}</span></code></pre>
+<p>If any <code>assert</code> fails, the test runner reports the file, line, and reason. If a script panics, the runner catches the panic and reports it as a test failure.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="zed-editor-extension"><a class="header" href="#zed-editor-extension">Zed Editor Extension</a></h1>
+<p>A Zed extension for Zenlang is available at <code>extensions/zenlang/</code> in the repository.</p>
+<h2 id="features-3"><a class="header" href="#features-3">Features</a></h2>
+<ul>
+<li><strong>Syntax Highlighting</strong> — Via tree-sitter grammar (compiled to WASM)</li>
+<li><strong>LSP Integration</strong> — Diagnostics, completions, hover, go-to-definition</li>
+<li><strong>Run Commands</strong> — <code>zenlang: run</code> to execute the current file</li>
+<li><strong>Format on Save</strong> — Via the built-in formatter</li>
+</ul>
+<h2 id="installation-1"><a class="header" href="#installation-1">Installation</a></h2>
+<ol>
+<li>Copy <code>extensions/zenlang/</code> to <code>~/.config/zed/extensions/</code></li>
+<li>Restart Zed</li>
+<li>Open a <code>.zen</code> file</li>
+</ol>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>The extension looks for <code>zenc</code> on your PATH. You can configure a custom path in Zed settings:</p>
+<pre><code class="language-json">{
+    "zenlang": {
+        "binary": {
+            "path": "zenc",
+            "arguments": ["lsp"]
+        }
+    }
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="rust-interop"><a class="header" href="#rust-interop">Rust Interop</a></h1>
+<p>Zenlang’s primary design goal is seamless Rust integration.</p>
+<ul>
+<li><a href="#embedding-the-vm">Embedding the VM</a></li>
+<li><a href="#registering-native-functions">Registering Native Functions</a></li>
+<li><a href="#foreign-types">Foreign Types</a></li>
+<li><a href="#calling-back-into-script">Calling Back into Script</a></li>
+<li><a href="#hot-reload">Hot Reload</a></li>
+<li><a href="#cargo-features-and-setup">Cargo Features and Setup</a></li>
+</ul>
+<h2 id="full-example"><a class="header" href="#full-example">Full Example</a></h2>
+<p>For a complete walkthrough including a Rust engine host and Zenlang script working together, see <a href="#full-end-to-end-example">Calling Back into Script</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="embedding-the-vm"><a class="header" href="#embedding-the-vm">Embedding the VM</a></h1>
+<p>Add Zenlang as a dependency and create a VM:</p>
+<pre class="playground"><code class="language-rust">use zenlang::vm::Vm;
+
+fn main() {
+    let mut vm = Vm::new();
+    vm.eval("print(42)").unwrap();
+}</code></pre>
+<h2 id="with-configuration"><a class="header" href="#with-configuration">With Configuration</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let config = VmConfig {
+    instruction_limit: 100_000,
+    module_search_paths: vec!["scripts".into()],
+};
+let mut vm = Vm::with_config(config);
+<span class="boring">}</span></code></pre>
+<h2 id="running-files"><a class="header" href="#running-files">Running Files</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let result = vm.eval_file("scripts/main.zen")?;
+<span class="boring">}</span></code></pre>
+<h2 id="evaluating-expressions"><a class="header" href="#evaluating-expressions">Evaluating Expressions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let result = vm.eval("1 + 2 * 3").unwrap();
+assert_eq!(result.as_i64(), Some(7));
+<span class="boring">}</span></code></pre>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match vm.eval("x") {
+    Ok(val) =&gt; println!("Got: {:?}", val),
+    Err(Error::Runtime(msg)) =&gt; eprintln!("Runtime error: {}", msg),
+    Err(Error::Compile(errors)) =&gt; {
+        for e in errors {
+            eprintln!("Compile error: {}", e);
+        }
+    }
+    Err(Error::Panic(msg)) =&gt; eprintln!("Script panicked: {}", msg),
+}
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="registering-native-functions"><a class="header" href="#registering-native-functions">Registering Native Functions</a></h1>
+<p>Register Rust functions to be callable from scripts.</p>
+<h2 id="simple-native-functions"><a class="header" href="#simple-native-functions">Simple Native Functions</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::native_fn;
+
+let mut vm = Vm::new();
+
+// Simple function: add two integers
+vm.register_fn("add", |args| {
+    let a = args[0].as_i64()?;
+    let b = args[1].as_i64()?;
+    Ok(Value::Int(a + b))
+});
+<span class="boring">}</span></code></pre>
+<h2 id="native-function-with-vmcontext-calling-back-into-script"><a class="header" href="#native-function-with-vmcontext-calling-back-into-script">Native Function with VmContext (Calling Back Into Script)</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::vm::VmContext;
+
+vm.register_fn("on_collide", |args: &amp;[Value], ctx: &amp;mut VmContext| {
+    let entity = &amp;args[0];
+    ctx.call("handle_collision", &amp;[entity.clone()])
+});
+<span class="boring">}</span></code></pre>
+<h2 id="batch-registration"><a class="header" href="#batch-registration">Batch Registration</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn register_game_api(vm: &amp;mut Vm) {
+    vm.register_fn("spawn_enemy", |args| {
+        let x = args[0].as_f64()?;
+        let y = args[1].as_f64()?;
+        Ok(Value::from("enemy_01"))
+    });
+    vm.register_fn("play_sound", |args| {
+        let name = args[0].as_str()?.to_string();
+        audio_engine.play(&amp;name);
+        Ok(Value::Void)
+    });
+    vm.register_fn("get_delta_time", |_| Ok(Value::Float(engine.dt())));
+}
+<span class="boring">}</span></code></pre>
+<h2 id="returning-complex-values"><a class="header" href="#returning-complex-values">Returning Complex Values</a></h2>
+<h3 id="returning-a-map"><a class="header" href="#returning-a-map">Returning a Map</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>vm.register_fn("get_player_info", |_| {
+    let info = Value::new_map();
+    map_set(info, "name", Value::from("Hero"));
+    map_set(info, "hp", Value::Int(100));
+    Ok(info)
+});
+<span class="boring">}</span></code></pre>
+<p><strong>Script side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let info = get_player_info();
+print(info["name"]);
+<span class="boring">}</span></code></pre>
+<h3 id="returning-an-array"><a class="header" href="#returning-an-array">Returning an Array</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>vm.register_fn("get_inventory", |_| {
+    Ok(Value::from(vec![
+        Value::from("sword"),
+        Value::from("shield"),
+        Value::from("potion"),
+    ]))
+});
+<span class="boring">}</span></code></pre>
+<h2 id="accepting-callbacks-from-script"><a class="header" href="#accepting-callbacks-from-script">Accepting Callbacks from Script</a></h2>
+<p><strong>Rust side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Store script callbacks and invoke them later
+let mut script_callbacks: Vec&lt;Value&gt; = Vec::new();
+
+vm.register_fn("on_button_click", |args: &amp;[Value], _ctx: &amp;mut VmContext| {
+    let callback = args[0].clone();
+    script_callbacks.push(callback);
+    Ok(Value::Void)
+});
+
+// Later, invoke stored callbacks
+for cb in &amp;script_callbacks {
+    ctx.call_value(cb, &amp;[])?;
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Script side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>on_button_click(|| {
+    print("button clicked!");
+});
+<span class="boring">}</span></code></pre>
+<h2 id="using-the-macro"><a class="header" href="#using-the-macro">Using the Macro</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::{native_fn, Value, VmError};
+
+#[native_fn]
+fn greet(name: Value) -&gt; Result&lt;Value, VmError&gt; {
+    let name_str = name.as_str().ok_or(VmError::new("expected string"))?;
+    Ok(Value::from("Hello, {name_str}!"))
+}
+<span class="boring">}</span></code></pre>
+<h2 id="type-conversions"><a class="header" href="#type-conversions">Type Conversions</a></h2>
+<p>The <code>From</code> trait is implemented for converting between Rust types and <code>Value</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::value::{FromValue, ToValue};
+
+// Convert Value → Rust
+let x: f64 = val.from_value()?;
+
+// Convert Rust → Value
+let val: Value = 42.0.into();
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="foreign-types"><a class="header" href="#foreign-types">Foreign Types</a></h1>
+<p>Expose Rust types to Zenlang with fields and methods using the <code>foreign_type!</code> macro.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::foreign_type;
+
+struct Texture {
+    id: u32,
+    width: u32,
+    height: u32,
+}
+
+foreign_type! {
+    type Texture = "Texture" {
+        fields {
+            width: i64,
+            height: i64,
+        }
+        methods {
+            fn load(path: &amp;str) -&gt; Texture;
+            fn get_size(&amp;self) -&gt; (i64, i64);
+        }
+    }
+}
+
+// Implement the methods
+impl ForeignTexture {
+    fn load(path: &amp;str) -&gt; Result&lt;Value, VmError&gt; {
+        let tex = Texture::load_from_file(path)?;
+        Ok(ForeignTexture::new(tex).into())
+    }
+
+    fn get_size(&amp;self) -&gt; Result&lt;Value, VmError&gt; {
+        Ok((self.0.width as i64, self.0.height as i64).into())
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="in-script-1"><a class="header" href="#in-script-1">In Script</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let tex = Texture::load("player.png");
+assert(tex.width &gt; 0);
+let (w, h) = tex.get_size();
+<span class="boring">}</span></code></pre>
+<h2 id="foreign-type-with-mutable-state"><a class="header" href="#foreign-type-with-mutable-state">Foreign Type with Mutable State</a></h2>
+<p><strong>Rust side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct Transform {
+    pub x: f64, pub y: f64,
+    pub rotation: f64, pub scale: f64,
+}
+
+foreign_type! {
+    type Transform = "Transform" {
+        fields { x: f64, y: f64 }
+        methods {
+            fn new() -&gt; Transform;
+            fn translate(&amp;mut self, dx: f64, dy: f64);
+            fn get_rotation(&amp;self) -&gt; f64;
+            fn set_rotation(&amp;mut self, r: f64);
+        }
+    }
+}
+
+impl ForeignTransform {
+    fn new() -&gt; Result&lt;Value, VmError&gt; {
+        Ok(ForeignTransform::new(Transform {
+            x: 0.0, y: 0.0, rotation: 0.0, scale: 1.0,
+        }).into())
+    }
+    fn translate(&amp;mut self, dx: f64, dy: f64) -&gt; Result&lt;Value, VmError&gt; {
+        self.0.x += dx; self.0.y += dy;
+        Ok(Value::Void)
+    }
+    fn get_rotation(&amp;self) -&gt; Result&lt;Value, VmError&gt; {
+        Ok(Value::Float(self.0.rotation))
+    }
+    fn set_rotation(&amp;mut self, r: f64) -&gt; Result&lt;Value, VmError&gt; {
+        self.0.rotation = r;
+        Ok(Value::Void)
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Script side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let t = Transform::new();
+t.translate(10.0, 5.0);
+t.set_rotation(1.57);
+assert(t.x == 10.0);
+<span class="boring">}</span></code></pre>
+<h2 id="foreign-type-with-enum-style-variants"><a class="header" href="#foreign-type-with-enum-style-variants">Foreign Type with Enum-Style Variants</a></h2>
+<p><strong>Rust side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum Shape {
+    Circle { radius: f64 },
+    Rect { w: f64, h: f64 },
+}
+
+foreign_type! {
+    type Shape = "Shape" {
+        fields {}
+        methods {
+            fn circle(radius: f64) -&gt; Shape;
+            fn rect(w: f64, h: f64) -&gt; Shape;
+            fn area(&amp;self) -&gt; f64;
+        }
+    }
+}
+
+impl ForeignShape {
+    fn circle(radius: f64) -&gt; Result&lt;Value, VmError&gt; {
+        Ok(ForeignShape::new(Shape::Circle { radius }).into())
+    }
+    fn rect(w: f64, h: f64) -&gt; Result&lt;Value, VmError&gt; {
+        Ok(ForeignShape::new(Shape::Rect { w, h }).into())
+    }
+    fn area(&amp;self) -&gt; Result&lt;Value, VmError&gt; {
+        match &amp;self.0 {
+            Shape::Circle { radius } =&gt; Ok(Value::Float(3.14159 * radius * radius)),
+            Shape::Rect { w, h } =&gt; Ok(Value::Float(w * h)),
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Script side:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let c = Shape::circle(5.0);
+let r = Shape::rect(3.0, 4.0);
+print(c.area());   // 78.53975
+print(r.area());   // 12.0
+<span class="boring">}</span></code></pre>
+<p>Foreign types are stored as <code>Rc&lt;dyn Any&gt;</code> and accessed through thin wrappers.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="calling-back-into-script"><a class="header" href="#calling-back-into-script">Calling Back into Script</a></h1>
+<p>From a native function, you can call back into the script by getting the <code>VmContext</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::vm::VmContext;
+
+fn register_hooks(vm: &amp;mut Vm) {
+    vm.register_fn("on_update", |args, ctx: &amp;mut VmContext| {
+        // Call a Zenlang function from Rust
+        let result = ctx.call("player_update", &amp;[args[0].clone()])?;
+        Ok(result)
+    });
+}
+<span class="boring">}</span></code></pre>
+<h2 id="calling-a-named-function"><a class="header" href="#calling-a-named-function">Calling a Named Function</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Script defines: fn greet(name) { "Hello, {name}!" }
+let result = vm.call("greet", &amp;[Value::from("World")])?;
+println!("{}", result.as_str().unwrap());  // "Hello, World!"
+<span class="boring">}</span></code></pre>
+<h2 id="global-variable-access"><a class="header" href="#global-variable-access">Global Variable Access</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Script sets: let player_name = "Alice";
+if let Some(name) = vm.get_global("player_name") {
+    println!("Player: {:?}", name);
+}
+
+vm.set_global("player_name", Value::from("Bob"));
+<span class="boring">}</span></code></pre>
+<h2 id="full-end-to-end-example"><a class="header" href="#full-end-to-end-example">Full End-to-End Example</a></h2>
+<h3 id="rust-host"><a class="header" href="#rust-host">Rust Host</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use zenlang::vm::{Vm, VmConfig};
+use zenlang::value::Value;
+
+struct Engine {
+    vm: Vm,
+    dt: f64,
+}
+
+impl Engine {
+    fn new() -&gt; Self {
+        let mut vm = Vm::new();
+
+        vm.register_fn("engine_spawn", |args| {
+            let kind = args[0].as_str()?;
+            let x = args[1].as_f64()?;
+            let y = args[2].as_f64()?;
+            println!("spawn {kind} at ({x}, {y})");
+            Ok(Value::from("entity_001"))
+        });
+
+        vm.register_fn("engine_get_dt", |_| Ok(Value::Float(0.016)));
+
+        vm.eval_file("game.zen").unwrap();
+        Engine { vm, dt: 0.016 }
+    }
+
+    fn update(&amp;mut self) {
+        let _ = self.vm.call("on_update", &amp;[Value::Float(self.dt)]);
+    }
+
+    fn on_event(&amp;mut self, event: &amp;str) {
+        let _ = self.vm.call("on_event", &amp;[Value::from(event)]);
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="script-gamezen"><a class="header" href="#script-gamezen">Script (game.zen)</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Player { name: str, hp: i64, x: f64, y: f64 }
+
+let mut player = Player { name: "Hero", hp: 100, x: 0.0, y: 0.0 };
+
+fn on_update(dt) {
+    if is_key_down("right") { player.x = player.x + 100.0 * dt; }
+    if is_key_down("up")    { player.y = player.y - 100.0 * dt; }
+}
+
+fn on_event(event) {
+    if event == "collision" {
+        player.hp = player.hp - 10;
+        if player.hp &lt;= 0 {
+            engine_spawn("explosion", player.x, player.y);
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h2>
+<p>This enables patterns like:</p>
+<ul>
+<li><strong>Callbacks</strong> — Rust calls into script-defined event handlers</li>
+<li><strong>Overridable behavior</strong> — Scripts define functions that the engine calls</li>
+<li><strong>Plugin systems</strong> — Allow scripts to define game object behavior</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="hot-reload"><a class="header" href="#hot-reload">Hot Reload</a></h1>
+<p>Zenlang can watch source files and recompile them at runtime while preserving global state.</p>
+<h2 id="cli-usage"><a class="header" href="#cli-usage">CLI Usage</a></h2>
+<pre><code class="language-bash">zenc run --watch game.zen
+</code></pre>
+<h2 id="programmatic-usage"><a class="header" href="#programmatic-usage">Programmatic Usage</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut vm = Vm::new();
+vm.enable_hot_reload("scripts/", |vm: &amp;mut Vm| {
+    println!("Scripts reloaded! FPS: {:.1}", current_fps);
+})?;
+
+// Keep the host running — the watcher thread handles changes
+loop {
+    engine.update();
+    std::thread::sleep(Duration::from_millis(16));
+}
+<span class="boring">}</span></code></pre>
+<h2 id="what-gets-preserved"><a class="header" href="#what-gets-preserved">What Gets Preserved</a></h2>
+<ul>
+<li><strong>Global variables</strong> — Values are carried across recompilations by name</li>
+<li><strong>Foreign types and functions</strong> — Rust-side registrations remain</li>
+</ul>
+<h2 id="what-gets-replaced"><a class="header" href="#what-gets-replaced">What Gets Replaced</a></h2>
+<ul>
+<li><strong>Function bodies</strong> — Updated to new compiled bytecode</li>
+<li><strong>New globals</strong> — Added after recompile</li>
+<li><strong>Removed globals</strong> — Cleared after recompile</li>
+</ul>
+<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
+<p>The watcher runs in a separate thread using <code>notify</code>. When a change is detected:</p>
+<ol>
+<li>Reads the source file</li>
+<li>Compiles it</li>
+<li>Diffs the global variable table against the current VM state</li>
+<li>Preserves matching global values</li>
+<li>Replaces the compiled bytecode atomically</li>
+</ol>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="common-patterns"><a class="header" href="#common-patterns">Common Patterns</a></h1>
+<h2 id="game-loop"><a class="header" href="#game-loop">Game Loop</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Game {
+    player_hp: i64,
+    score: i64,
+}
+
+impl Game {
+    fn new() -&gt; Game { Game { player_hp: 100, score: 0 } }
+    fn update(&amp;mut self, dt: f64) {
+        // game logic here
+    }
+    fn is_alive(&amp;self) -&gt; bool { self.player_hp &gt; 0 }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="error-handling-1"><a class="header" href="#error-handling-1">Error Handling</a></h2>
+<pre class="playground"><code class="language-rust">fn load_config(path: str) -&gt; Result&lt;map, str&gt; {
+    if !exists(path) {
+        return Err("file not found");
+    }
+    let content = read(path);
+    Ok(decode(content))
+}
+
+fn main() {
+    match load_config("settings.json") {
+        Ok(cfg) =&gt; print("loaded"),
+        Err(e) =&gt; print("error: {e}"),
+    };
+}</code></pre>
+<h2 id="state-machine"><a class="header" href="#state-machine">State Machine</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum State { Idle, Running, Paused }
+
+struct Machine { state: State }
+
+impl Machine {
+    fn update(&amp;mut self) {
+        match self.state {
+            Idle =&gt; { /* ... */ },
+            Running =&gt; { /* ... */ },
+            Paused =&gt; { /* ... */ },
+        };
+    }
+}
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="advanced-topics"><a class="header" href="#advanced-topics">Advanced Topics</a></h1>
+<p>This chapter covers the internals and advanced features of Zenlang.</p>
+<ul>
+<li><a href="#bytecode-and-vm-architecture">Bytecode and VM Architecture</a></li>
+<li><a href="#memory-management">Memory Management</a></li>
+<li><a href="#compiler-pipeline">Compiler Pipeline</a></li>
+<li><a href="#cargo-features-and-setup">Cargo Features</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="bytecode-and-vm-architecture"><a class="header" href="#bytecode-and-vm-architecture">Bytecode and VM Architecture</a></h1>
+<p>Zenlang compiles source code directly to bytecode (no intermediate representation) and executes it on a register-based stack VM.</p>
+<h2 id="vm-design"><a class="header" href="#vm-design">VM Design</a></h2>
+<ul>
+<li><strong>Register-based</strong> — Uses a register array for operands, reducing stack shuffling</li>
+<li><strong>~50 opcodes</strong> — Compact instruction set</li>
+<li><strong>Single-pass codegen</strong> — No IR, no optimization passes</li>
+<li><strong>Source maps</strong> — Every instruction records its source line for debug info</li>
+</ul>
+<h2 id="execution"><a class="header" href="#execution">Execution</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Vm {
+    registers: Vec&lt;Value&gt;,         // Value stack / register file
+    globals: HashMap&lt;String, Value&gt;, // Global variables
+    call_stack: Vec&lt;Frame&gt;,        // Function call frames
+    ip: usize,                     // Instruction pointer
+    instruction_limit: Option&lt;u64&gt;, // Safety limit
+}
+<span class="boring">}</span></code></pre>
+<h2 id="instruction-limit"><a class="header" href="#instruction-limit">Instruction Limit</a></h2>
+<p>The VM tracks executed instructions and stops when the limit is reached (default: 100,000 if not configured). This prevents infinite loops from freezing the host.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>vm = Vm::with_config(VmConfig { instruction_limit: 50000, .. });
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="memory-management"><a class="header" href="#memory-management">Memory Management</a></h1>
+<p>Zenlang uses a simple, deterministic memory strategy: no garbage collector and no borrow checker.</p>
+<h2 id="value-representation"><a class="header" href="#value-representation">Value Representation</a></h2>
+<p>All values are stored as a <code>Value</code> enum:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum Value {
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Str(Rc&lt;str&gt;),
+    Array(Rc&lt;RefCell&lt;Vec&lt;Value&gt;&gt;&gt;),
+    Map(Rc&lt;RefCell&lt;HashMap&lt;Value, Value&gt;&gt;&gt;),
+    Function(Rc&lt;FnValue&gt;),
+    Foreign(Rc&lt;dyn Any&gt;),
+    Void,
+}
+<span class="boring">}</span></code></pre>
+<h2 id="reference-counting"><a class="header" href="#reference-counting">Reference Counting</a></h2>
+<ul>
+<li><strong>Strings</strong> — <code>Rc&lt;str&gt;</code>, cloned by incrementing the reference count</li>
+<li><strong>Arrays/Maps</strong> — <code>Rc&lt;RefCell&lt;...&gt;&gt;</code>, shared mutable state</li>
+<li><strong>Functions</strong> — <code>Rc&lt;FnValue&gt;</code>, closures capture their environment as cloned <code>Rc</code> handles</li>
+</ul>
+<h2 id="no-gc-pauses"><a class="header" href="#no-gc-pauses">No GC Pauses</a></h2>
+<p>Because Zenlang uses <code>Rc</code> instead of a tracing GC, there are no stop-the-world pauses. Memory is reclaimed deterministically when reference counts drop to zero.</p>
+<h2 id="arena--slab-allocator"><a class="header" href="#arena--slab-allocator">Arena / Slab Allocator</a></h2>
+<p>The compiler and runtime use slab-based allocation for internal data structures, reducing allocation overhead for short-lived objects.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="compiler-pipeline"><a class="header" href="#compiler-pipeline">Compiler Pipeline</a></h1>
+<pre><code>Source Code (.zen)
+    │
+    ▼
+┌─────────────┐
+│   Lexer     │  Tokenizes source into token stream
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Parser    │  Recursive descent, Pratt for expressions
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Type Check  │  Structural type checking, inference
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Bytecode    │  Single-pass code generation
+└──────┬──────┘
+       │
+       ▼
+     VM Execution
+</code></pre>
+<h2 id="key-design-decisions"><a class="header" href="#key-design-decisions">Key Design Decisions</a></h2>
+<ul>
+<li><strong>Recursive descent parser</strong> — Hand-written, no parser generator</li>
+<li><strong>Pratt parsing</strong> — For expression precedence handling</li>
+<li><strong>Single-pass codegen</strong> — The compiler walks the AST once and emits bytecode</li>
+<li><strong>No IR</strong> — Skips intermediate representation for simplicity</li>
+<li><strong>No optimization</strong> — The bytecode is a straightforward translation of the AST</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="cargo-features-and-setup"><a class="header" href="#cargo-features-and-setup">Cargo Features and Setup</a></h1>
+<h2 id="adding-zenlang-as-a-dependency"><a class="header" href="#adding-zenlang-as-a-dependency">Adding Zenlang as a Dependency</a></h2>
+<pre><code class="language-toml">[dependencies]
+zenlang = { git = "https://github.com/SonicZentropy/zenlang" }
+</code></pre>
+<h2 id="feature-selection"><a class="header" href="#feature-selection">Feature Selection</a></h2>
+<p>The <code>zenlang</code> crate has optional features:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Feature</th><th>Description</th><th>Default</th></tr>
+</thead>
+<tbody>
+<tr><td><code>cli</code></td><td>CLI binary (<code>zenc</code>)</td><td>on</td></tr>
+<tr><td><code>fs</code></td><td>File I/O stdlib module</td><td>on</td></tr>
+<tr><td><code>json</code></td><td>JSON stdlib module</td><td>on</td></tr>
+<tr><td><code>lsp</code></td><td>LSP server</td><td>on</td></tr>
+<tr><td><code>dap</code></td><td>Debug Adapter Protocol</td><td>on</td></tr>
+<tr><td><code>lualite</code></td><td>LuaLite backend (alternative)</td><td>off</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="disable-features-to-minimize-size"><a class="header" href="#disable-features-to-minimize-size">Disable Features to Minimize Size</a></h2>
+<pre><code class="language-toml">[dependencies]
+zenlang = { git = "...", default-features = false, features = ["cli"] }
+</code></pre>
+<p>This disables LSP, DAP, JSON, and file I/O, giving a smaller binary.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-c22b7243.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>

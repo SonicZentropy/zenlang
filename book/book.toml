@@ -1,0 +1,5 @@
+[book]
+title = "The Zenlang Programming Language"
+authors = ["Zenlang Contributors"]
+description = "A lightweight, embeddable Rust-like scripting language for game engines and real-time applications"
+language = "en"
