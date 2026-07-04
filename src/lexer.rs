@@ -193,7 +193,9 @@ impl<'a> Lexer<'a> {
                 }
             }
             '|' => {
-                if self.r#match('=') {
+                if self.r#match('>') {
+                    self.make_token(TokenKind::Pipe)
+                } else if self.r#match('=') {
                     self.make_token(TokenKind::OrEq)
                 } else if self.r#match('|') {
                     self.make_token(TokenKind::OrOr)

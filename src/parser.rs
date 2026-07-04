@@ -12,6 +12,7 @@ enum Precedence {
     Or,      // ||
     And,     // &&
     Compare, // == != < > <= >=
+    Pipe,    // |>
     Term,    // + -
     Factor,  // * / %
     Unary,   // ! -
@@ -26,7 +27,8 @@ impl Precedence {
             Precedence::Assign => Precedence::Or,
             Precedence::Or => Precedence::And,
             Precedence::And => Precedence::Compare,
-            Precedence::Compare => Precedence::Term,
+            Precedence::Compare => Precedence::Pipe,
+            Precedence::Pipe => Precedence::Term,
             Precedence::Term => Precedence::Factor,
             Precedence::Factor => Precedence::Unary,
             Precedence::Unary => Precedence::Call,
@@ -39,6 +41,7 @@ impl Precedence {
         match kind {
             TokenKind::Eq => Precedence::Assign,
             TokenKind::DotDot | TokenKind::DotDotEq => Precedence::Assign,
+            TokenKind::Pipe => Precedence::Pipe,
             TokenKind::OrOr => Precedence::Or,
             TokenKind::AndAnd => Precedence::And,
             TokenKind::EqEq
@@ -680,6 +683,21 @@ impl<'a> Parser<'a> {
                 expr = Expr::Call {
                     func: Box::new(expr),
                     args,
+                };
+            } else if matches!(tok, TokenKind::Pipe) {
+                self.advance();
+                let rhs = self.expression(Precedence::of(&tok).next())?;
+                // Desugar:  x |> f(args...)  →  f(x, args...)
+                //          x |> f            →  f(x)
+                expr = match rhs {
+                    Expr::Call { func, mut args } => {
+                        args.insert(0, expr);
+                        Expr::Call { func, args }
+                    }
+                    other => Expr::Call {
+                        func: Box::new(other),
+                        args: vec![expr],
+                    },
                 };
             } else if matches!(tok, TokenKind::DotDot | TokenKind::DotDotEq) {
                 self.advance();

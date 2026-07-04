@@ -38,6 +38,7 @@ pub enum TokenKind {
     Opaque,
 
     // Operators & Delimiters
+    Pipe,
     Plus,
     PlusEq,
     Minus,
@@ -149,6 +150,7 @@ impl fmt::Display for TokenKind {
             TokenKind::And => write!(f, "`&`"),
             TokenKind::AndEq => write!(f, "`&=`"),
             TokenKind::AndAnd => write!(f, "`&&`"),
+            TokenKind::Pipe => write!(f, "`|>`"),
             TokenKind::Or => write!(f, "`|`"),
             TokenKind::OrEq => write!(f, "`|=`"),
             TokenKind::OrOr => write!(f, "`||`"),

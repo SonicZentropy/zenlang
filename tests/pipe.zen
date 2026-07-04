@@ -1,0 +1,28 @@
+fn double(x: i64) -> i64 { x * 2 }
+
+let a = 5 |> double;
+assert_eq(a, 10);
+
+fn add(a: i64, b: i64) -> i64 { a + b }
+
+let b = 10 |> add(5);
+assert_eq(b, 15);
+
+fn inc(x: i64) -> i64 { x + 1 }
+
+let c = 0 |> inc |> inc |> inc;
+assert_eq(c, 3);
+
+let d = 5 |> |y| y * 3;
+assert_eq(d, 15);
+
+let e = "hello" |> len;
+assert_eq(e, 5);
+
+fn mul(a: i64, b: i64, c: i64) -> i64 { a * b * c }
+
+let f = 2 |> mul(3, 4);
+assert_eq(f, 24);
+
+let g = (0 |> inc) + (0 |> inc);
+assert_eq(g, 2);
