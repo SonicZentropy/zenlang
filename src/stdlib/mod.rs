@@ -94,7 +94,8 @@ pub fn register_builtins(vm: &mut VM) {
     vm.register_native("insert", Rc::new(insert_impl));
     vm.register_native("remove", Rc::new(remove_impl));
 
-    // Conversion
+    // Conversion / timing
+    vm.register_native("clock", Rc::new(clock_impl));
     vm.register_native("to_int", Rc::new(to_int_impl));
     vm.register_native("to_float", Rc::new(to_float_impl));
     vm.register_native("to_str", Rc::new(to_str_impl));
@@ -260,6 +261,12 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
             name: "to_str".into(),
             params: vec![("val".into(), Type::Any)],
             return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "clock".into(),
+            params: vec![],
+            return_type: Some(Type::I64),
         },
         FnSignature {
             type_params: vec![],
@@ -1081,4 +1088,15 @@ fn upgrade_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             msg: "upgrade requires a weak reference argument".into(),
         }),
     }
+}
+
+// --- Timing ---
+
+fn clock_impl(_ctx: &mut VMContext, _args: &[Value]) -> Result<Value> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as i64;
+    Ok(Value::Int(nanos))
 }

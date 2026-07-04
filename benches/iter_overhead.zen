@@ -1,0 +1,130 @@
+// Benchmark: overhead of lazy iterator adapters vs raw loops
+//
+// Measures nanoseconds via clock() for each approach, runs multiple
+// iterations, reports min/avg.
+
+fn main() {
+    // Warm up / build the array
+    let mut arr = [];
+    let N = 100_000;
+    let i = 0;
+    for i2 in 0..N {
+        push(arr, i2);
+    }
+
+    let ITERS = 5;
+    print("Benchmarking with N=" + to_str(N) + " elements, " + to_str(ITERS) + " iterations");
+    print("");
+
+    // 1. Raw for-loop (baseline — pure bytecode, no adapter overhead)
+    let mut raw_times = [];
+    let iter_i = 0;
+    for iter_i2 in 0..ITERS {
+        let t0 = clock();
+        let mut acc = 0;
+        for x in arr {
+            acc += x * 2;
+        }
+        let t1 = clock();
+        let _d = acc;
+        push(raw_times, t1 - t0);
+    }
+    report("raw for-loop", raw_times);
+
+    // 2. Lazy map + collect (1 adapter layer)
+    let mut map_times = [];
+    for iter_i2 in 0..ITERS {
+        let t0 = clock();
+        let r = collect(map(arr, |x| x * 2));
+        let t1 = clock();
+        let _d = len(r);
+        push(map_times, t1 - t0);
+    }
+    report("lazy map + collect", map_times);
+
+    // 3. Lazy filter + map + collect (2 adapter layers)
+    let mut filter_map_times = [];
+    for iter_i2 in 0..ITERS {
+        let t0 = clock();
+        let r = collect(map(filter(arr, |x| x > 0), |x| x * 2));
+        let t1 = clock();
+        let _d = len(r);
+        push(filter_map_times, t1 - t0);
+    }
+    report("lazy filter+map + collect", filter_map_times);
+
+    // 4. Lazy take + skip + map + collect (3 adapter layers)
+    let mut deep_times = [];
+    for iter_i2 in 0..ITERS {
+        let t0 = clock();
+        let r = collect(map(skip(take(arr, 50000), 10000), |x| x * 3));
+        let t1 = clock();
+        let _d = len(r);
+        push(deep_times, t1 - t0);
+    }
+    report("lazy take+skip+map + collect (3 layers)", deep_times);
+
+    // 5. Eager Zen-style map (old prelude style) — inline Zen function
+    let mut eager_times = [];
+    for iter_i2 in 0..ITERS {
+        let t0 = clock();
+        let r = eager_map(arr, |x| x * 2);
+        let t1 = clock();
+        let _d = len(r);
+        push(eager_times, t1 - t0);
+    }
+    report("eager zen map (old prelude style)", eager_times);
+
+    // 6. Eager Zen-style filter then map
+    let mut eager_fm_times = [];
+    for iter_i2 in 0..ITERS {
+        let t0 = clock();
+        let r = eager_map(eager_filter(arr, |x| x > 0), |x| x * 2);
+        let t1 = clock();
+        let _d = len(r);
+        push(eager_fm_times, t1 - t0);
+    }
+    report("eager zen filter+map (old prelude style)", eager_fm_times);
+
+    print("");
+    print("Done.");
+}
+
+fn report(label, times) {
+    let mut total = 0;
+    let mut min = times[0];
+    for t in times {
+        total += t;
+        if t < min { min = t; }
+    }
+    let avg = total / len(times);
+    let avg_ms = avg / 1_000_000;
+    let min_ms = min / 1_000_000;
+    print(label + ": min=" + to_str(min) + "ns (" + to_str(min_ms) + "ms)  avg=" + to_str(avg) + "ns (" + to_str(avg_ms) + "ms)");
+}
+
+// Old-style eager map — materializes array immediately
+fn eager_map(iterable, f) {
+    let it = iter(iterable);
+    let mut result = [];
+    loop {
+        match it.next() {
+            Some(v) => { push(result, f(v)); }
+            None => { break; }
+        }
+    }
+    result
+}
+
+// Old-style eager filter
+fn eager_filter(iterable, pred) {
+    let it = iter(iterable);
+    let mut result = [];
+    loop {
+        match it.next() {
+            Some(v) => { if pred(v) { push(result, v); } }
+            None => { break; }
+        }
+    }
+    result
+}
