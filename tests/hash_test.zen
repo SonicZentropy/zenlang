@@ -1,0 +1,15 @@
+let h1 = fnv1a("hello");
+assert(type_of(h1) == "str");
+assert(len(h1) == 16);
+assert(h1 == "e19f1b9f0b8c7c3d");
+
+let h2 = crc32("hello");
+assert(type_of(h2) == "str");
+assert(len(h2) == 8);
+assert(h2 == "3610a686");
+
+let h3 = hash_str("hello");
+assert(type_of(h3) == "str");
+assert(len(h3) == 16);
+
+print("hash test passed");

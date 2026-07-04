@@ -1,0 +1,12 @@
+let id = uuid_v4();
+assert(type_of(id) == "str");
+assert(len(id) == 36);
+assert(id[8] == '-');
+assert(id[13] == '-');
+assert(id[18] == '-');
+assert(id[23] == '-');
+
+// version nibble should be 4
+assert(id[14] == '4');
+
+print("uuid test passed");

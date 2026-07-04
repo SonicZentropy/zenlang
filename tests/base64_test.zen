@@ -1,0 +1,11 @@
+let enc = base64_encode("Hello, World!");
+assert(enc == "SGVsbG8sIFdvcmxkIQ==");
+
+let dec = base64_decode(enc);
+assert(is_some(dec));
+assert(unwrap(dec) == "Hello, World!");
+
+let dec2 = base64_decode("!!invalid!!");
+assert(is_none(dec2));
+
+print("base64 test passed");

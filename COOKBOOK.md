@@ -365,6 +365,88 @@ let id = set_interval(|| update(), 16);
 clear_timer(id);
 ```
 
+### Date and Time
+
+```rust
+let ts = now();                              // f64: current Unix timestamp
+let date = format(ts, "%Y-%m-%d");           // str: "2026-07-04"
+```
+
+### Set
+
+```rust
+let s = set_new();
+set_add(s, "apple");
+set_add(s, "banana");
+set_contains(s, "apple");    // true
+set_len(s);                  // 2
+let arr = set_to_array(s);
+```
+
+### Deque
+
+```rust
+let d = deque_new();
+deque_push_back(d, 10);
+deque_push_front(d, 5);
+deque_pop_front(d);          // 5
+deque_peek_back(d);          // 10
+deque_is_empty(d);           // false
+```
+
+### Sorted Map
+
+```rust
+let sm = sorted_map_new();
+sorted_map_insert(sm, "b", 2);
+sorted_map_insert(sm, "a", 1);
+sorted_map_keys(sm);         // ["a", "b"]
+sorted_map_get(sm, "a");     // Some(1)
+sorted_map_range(sm, "a", "b");  // [["a",1]]
+```
+
+### Base64
+
+```rust
+let enc = base64_encode("Hello, World!");
+// "SGVsbG8sIFdvcmxkIQ=="
+let dec = base64_decode(enc);
+// Some("Hello, World!")
+```
+
+### UUID
+
+```rust
+let id = uuid_v4();
+// "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+```
+
+### Hashing
+
+```rust
+let h = fnv1a("hello");          // 16 hex chars
+let c = crc32("hello");          // 8 hex chars
+let s = hash_str("hello");       // 16 hex chars
+```
+
+### Noise
+
+```rust
+perlin2d(1.5, 2.3, 42);          // f64 in [0, 1]
+simplex2d(1.5, 2.3, 42);
+fbm2d(0.5, 0.5, 4, 42);
+```
+
+### Color
+
+```rust
+let red = rgba(255, 0, 0, 255);
+color_r(red);                    // 255
+let teal = hex_color("#008080"); // Some(color)
+let pink = hsla(330.0, 1.0, 0.7, 255);
+lerp_color(red, 0x00FF00FF, 0.5);
+```
+
 ### Option / Result
 
 ```rust

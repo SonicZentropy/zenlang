@@ -1,0 +1,12 @@
+let n1 = perlin2d(0.0, 0.0, 42);
+assert(type_of(n1) == "float");
+assert(n1 >= 0.0 && n1 <= 1.0);
+
+let n2 = simplex2d(1.5, 2.3, 42);
+assert(type_of(n2) == "float");
+
+let n3 = fbm2d(0.5, 0.5, 3, 42);
+assert(type_of(n3) == "float");
+assert(n3 >= 0.0 && n3 <= 1.0);
+
+print("noise test passed");

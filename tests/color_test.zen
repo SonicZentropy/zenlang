@@ -1,0 +1,26 @@
+let c = rgba(255, 128, 64, 255);
+assert(color_r(c) == 255);
+assert(color_g(c) == 128);
+assert(color_b(c) == 64);
+assert(color_a(c) == 255);
+
+let h = hsla(180.0, 0.5, 0.5, 255);
+assert(color_r(h) >= 0 && color_g(h) >= 0 && color_b(h) >= 0);
+
+let c2 = hex_color("#ff8040");
+assert(is_some(c2));
+let cv = unwrap(c2);
+assert(color_r(cv) == 255);
+assert(color_g(cv) == 128);
+assert(color_b(cv) == 64);
+
+let bad = hex_color("not a color");
+assert(is_none(bad));
+
+let a = rgba(255, 0, 0, 255);
+let b = rgba(0, 255, 0, 255);
+let m = lerp_color(a, b, 0.5);
+assert(color_r(m) == 127 || color_r(m) == 128);
+assert(color_g(m) == 127 || color_g(m) == 128);
+
+print("color test passed");
