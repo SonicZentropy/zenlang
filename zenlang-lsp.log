@@ -653,3 +653,18 @@
 2026-07-03T05:58:00.246370Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
 2026-07-03T05:58:13.002206Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
 2026-07-03T05:58:13.002264Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-04T00:14:21.703840Z  INFO zenlang::lsp: LSP server starting
+2026-07-04T00:14:21.845480Z  INFO zenlang::lsp: LSP server initialized with capabilities
+2026-07-04T00:14:21.845542Z DEBUG zenlang::lsp: received notification: workspace/didChangeConfiguration
+2026-07-04T00:14:21.845559Z DEBUG zenlang::lsp: unhandled notification: workspace/didChangeConfiguration
+2026-07-04T00:14:21.845617Z DEBUG zenlang::lsp: received notification: textDocument/didOpen
+2026-07-04T00:14:21.845752Z  INFO zenlang::lsp: didOpen: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-07-04T00:14:21.846659Z  WARN zenlang::lsp: didOpen: compilation produced 3 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-07-04T00:14:21.847094Z DEBUG zenlang::lsp: send_diagnostics: 3 diagnostic(s) for Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-07-04T00:14:21.907833Z DEBUG zenlang::lsp: received request: textDocument/semanticTokens/full (id=RequestId(I32(2)))
+2026-07-04T00:14:21.907926Z DEBUG zenlang::lsp: handling request: textDocument/semanticTokens/full for file:///Z:/workspace/Rust/language_dev/zenlang/test.zen
+2026-07-04T00:14:25.949701Z DEBUG zenlang::lsp: received notification: textDocument/didClose
+2026-07-04T00:14:25.949987Z  INFO zenlang::lsp: didClose: Uri(Uri { scheme: Some("file"), authority: Some(Authority { userinfo: None, host: Host { text: "", data: RegName("") }, port: None }), path: "/Z:/workspace/Rust/language_dev/zenlang/test.zen", query: None, fragment: None })
+2026-07-04T00:14:30.279149Z DEBUG zenlang::lsp: received request: shutdown (id=RequestId(I32(3)))
+2026-07-04T00:14:30.334506Z  INFO zenlang::lsp: received shutdown request
+2026-07-04T00:14:30.334541Z  INFO zenlang::lsp: LSP server shutting down

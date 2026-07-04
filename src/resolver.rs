@@ -32,7 +32,10 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
         }
     }
     // Pre-register built-in Option type
-    let option_param = TypeParam { name: "T".into(), bounds: vec![] };
+    let option_param = TypeParam {
+        name: "T".into(),
+        bounds: vec![],
+    };
     let option_def = EnumDef {
         name: "Option".into(),
         type_params: vec![option_param],
@@ -41,7 +44,9 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
             ("None".into(), vec![]),
         ],
     };
-    let _ = resolver.symbols.define("Option", SymKind::Enum(option_def.clone()));
+    let _ = resolver
+        .symbols
+        .define("Option", SymKind::Enum(option_def.clone()));
     for (tag, (vname, fields)) in option_def.variants.iter().enumerate() {
         let cons = SymKind::EnumConstructor {
             enum_name: "Option".into(),
@@ -50,11 +55,19 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
             fields: fields.clone(),
         };
         let _ = resolver.symbols.define(vname, cons.clone());
-        let _ = resolver.symbols.define(&format!("{}::{}", "Option", vname), cons);
+        let _ = resolver
+            .symbols
+            .define(&format!("{}::{}", "Option", vname), cons);
     }
     // Pre-register built-in Result type
-    let result_t_param = TypeParam { name: "T".into(), bounds: vec![] };
-    let result_e_param = TypeParam { name: "E".into(), bounds: vec![] };
+    let result_t_param = TypeParam {
+        name: "T".into(),
+        bounds: vec![],
+    };
+    let result_e_param = TypeParam {
+        name: "E".into(),
+        bounds: vec![],
+    };
     let result_def = EnumDef {
         name: "Result".into(),
         type_params: vec![result_t_param, result_e_param],
@@ -63,7 +76,9 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
             ("Err".into(), vec![Type::Any]), // Any acts as generic placeholder
         ],
     };
-    let _ = resolver.symbols.define("Result", SymKind::Enum(result_def.clone()));
+    let _ = resolver
+        .symbols
+        .define("Result", SymKind::Enum(result_def.clone()));
     for (tag, (vname, fields)) in result_def.variants.iter().enumerate() {
         let cons = SymKind::EnumConstructor {
             enum_name: "Result".into(),
@@ -72,7 +87,9 @@ pub fn resolve_with_natives(program: &mut Program, native_names: &[String]) -> R
             fields: fields.clone(),
         };
         let _ = resolver.symbols.define(vname, cons.clone());
-        let _ = resolver.symbols.define(&format!("{}::{}", "Result", vname), cons);
+        let _ = resolver
+            .symbols
+            .define(&format!("{}::{}", "Result", vname), cons);
     }
     resolver.resolve_program(program)?;
     Ok(resolver.symbols)
@@ -86,7 +103,11 @@ struct Resolver {
 
 impl Resolver {
     fn new() -> Self {
-        Self { symbols: SymbolTable::new(), errors: Vec::new(), current_span: crate::span::Span::new(0, 0) }
+        Self {
+            symbols: SymbolTable::new(),
+            errors: Vec::new(),
+            current_span: crate::span::Span::new(0, 0),
+        }
     }
 
     fn set_span(&mut self, span: crate::span::Span) {
@@ -116,7 +137,9 @@ impl Resolver {
         if self.errors.is_empty() {
             Ok(())
         } else {
-            Err(Error::ParseMultiple { errors: std::mem::take(&mut self.errors) })
+            Err(Error::ParseMultiple {
+                errors: std::mem::take(&mut self.errors),
+            })
         }
     }
 
@@ -124,45 +147,91 @@ impl Resolver {
 
     fn resolve_type(&self, ty: &Type, type_params: &[TypeParam]) -> Type {
         match ty {
-            Type::Named(s) if type_params.iter().any(|tp| tp.name == *s) => Type::Generic(s.clone()),
+            Type::Named(s) if type_params.iter().any(|tp| tp.name == *s) => {
+                Type::Generic(s.clone())
+            }
             _ => ty.clone(),
         }
     }
 
     fn resolve_types_in_vec(&self, tys: &[Type], type_params: &[TypeParam]) -> Vec<Type> {
-        tys.iter().map(|t| self.resolve_type(t, type_params)).collect()
+        tys.iter()
+            .map(|t| self.resolve_type(t, type_params))
+            .collect()
     }
 
     fn register_top_level(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Fn { name, type_params, params, return_type, body: _, .. } => {
+            Stmt::Fn {
+                name,
+                type_params,
+                params,
+                return_type,
+                ..
+            } => {
                 let sig = FnSignature {
                     name: name.to_string(),
                     type_params: type_params.clone(),
-                    params: params.iter().map(|p| {
-                        let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Any), type_params);
-                        (p.name.to_string(), ty)
-                    }).collect(),
-                    return_type: return_type.as_ref().map(|t| self.resolve_type(t, type_params)),
+                    params: params
+                        .iter()
+                        .map(|p| {
+                            let ty = self.resolve_type(
+                                &p.type_ann.clone().unwrap_or(Type::Any),
+                                type_params,
+                            );
+                            (p.name.to_string(), ty)
+                        })
+                        .collect(),
+                    return_type: return_type
+                        .as_ref()
+                        .map(|t| self.resolve_type(t, type_params)),
                 };
                 if let Err(e) = self.symbols.define(name, SymKind::Function(sig)) {
                     self.error(e);
                 }
             }
-            Stmt::Struct { name, type_params, fields, .. } => {
-                let resolved_fields: Vec<StructField> = fields.iter()
-                    .map(|f| StructField { name: f.name.clone(), type_ann: self.resolve_type(&f.type_ann, type_params) })
+            Stmt::Struct {
+                name,
+                type_params,
+                fields,
+                ..
+            } => {
+                let resolved_fields: Vec<StructField> = fields
+                    .iter()
+                    .map(|f| StructField {
+                        name: f.name.clone(),
+                        type_ann: self.resolve_type(&f.type_ann, type_params),
+                    })
                     .collect();
-                let def = StructDef { name: name.to_string(), type_params: type_params.clone(), fields: resolved_fields };
+                let def = StructDef {
+                    name: name.to_string(),
+                    type_params: type_params.clone(),
+                    fields: resolved_fields,
+                };
                 if let Err(e) = self.symbols.define(name, SymKind::Struct(def)) {
                     self.error(e);
                 }
             }
-            Stmt::Enum { name, type_params, variants, .. } => {
-                let v: Vec<(String, Vec<Type>)> = variants.iter()
-                    .map(|v| (v.name.to_string(), self.resolve_types_in_vec(&v.fields, type_params)))
+            Stmt::Enum {
+                name,
+                type_params,
+                variants,
+                ..
+            } => {
+                let v: Vec<(String, Vec<Type>)> = variants
+                    .iter()
+                    .map(|v| {
+                        (
+                            v.name.to_string(),
+                            self.resolve_types_in_vec(&v.fields, type_params),
+                        )
+                    })
                     .collect();
-                let def = EnumDef { name: name.to_string(), type_params: type_params.clone(), variants: v.clone() };
+                let def = EnumDef {
+                    name: name.to_string(),
+                    type_params: type_params.clone(),
+                    variants: v.clone(),
+                };
                 if let Err(e) = self.symbols.define(name, SymKind::Enum(def)) {
                     self.error(e);
                 }
@@ -179,68 +248,131 @@ impl Resolver {
                         fields: self.resolve_types_in_vec(&variant.fields, type_params),
                     };
                     let _ = self.symbols.define(&variant.name, cons.clone());
-                    if let Err(e) = self.symbols.define(&format!("{}::{}", name, variant.name), cons) {
+                    if let Err(e) = self
+                        .symbols
+                        .define(&format!("{}::{}", name, variant.name), cons)
+                    {
                         self.error(e);
                     }
                 }
             }
-            Stmt::Impl { type_name, type_params, methods, trait_name, .. } => {
+            Stmt::Impl {
+                type_name,
+                type_params,
+                methods,
+                trait_name,
+                ..
+            } => {
                 for method in methods {
-                    if let Stmt::Fn { name, type_params: fn_type_params, params, return_type, body: _, .. } = &method.node {
-                        let combined_type_params: Vec<TypeParam> = type_params.iter().chain(fn_type_params.iter()).cloned().collect();
+                    if let Stmt::Fn {
+                        name,
+                        type_params: fn_type_params,
+                        params,
+                        return_type,
+                        ..
+                    } = &method.node
+                    {
+                        let combined_type_params: Vec<TypeParam> = type_params
+                            .iter()
+                            .chain(fn_type_params.iter())
+                            .cloned()
+                            .collect();
                         let sig = FnSignature {
                             name: format!("{}::{}", type_name, name),
                             type_params: combined_type_params.clone(),
-                            params: params.iter().map(|p| {
-                                let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Any), &combined_type_params);
-                                (p.name.to_string(), ty)
-                            }).collect(),
-                            return_type: return_type.as_ref().map(|t| self.resolve_type(t, &combined_type_params)),
+                            params: params
+                                .iter()
+                                .map(|p| {
+                                    let ty = self.resolve_type(
+                                        &p.type_ann.clone().unwrap_or(Type::Any),
+                                        &combined_type_params,
+                                    );
+                                    (p.name.to_string(), ty)
+                                })
+                                .collect(),
+                            return_type: return_type
+                                .as_ref()
+                                .map(|t| self.resolve_type(t, &combined_type_params)),
                         };
-                        if let Err(e) = self.symbols.define(
-                            &format!("{}::{}", type_name, name),
-                            SymKind::Function(sig),
-                        ) {
+                        if let Err(e) = self
+                            .symbols
+                            .define(&format!("{}::{}", type_name, name), SymKind::Function(sig))
+                        {
                             self.error(e);
                         }
                     }
                 }
                 // If this is a trait impl, verify the trait exists
-                if let Some(trait_name) = trait_name {
-                    if self.symbols.lookup(trait_name).is_none() {
-                        self.error(format!("cannot find trait '{}'", trait_name));
-                    }
+                if let Some(trait_name) = trait_name
+                    && self.symbols.lookup(trait_name).is_none()
+                {
+                    self.error(format!("cannot find trait '{}'", trait_name));
                 }
             }
-            Stmt::Trait { name, type_params, methods, .. } => {
+            Stmt::Trait {
+                name,
+                type_params,
+                methods,
+                ..
+            } => {
                 let mut method_sigs = Vec::new();
                 for method in methods {
-                    if let Stmt::Fn { name: fn_name, type_params: fn_type_params, params, return_type, body: _, .. } = &method.node {
-                        let combined_type_params: Vec<TypeParam> = type_params.iter().chain(fn_type_params.iter()).cloned().collect();
+                    if let Stmt::Fn {
+                        name: fn_name,
+                        type_params: fn_type_params,
+                        params,
+                        return_type,
+                        ..
+                    } = &method.node
+                    {
+                        let combined_type_params: Vec<TypeParam> = type_params
+                            .iter()
+                            .chain(fn_type_params.iter())
+                            .cloned()
+                            .collect();
                         let sig = FnSignature {
                             name: fn_name.to_string(),
                             type_params: combined_type_params.clone(),
-                            params: params.iter().map(|p| {
-                                let ty = self.resolve_type(&p.type_ann.clone().unwrap_or(Type::Unit), &combined_type_params);
-                                (p.name.to_string(), ty)
-                            }).collect(),
+                            params: params
+                                .iter()
+                                .map(|p| {
+                                    let ty = self.resolve_type(
+                                        &p.type_ann.clone().unwrap_or(Type::Unit),
+                                        &combined_type_params,
+                                    );
+                                    (p.name.to_string(), ty)
+                                })
+                                .collect(),
                             return_type: return_type.clone(),
                         };
                         method_sigs.push(sig);
                     }
                 }
-                let def = TraitDef { name: name.to_string(), type_params: type_params.clone(), method_sigs };
+                let def = TraitDef {
+                    name: name.to_string(),
+                    type_params: type_params.clone(),
+                    method_sigs,
+                };
                 if let Err(e) = self.symbols.define(name, SymKind::Trait(def)) {
                     self.error(e);
                 }
             }
-            Stmt::Type { name, type_params, alias, opaque, .. } => {
+            Stmt::Type {
+                name,
+                type_params,
+                alias,
+                opaque,
+                ..
+            } => {
                 let resolved_alias = self.resolve_type(alias, type_params);
-                if let Err(e) = self.symbols.define(name, SymKind::TypeAlias {
-                    type_params: type_params.clone(),
-                    alias: resolved_alias,
-                    opaque: *opaque,
-                }) {
+                if let Err(e) = self.symbols.define(
+                    name,
+                    SymKind::TypeAlias {
+                        type_params: type_params.clone(),
+                        alias: resolved_alias,
+                        opaque: *opaque,
+                    },
+                ) {
                     self.error(e);
                 }
             }
@@ -250,14 +382,22 @@ impl Resolver {
                 let module_scope = self.symbols.current_scope;
                 let parent = self.symbols.scopes[module_scope].parent.unwrap();
                 // Register module name in the parent scope
-                if self.symbols.scopes[parent].symbols.contains_key(name.as_str()) {
+                if self.symbols.scopes[parent]
+                    .symbols
+                    .contains_key(name.as_str())
+                {
                     self.error(format!("duplicate definition of '{}'", name));
                 } else {
                     let id = self.symbols.symbols.len();
-                    self.symbols.symbols.push((name.to_string(), SymKind::Module(module_scope)));
+                    self.symbols
+                        .symbols
+                        .push((name.to_string(), SymKind::Module(module_scope)));
                     self.symbols.scopes[parent].symbols.insert(
                         name.to_string(),
-                        SymEntry { id, kind: SymKind::Module(module_scope) },
+                        SymEntry {
+                            id,
+                            kind: SymKind::Module(module_scope),
+                        },
                     );
                 }
                 // Register top-level declarations within the module
@@ -274,11 +414,20 @@ impl Resolver {
 
     fn resolve_decl(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Fn { name: _, type_params, params, body, .. } => {
+            Stmt::Fn {
+                name: _,
+                type_params,
+                params,
+                body,
+                ..
+            } => {
                 self.symbols.enter_scope();
                 // Register generic type parameters in scope
                 for tp in type_params {
-                    if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                    if let Err(e) = self
+                        .symbols
+                        .define(&tp.name, SymKind::TypeParam(tp.name.to_string()))
+                    {
                         self.error(e);
                     }
                 }
@@ -291,19 +440,37 @@ impl Resolver {
                 self.resolve_block(body);
                 self.symbols.exit_scope();
             }
-            Stmt::Impl { type_name, type_params, methods, .. } => {
+            Stmt::Impl {
+                type_name,
+                type_params,
+                methods,
+                ..
+            } => {
                 for method in methods {
-                    if let Stmt::Fn { name: _, type_params: method_type_params, params, body, .. } = &method.node {
+                    if let Stmt::Fn {
+                        name: _,
+                        type_params: method_type_params,
+                        params,
+                        body,
+                        ..
+                    } = &method.node
+                    {
                         self.symbols.enter_scope();
                         // Register generic type parameters from impl block
                         for tp in type_params {
-                            if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                            if let Err(e) = self
+                                .symbols
+                                .define(&tp.name, SymKind::TypeParam(tp.name.to_string()))
+                            {
                                 self.error(e);
                             }
                         }
                         // Register generic type parameters from method
                         for tp in method_type_params {
-                            if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                            if let Err(e) = self
+                                .symbols
+                                .define(&tp.name, SymKind::TypeParam(tp.name.to_string()))
+                            {
                                 self.error(e);
                             }
                         }
@@ -313,7 +480,8 @@ impl Resolver {
                             } else {
                                 param.type_ann.clone().unwrap_or(Type::Unit)
                             };
-                            if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty)) {
+                            if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty))
+                            {
                                 self.error(e);
                             }
                         }
@@ -322,25 +490,42 @@ impl Resolver {
                     }
                 }
             }
-            Stmt::Trait { type_params, methods, .. } => {
+            Stmt::Trait {
+                type_params,
+                methods,
+                ..
+            } => {
                 // Register generic type parameters in scope for method resolution
                 self.symbols.enter_scope();
                 for tp in type_params {
-                    if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                    if let Err(e) = self
+                        .symbols
+                        .define(&tp.name, SymKind::TypeParam(tp.name.to_string()))
+                    {
                         self.error(e);
                     }
                 }
                 // Resolve types in method signatures
                 for method in methods {
-                    if let Stmt::Fn { name: _, type_params: fn_type_params, params, body: _, .. } = &method.node {
+                    if let Stmt::Fn {
+                        name: _,
+                        type_params: fn_type_params,
+                        params,
+                        ..
+                    } = &method.node
+                    {
                         for tp in fn_type_params {
-                            if let Err(e) = self.symbols.define(&tp.name, SymKind::TypeParam(tp.name.to_string())) {
+                            if let Err(e) = self
+                                .symbols
+                                .define(&tp.name, SymKind::TypeParam(tp.name.to_string()))
+                            {
                                 self.error(e);
                             }
                         }
                         for param in params {
                             let ty = param.type_ann.clone().unwrap_or(Type::Unit);
-                            if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty)) {
+                            if let Err(e) = self.symbols.define(&param.name, SymKind::Variable(ty))
+                            {
                                 self.error(e);
                             }
                         }
@@ -348,7 +533,12 @@ impl Resolver {
                 }
                 self.symbols.exit_scope();
             }
-            Stmt::Let { name, type_ann, init, .. } => {
+            Stmt::Let {
+                name,
+                type_ann,
+                init,
+                ..
+            } => {
                 if let Some(expr) = init {
                     self.resolve_expr(expr);
                 }
@@ -357,7 +547,12 @@ impl Resolver {
                     self.error(e);
                 }
             }
-            Stmt::Const { name, type_ann, init, .. } => {
+            Stmt::Const {
+                name,
+                type_ann,
+                init,
+                ..
+            } => {
                 self.resolve_expr(init);
                 let ty = type_ann.clone().unwrap_or(Type::Unit);
                 if let Err(e) = self.symbols.define(name, SymKind::Variable(ty)) {
@@ -386,11 +581,17 @@ impl Resolver {
                     let item_name = &path[path.len() - 1];
                     let entry = self.symbols.lookup(module_name).cloned();
                     match entry {
-                        Some(SymEntry { kind: SymKind::Module(scope_idx), .. }) => {
+                        Some(SymEntry {
+                            kind: SymKind::Module(scope_idx),
+                            ..
+                        }) => {
                             if let Some(item) = self.symbols.lookup_in_scope(scope_idx, item_name) {
                                 let _ = self.symbols.define(item_name, item.kind.clone());
                             } else {
-                                self.error(format!("cannot find '{}' in module '{}'", item_name, module_name));
+                                self.error(format!(
+                                    "cannot find '{}' in module '{}'",
+                                    item_name, module_name
+                                ));
                             }
                         }
                         Some(_) => {
@@ -405,7 +606,11 @@ impl Resolver {
             Stmt::Mod { name, body, .. } => {
                 // Find the module's scope
                 let entry = self.symbols.lookup(name).cloned();
-                if let Some(SymEntry { kind: SymKind::Module(scope_idx), .. }) = entry {
+                if let Some(SymEntry {
+                    kind: SymKind::Module(scope_idx),
+                    ..
+                }) = entry
+                {
                     let prev_scope = self.symbols.current_scope;
                     self.symbols.current_scope = scope_idx;
                     for stmt in body {
@@ -487,20 +692,30 @@ impl Resolver {
             Expr::Match { expr, arms } => {
                 self.resolve_expr(expr);
                 for arm in arms {
-                    let enters_scope = matches!(arm.pattern, Pattern::Ident(_) | Pattern::EnumVariant { .. });
+                    let enters_scope =
+                        matches!(arm.pattern, Pattern::Ident(_) | Pattern::EnumVariant { .. });
                     if enters_scope {
                         self.symbols.enter_scope();
                     }
                     match &arm.pattern {
                         Pattern::Ident(name) => {
-                            if let Err(e) = self.symbols.define(name, SymKind::Variable(Type::Unit)) {
+                            if let Err(e) = self.symbols.define(name, SymKind::Variable(Type::Unit))
+                            {
                                 self.error(e);
                             }
                         }
-                        Pattern::EnumVariant { enum_name: _, variant_name: _, bindings } => {
+                        Pattern::EnumVariant {
+                            enum_name: _,
+                            variant_name: _,
+                            bindings,
+                        } => {
                             for binding in bindings {
-                                if binding.is_empty() { continue; } // wildcard _
-                                if let Err(e) = self.symbols.define(binding, SymKind::Variable(Type::Unit)) {
+                                if binding.is_empty() {
+                                    continue;
+                                } // wildcard _
+                                if let Err(e) =
+                                    self.symbols.define(binding, SymKind::Variable(Type::Unit))
+                                {
                                     self.error(e);
                                 }
                             }
@@ -557,8 +772,13 @@ impl Resolver {
                 }
             }
             // Literals don't have names to resolve
-            Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)
-            | Expr::Unit | Expr::Break | Expr::Continue => {}
+            Expr::Int(_)
+            | Expr::Float(_)
+            | Expr::Str(_)
+            | Expr::Bool(_)
+            | Expr::Unit
+            | Expr::Break
+            | Expr::Continue => {}
         }
     }
 }
@@ -628,25 +848,37 @@ mod tests {
     fn test_mod_decl() {
         let table = resolve_program("mod math { fn add(x, y) { x + y } }").unwrap();
         assert!(table.lookup("math").is_some());
-        assert!(matches!(table.lookup("math").unwrap().kind, SymKind::Module(_)));
+        assert!(matches!(
+            table.lookup("math").unwrap().kind,
+            SymKind::Module(_)
+        ));
     }
 
     #[test]
     fn test_use_import() {
-        let table = resolve_program("
+        let table = resolve_program(
+            "
             mod math { fn add(x, y) { x + y } }
             use math::add;
-        ").unwrap();
+        ",
+        )
+        .unwrap();
         assert!(table.lookup("add").is_some());
-        assert!(matches!(table.lookup("add").unwrap().kind, SymKind::Function(_)));
+        assert!(matches!(
+            table.lookup("add").unwrap().kind,
+            SymKind::Function(_)
+        ));
     }
 
     #[test]
     fn test_use_imports_variable() {
-        let table = resolve_program("
+        let table = resolve_program(
+            "
             mod config { let pi = 314; }
             use config::pi;
-        ").unwrap();
+        ",
+        )
+        .unwrap();
         assert!(table.lookup("pi").is_some());
     }
 

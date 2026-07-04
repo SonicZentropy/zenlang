@@ -1,12 +1,12 @@
-use crate::ast::{Stmt, Type, EnumVariant, Expr, BinOp};
+use crate::ast::{BinOp, EnumVariant, Expr, Stmt, Type};
+use crate::compiler;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::resolver::resolve;
 use crate::symbol::SymKind;
 use crate::typeck;
-use crate::compiler;
-use crate::vm::VM;
 use crate::value::Value;
+use crate::vm::VM;
 
 fn parse(source: &str) -> crate::error::Result<crate::ast::Program> {
     let tokens = Lexer::new(source).tokenize()?;
@@ -18,7 +18,14 @@ fn test_generic_fn() {
     let prog = parse("fn identity<T>(x: T) -> T { x }").unwrap();
     assert_eq!(prog.stmts.len(), 1);
     match &prog.stmts[0].node {
-        Stmt::Fn { name, type_params, params, return_type, body: _, .. } => {
+        Stmt::Fn {
+            name,
+            type_params,
+            params,
+            return_type,
+            body: _,
+            ..
+        } => {
             assert_eq!(name, "identity");
             assert_eq!(type_params.len(), 1);
             assert_eq!(type_params[0].name, "T");
@@ -36,7 +43,12 @@ fn test_generic_struct() {
     let prog = parse("struct Pair<T, U> { first: T, second: U }").unwrap();
     assert_eq!(prog.stmts.len(), 1);
     match &prog.stmts[0].node {
-        Stmt::Struct { name, type_params, fields, .. } => {
+        Stmt::Struct {
+            name,
+            type_params,
+            fields,
+            ..
+        } => {
             assert_eq!(name, "Pair");
             assert_eq!(type_params.len(), 2);
             assert_eq!(type_params[0].name, "T");
@@ -54,7 +66,12 @@ fn test_generic_enum() {
     let prog = parse("enum Option<T> { Some(T), None }").unwrap();
     assert_eq!(prog.stmts.len(), 1);
     match &prog.stmts[0].node {
-        Stmt::Enum { name, type_params, variants, .. } => {
+        Stmt::Enum {
+            name,
+            type_params,
+            variants,
+            ..
+        } => {
             assert_eq!(name, "Option");
             assert_eq!(type_params.len(), 1);
             assert_eq!(type_params[0].name, "T");
@@ -69,7 +86,12 @@ fn test_generic_impl() {
     let prog = parse("impl<T> Vec2 { fn add(other: T) { } }").unwrap();
     assert_eq!(prog.stmts.len(), 1);
     match &prog.stmts[0].node {
-        Stmt::Impl { type_params, type_name, methods, .. } => {
+        Stmt::Impl {
+            type_params,
+            type_name,
+            methods,
+            ..
+        } => {
             assert_eq!(type_name, "Vec2");
             assert_eq!(type_params.len(), 1);
             assert_eq!(type_params[0].name, "T");
@@ -81,7 +103,8 @@ fn test_generic_impl() {
 
 #[test]
 fn test_enum_variant_construction_and_match() {
-    let prog = parse(r#"
+    let prog = parse(
+        r#"
         enum Color { Red, Green, Blue }
         enum MyOption { MySome(i32), MyNone }
         enum MyResult { MyOk(i32), MyErr(str) }
@@ -119,12 +142,19 @@ fn test_enum_variant_construction_and_match() {
         let e = my_unwrap_or(MyOption::MyNone, 42);
         let f = divide(10, 2);
         let g = divide(5, 0);
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
     assert_eq!(prog.stmts.len(), 14); // 3 enums + 4 fn + 7 let stmts
 
     // Check enum declarations
     match &prog.stmts[0].node {
-        Stmt::Enum { name, type_params, variants, .. } => {
+        Stmt::Enum {
+            name,
+            type_params,
+            variants,
+            ..
+        } => {
             assert_eq!(name, "Color");
             assert_eq!(type_params.len(), 0);
             assert_eq!(variants.len(), 3);
@@ -132,7 +162,12 @@ fn test_enum_variant_construction_and_match() {
         _ => panic!("expected enum stmt"),
     }
     match &prog.stmts[1].node {
-        Stmt::Enum { name, type_params, variants, .. } => {
+        Stmt::Enum {
+            name,
+            type_params,
+            variants,
+            ..
+        } => {
             assert_eq!(name, "MyOption");
             assert_eq!(type_params.len(), 0);
             assert_eq!(variants.len(), 2);
@@ -156,7 +191,12 @@ fn test_enum_variant_construction_and_match() {
         _ => panic!("expected enum stmt"),
     }
     match &prog.stmts[2].node {
-        Stmt::Enum { name, type_params, variants, .. } => {
+        Stmt::Enum {
+            name,
+            type_params,
+            variants,
+            ..
+        } => {
             assert_eq!(name, "MyResult");
             assert_eq!(type_params.len(), 0);
             assert_eq!(variants.len(), 2);
@@ -166,7 +206,13 @@ fn test_enum_variant_construction_and_match() {
 
     // Check function declarations
     match &prog.stmts[3].node {
-        Stmt::Fn { name, params, return_type, body: _, .. } => {
+        Stmt::Fn {
+            name,
+            params,
+            return_type,
+            body: _,
+            ..
+        } => {
             assert_eq!(name, "describe_color");
             assert_eq!(params.len(), 1);
             assert_eq!(params[0].name, "c");
@@ -175,7 +221,13 @@ fn test_enum_variant_construction_and_match() {
         _ => panic!("expected describe_color fn"),
     }
     match &prog.stmts[4].node {
-        Stmt::Fn { name, params, return_type, body: _, .. } => {
+        Stmt::Fn {
+            name,
+            params,
+            return_type,
+            body: _,
+            ..
+        } => {
             assert_eq!(name, "my_is_some");
             assert_eq!(params.len(), 1);
             assert_eq!(params[0].name, "opt");
@@ -184,7 +236,13 @@ fn test_enum_variant_construction_and_match() {
         _ => panic!("expected my_is_some fn"),
     }
     match &prog.stmts[5].node {
-        Stmt::Fn { name, params, return_type, body: _, .. } => {
+        Stmt::Fn {
+            name,
+            params,
+            return_type,
+            body: _,
+            ..
+        } => {
             assert_eq!(name, "my_unwrap_or");
             assert_eq!(params.len(), 2);
             assert_eq!(params[0].name, "opt");
@@ -194,7 +252,13 @@ fn test_enum_variant_construction_and_match() {
         _ => panic!("expected unwrap_or fn"),
     }
     match &prog.stmts[6].node {
-        Stmt::Fn { name, params, return_type, body: _, .. } => {
+        Stmt::Fn {
+            name,
+            params,
+            return_type,
+            body: _,
+            ..
+        } => {
             assert_eq!(name, "divide");
             assert_eq!(params.len(), 2);
             assert_eq!(params[0].name, "a");
@@ -230,31 +294,42 @@ fn test_unit_variant_exhaustiveness_check() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let result = typeck::check(&program, &mut symbols);
-    assert!(result.is_err(), "expected type error for non-exhaustive match");
+    assert!(
+        result.is_err(),
+        "expected type error for non-exhaustive match"
+    );
     let err_msg = match result {
-        Err(crate::error::Error::ParseMultiple { errors }) => {
-            errors.iter().map(|e| format!("{}", e)).collect::<Vec<_>>().join(", ")
-        }
+        Err(crate::error::Error::ParseMultiple { errors }) => errors
+            .iter()
+            .map(|e| format!("{}", e))
+            .collect::<Vec<_>>()
+            .join(", "),
         Err(e) => format!("{}", e),
         Ok(_) => unreachable!(),
     };
-    assert!(err_msg.contains("non-exhaustive"), "expected non-exhaustive error, got: {}", err_msg);
+    assert!(
+        err_msg.contains("non-exhaustive"),
+        "expected non-exhaustive error, got: {}",
+        err_msg
+    );
 }
 
 #[test]
 fn test_unit_variant_pattern_matching_compiles_and_runs() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     fn run(source: &str) -> Value {
         let tokens = crate::lexer::Lexer::new(source).tokenize().unwrap();
         let parser = crate::parser::Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -352,8 +427,8 @@ fn test_unit_variant_pattern_matching_compiles_and_runs() {
 #[test]
 fn test_generic_fn_full_pipeline() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     let source = r#"
         fn identity<T>(x: T) -> T { x }
@@ -366,7 +441,8 @@ fn test_generic_fn_full_pipeline() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -377,8 +453,8 @@ fn test_generic_fn_full_pipeline() {
 #[test]
 fn test_generic_fn_multiple_type_args() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     let source = r#"
         fn pair<T, U>(a: T, b: U) -> T { a }
@@ -391,7 +467,8 @@ fn test_generic_fn_multiple_type_args() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -402,8 +479,8 @@ fn test_generic_fn_multiple_type_args() {
 #[test]
 fn test_generic_fn_type_erasure() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     let source = r#"
         fn identity<T>(x: T) -> T { x }
@@ -416,7 +493,8 @@ fn test_generic_fn_type_erasure() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -437,7 +515,8 @@ fn test_try_operator_simple() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -460,7 +539,8 @@ fn test_try_operator_ok_value() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -471,8 +551,8 @@ fn test_try_operator_ok_value() {
 #[test]
 fn test_try_operator_early_return() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     let source = r#"
         fn try_or_default() -> Result<i64, str> {
@@ -492,7 +572,8 @@ fn test_try_operator_early_return() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -513,11 +594,23 @@ fn test_trait_decl_parse() {
     let program = Parser::new(source, &tokens).parse().unwrap();
     assert_eq!(program.stmts.len(), 1);
     match &program.stmts[0].node {
-        Stmt::Trait { name, type_params, methods, .. } => {
+        Stmt::Trait {
+            name,
+            type_params,
+            methods,
+            ..
+        } => {
             assert_eq!(name, "Shape");
             assert!(type_params.is_empty());
             assert_eq!(methods.len(), 2);
-            if let Stmt::Fn { name: fn_name, params, return_type, body, .. } = &methods[0].node {
+            if let Stmt::Fn {
+                name: fn_name,
+                params,
+                return_type,
+                body,
+                ..
+            } = &methods[0].node
+            {
                 assert_eq!(fn_name, "area");
                 assert!(params.is_empty());
                 assert!(return_type.is_some());
@@ -555,8 +648,8 @@ fn test_trait_resolve_and_symbol() {
 #[test]
 fn test_trait_impl_pipeline() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     let source = r#"
         struct Circle { radius: f64 }
@@ -575,7 +668,8 @@ fn test_trait_impl_pipeline() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -586,8 +680,8 @@ fn test_trait_impl_pipeline() {
 #[test]
 fn test_trait_impl_trait_for_type_pipeline() {
     use crate::compiler;
-    use crate::vm::VM;
     use crate::value::Value;
+    use crate::vm::VM;
 
     let source = r#"
         struct Circle { radius: f64 }
@@ -607,7 +701,8 @@ fn test_trait_impl_trait_for_type_pipeline() {
     let native_names = crate::stdlib::native_names();
     let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
     let types = crate::typeck::check(&program, &mut symbols).unwrap();
-    let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+    let (fns, global_names) =
+        compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
     let mut vm = VM::new();
     crate::stdlib::register_builtins(&mut vm);
     vm.load_bytecode(fns, global_names);
@@ -677,7 +772,12 @@ fn test_const_declaration_parses() {
     let program = Parser::new(source, &tokens).parse().unwrap();
     assert_eq!(program.stmts.len(), 1);
     match &program.stmts[0].node {
-        Stmt::Const { name, type_ann, init, .. } => {
+        Stmt::Const {
+            name,
+            type_ann,
+            init,
+            ..
+        } => {
             assert_eq!(name, "MAX");
             assert!(type_ann.is_none());
             match init {
@@ -696,7 +796,12 @@ fn test_const_declaration_with_type_annotation() {
     let program = Parser::new(source, &tokens).parse().unwrap();
     assert_eq!(program.stmts.len(), 1);
     match &program.stmts[0].node {
-        Stmt::Const { name, type_ann, init, .. } => {
+        Stmt::Const {
+            name,
+            type_ann,
+            init,
+            ..
+        } => {
             assert_eq!(name, "PI");
             assert!(type_ann.is_some());
             assert_eq!(type_ann.as_ref().unwrap(), &Type::F64);
@@ -717,7 +822,11 @@ const Y: i64 = 20;
 X + Y
 "#;
     let result = crate::vm::tests::run_program(source);
-    assert!(result.is_ok(), "const program should compile and run: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "const program should compile and run: {:?}",
+        result.err()
+    );
     assert_eq!(result.unwrap(), Value::Int(30));
 }
 
@@ -733,7 +842,11 @@ X
 "#;
     let result = crate::vm::tests::run_program(source);
     // Const reassignment currently succeeds (no immutability enforcement)
-    assert!(result.is_ok(), "const should compile and run: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "const should compile and run: {:?}",
+        result.err()
+    );
     assert_eq!(result.unwrap(), Value::Int(20));
 }
 
@@ -744,7 +857,12 @@ fn test_type_alias_parses() {
     let program = Parser::new(source, &tokens).parse().unwrap();
     assert_eq!(program.stmts.len(), 1);
     match &program.stmts[0].node {
-        Stmt::Type { name, type_params, alias, .. } => {
+        Stmt::Type {
+            name,
+            type_params,
+            alias,
+            ..
+        } => {
             assert_eq!(name, "MyInt");
             assert!(type_params.is_empty());
             assert_eq!(alias, &Type::I64);
@@ -760,7 +878,9 @@ fn test_type_alias_with_type_params() {
     let program = Parser::new(source, &tokens).parse().unwrap();
     assert_eq!(program.stmts.len(), 1);
     match &program.stmts[0].node {
-        Stmt::Type { name, type_params, .. } => {
+        Stmt::Type {
+            name, type_params, ..
+        } => {
             assert_eq!(name, "Pair");
             assert_eq!(type_params.len(), 2);
             assert_eq!(type_params[0].name, "T");
@@ -778,7 +898,11 @@ let x: MyInt = 42;
 x
 "#;
     let result = crate::vm::tests::run_program(source);
-    assert!(result.is_ok(), "type alias should compile and run: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "type alias should compile and run: {:?}",
+        result.err()
+    );
     assert_eq!(result.unwrap(), Value::Int(42));
 }
 

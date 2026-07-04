@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::value::Value as ZenValue;
 use crate::vm::{DebugStepMode, VM};
-use serde_json::{json, Value as JsonValue};
+use serde_json::{Value as JsonValue, json};
 use std::cell::RefCell;
 use std::io::{self, BufRead, Read, Write};
 use std::path::Path;
@@ -223,7 +223,6 @@ impl DapSession {
             _ => 0,
         }
     }
-
 }
 
 /// Expand a compound value into (name, value) pairs.
@@ -245,7 +244,8 @@ fn expand_value_raw(vm: &VM, val: &ZenValue) -> Vec<(String, ZenValue)> {
         ZenValue::Struct(h, _) => {
             let data = vm.structs.get(*h);
             let names = data.field_names.clone();
-            names.iter()
+            names
+                .iter()
                 .map(|name| {
                     let fv = data.get_field(name).cloned().unwrap_or(ZenValue::Nil);
                     (name.clone(), fv)
@@ -261,7 +261,10 @@ fn expand_value_raw(vm: &VM, val: &ZenValue) -> Vec<(String, ZenValue)> {
 }
 
 /// Evaluate a condition expression for breakpoints.
-fn eval_condition(cond: &str, locals: &[(String, crate::value::Value)]) -> Option<crate::value::Value> {
+fn eval_condition(
+    cond: &str,
+    locals: &[(String, crate::value::Value)],
+) -> Option<crate::value::Value> {
     let trimmed = cond.trim();
     if trimmed.is_empty() {
         return None;
@@ -271,7 +274,7 @@ fn eval_condition(cond: &str, locals: &[(String, crate::value::Value)]) -> Optio
         return Some(val.clone());
     }
     // Binary operators: `a == b`, `a != b`, `a < b`, etc.
-    if let Some(op_pos) = trimmed.find(|c: char| c == '=' || c == '!' || c == '<' || c == '>') {
+    if let Some(op_pos) = trimmed.find(['=', '!', '<', '>']) {
         let lhs = trimmed[..op_pos].trim();
         let mut rest = trimmed[op_pos..].trim_start();
         // Handle ==, !=, <=, >=, <, >
@@ -297,7 +300,8 @@ fn eval_condition(cond: &str, locals: &[(String, crate::value::Value)]) -> Optio
             return None;
         };
         let rhs = rest.trim();
-        if let (Some(lv), Some(rv)) = (eval_simple_term(lhs, locals), eval_simple_term(rhs, locals)) {
+        if let (Some(lv), Some(rv)) = (eval_simple_term(lhs, locals), eval_simple_term(rhs, locals))
+        {
             match op {
                 "==" => Some(crate::value::Value::Bool(lv == rv)),
                 "!=" => Some(crate::value::Value::Bool(lv != rv)),
@@ -329,7 +333,10 @@ fn eval_condition(cond: &str, locals: &[(String, crate::value::Value)]) -> Optio
 }
 
 /// Evaluate a simple term (variable name or numeric literal).
-fn eval_simple_term(term: &str, locals: &[(String, crate::value::Value)]) -> Option<crate::value::Value> {
+fn eval_simple_term(
+    term: &str,
+    locals: &[(String, crate::value::Value)],
+) -> Option<crate::value::Value> {
     if let Ok(i) = term.parse::<i64>() {
         return Some(crate::value::Value::Int(i));
     }
@@ -473,10 +480,10 @@ impl DapSession {
                     for bp in &bps {
                         let line = bp["line"].as_i64().unwrap_or(0) as usize;
                         let count = self.vm.set_source_breakpoint(line);
-                        if let Some(cond) = bp["condition"].as_str() {
-                            if !cond.is_empty() {
-                                self.bp_conditions.insert(line, cond.to_string());
-                            }
+                        if let Some(cond) = bp["condition"].as_str()
+                            && !cond.is_empty()
+                        {
+                            self.bp_conditions.insert(line, cond.to_string());
                         }
                         actual_bps.push(json!({
                             "line": line,
@@ -575,10 +582,12 @@ impl DapSession {
                 }
 
                 "variables" => {
-                    let ref_id = req["arguments"]["variablesReference"].as_i64().unwrap_or(0) as usize;
+                    let ref_id =
+                        req["arguments"]["variablesReference"].as_i64().unwrap_or(0) as usize;
                     let variables: Vec<JsonValue> = if ref_id == 1 {
                         // Top-level locals
-                        self.vm.debug_locals(0)
+                        self.vm
+                            .debug_locals(0)
                             .into_iter()
                             .map(|(name, val)| self.value_to_dap_var(&name, val))
                             .collect()
@@ -593,9 +602,16 @@ impl DapSession {
                                 let type_name = fo.type_name.to_owned();
                                 let registry = &self.vm.foreign_registry;
                                 if let Some(def) = registry.get_by_name(&type_name) {
-                                    let children: Vec<(String, ZenValue)> = def.fields.keys().filter_map(|name| {
-                                        def.fields[name].get(&self.vm, val).ok().map(|fv| (name.clone(), fv))
-                                    }).collect();
+                                    let children: Vec<(String, ZenValue)> = def
+                                        .fields
+                                        .keys()
+                                        .filter_map(|name| {
+                                            def.fields[name]
+                                                .get(&self.vm, val)
+                                                .ok()
+                                                .map(|fv| (name.clone(), fv))
+                                        })
+                                        .collect();
                                     for (name, fv) in children {
                                         vars.push(self.value_to_dap_var(&name, fv));
                                     }
@@ -622,14 +638,17 @@ impl DapSession {
                     let frame_id = req["arguments"]["frameId"].as_i64().unwrap_or(0) as usize;
                     // Simple variable lookup in the specified frame
                     let locals = self.vm.debug_locals(frame_id);
-                    let result = locals.iter().find(|(name, _)| name == expr).map(|(_, val)| {
-                        let var = self.value_to_dap_var(expr, val.clone());
-                        json!({
-                            "result": var["value"],
-                            "type": var["type"],
-                            "variablesReference": var["variablesReference"],
-                        })
-                    });
+                    let result = locals
+                        .iter()
+                        .find(|(name, _)| name == expr)
+                        .map(|(_, val)| {
+                            let var = self.value_to_dap_var(expr, val.clone());
+                            json!({
+                                "result": var["value"],
+                                "type": var["type"],
+                                "variablesReference": var["variablesReference"],
+                            })
+                        });
                     match result {
                         Some(body) => {
                             self.send_response(req_seq, &command, true, Some(body));

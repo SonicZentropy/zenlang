@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::Result;
 use crate::error::Error;
-use crate::value::{ArrayData, MapKey, MapData, Value};
+use crate::value::{ArrayData, MapData, MapKey, Value};
 use crate::vm::{VM, VMContext};
 
 use super::{option_none, option_some};
@@ -20,7 +20,9 @@ fn key_error(v: &Value) -> Error {
 /// `map_new()` — create a new, empty map.
 fn map_new_impl(ctx: &mut VMContext, _args: &[Value]) -> Result<Value> {
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-    let h = vm.maps.insert(MapData { entries: HashMap::new() });
+    let h = vm.maps.insert(MapData {
+        entries: HashMap::new(),
+    });
     Ok(Value::Map(h))
 }
 
@@ -28,9 +30,14 @@ fn map_new_impl(ctx: &mut VMContext, _args: &[Value]) -> Result<Value> {
 fn map_set_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let key_val = args.get(1).unwrap_or(&Value::Nil);
     let key = MapKey::from_value(key_val).ok_or_else(|| key_error(key_val))?;
@@ -44,9 +51,14 @@ fn map_set_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_get_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let key_val = args.get(1).unwrap_or(&Value::Nil);
     let Some(key) = MapKey::from_value(key_val) else {
@@ -63,9 +75,14 @@ fn map_get_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_has_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let key_val = args.get(1).unwrap_or(&Value::Nil);
     let Some(key) = MapKey::from_value(key_val) else {
@@ -79,9 +96,14 @@ fn map_has_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_remove_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let key_val = args.get(1).unwrap_or(&Value::Nil);
     let Some(key) = MapKey::from_value(key_val) else {
@@ -98,12 +120,23 @@ fn map_remove_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_keys_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let vm: &VM = unsafe { &*ctx.raw_vm };
-    let keys: Vec<Value> = vm.maps.get(h).entries.keys().map(|k| k.to_value()).collect();
+    let keys: Vec<Value> = vm
+        .maps
+        .get(h)
+        .entries
+        .keys()
+        .map(|k| k.to_value())
+        .collect();
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
     let arr = vm.arrays.insert(ArrayData { values: keys });
     Ok(Value::Array(arr))
@@ -113,9 +146,14 @@ fn map_keys_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_values_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let vm: &VM = unsafe { &*ctx.raw_vm };
     let values: Vec<Value> = vm.maps.get(h).entries.values().cloned().collect();
@@ -128,9 +166,14 @@ fn map_values_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let vm: &VM = unsafe { &*ctx.raw_vm };
     Ok(Value::Int(vm.maps.get(h).entries.len() as i64))
@@ -140,9 +183,14 @@ fn map_len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn map_clear_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
         Some(Value::Map(h)) => *h,
-        other => return Err(Error::Script {
-            msg: format!("expected a map, got '{}'", other.map(|v| v.type_name()).unwrap_or("nil")),
-        }),
+        other => {
+            return Err(Error::Script {
+                msg: format!(
+                    "expected a map, got '{}'",
+                    other.map(|v| v.type_name()).unwrap_or("nil")
+                ),
+            });
+        }
     };
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
     vm.maps.get_mut(h).entries.clear();

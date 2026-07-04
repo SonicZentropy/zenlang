@@ -7,6 +7,7 @@ use crate::value::{NativeFn, Value};
 use crate::vm::VM;
 
 /// Accessor for a field on a foreign type.
+#[allow(clippy::type_complexity)]
 pub struct FieldAccessor {
     pub get: Rc<dyn Fn(&VM, &Value) -> Result<Value>>,
     pub set: Rc<dyn Fn(&mut VM, &mut Value, Value) -> Result<()>>,
@@ -19,7 +20,10 @@ impl FieldAccessor {
         G: Fn(&VM, &Value) -> Result<Value> + 'static,
         S: Fn(&mut VM, &mut Value, Value) -> Result<()> + 'static,
     {
-        Self { get: Rc::new(getter), set: Rc::new(setter) }
+        Self {
+            get: Rc::new(getter),
+            set: Rc::new(setter),
+        }
     }
 
     pub fn get(&self, vm: &VM, obj: &Value) -> Result<Value> {
@@ -33,7 +37,10 @@ impl FieldAccessor {
 
 impl Clone for FieldAccessor {
     fn clone(&self) -> Self {
-        Self { get: self.get.clone(), set: self.set.clone() }
+        Self {
+            get: self.get.clone(),
+            set: self.set.clone(),
+        }
     }
 }
 
@@ -48,7 +55,11 @@ pub struct ForeignTypeDef {
 impl ForeignTypeDef {
     /// Create a new type definition with the given name.
     pub fn new(name: &'static str) -> Self {
-        Self { name, fields: HashMap::new(), methods: HashMap::new() }
+        Self {
+            name,
+            fields: HashMap::new(),
+            methods: HashMap::new(),
+        }
     }
 
     /// Register a named field with getter and setter closures.
@@ -57,7 +68,8 @@ impl ForeignTypeDef {
         G: Fn(&VM, &Value) -> Result<Value> + 'static,
         S: Fn(&mut VM, &mut Value, Value) -> Result<()> + 'static,
     {
-        self.fields.insert(name.to_string(), FieldAccessor::new(getter, setter));
+        self.fields
+            .insert(name.to_string(), FieldAccessor::new(getter, setter));
         self
     }
 
@@ -74,9 +86,17 @@ pub struct ForeignTypeRegistry {
     types: HashMap<TypeId, ForeignTypeDef>,
 }
 
+impl Default for ForeignTypeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ForeignTypeRegistry {
     pub fn new() -> Self {
-        Self { types: HashMap::new() }
+        Self {
+            types: HashMap::new(),
+        }
     }
 
     /// Register a foreign type with an explicit TypeId.
@@ -107,16 +127,22 @@ impl ForeignTypeRegistry {
         ctx: &mut crate::vm::VMContext,
         args: &[Value],
     ) -> Option<Result<Value>> {
-        self.types.get(type_id).and_then(|def| {
-            def.methods.get(method).map(|f| f(ctx, args))
-        })
+        self.types
+            .get(type_id)
+            .and_then(|def| def.methods.get(method).map(|f| f(ctx, args)))
     }
 
     /// Look up and get a field value from a foreign type.
-    pub fn get_field(&self, vm: &VM, type_id: &TypeId, field: &str, obj: &Value) -> Option<Result<Value>> {
-        self.types.get(type_id).and_then(|def| {
-            def.fields.get(field).map(|accessor| accessor.get(vm, obj))
-        })
+    pub fn get_field(
+        &self,
+        vm: &VM,
+        type_id: &TypeId,
+        field: &str,
+        obj: &Value,
+    ) -> Option<Result<Value>> {
+        self.types
+            .get(type_id)
+            .and_then(|def| def.fields.get(field).map(|accessor| accessor.get(vm, obj)))
     }
 
     /// Look up and set a field value on a foreign type.
@@ -129,7 +155,9 @@ impl ForeignTypeRegistry {
         val: Value,
     ) -> Option<Result<()>> {
         self.types.get(type_id).and_then(|def| {
-            def.fields.get(field).map(|accessor| accessor.set(vm, obj, val))
+            def.fields
+                .get(field)
+                .map(|accessor| accessor.set(vm, obj, val))
         })
     }
 }
@@ -143,12 +171,16 @@ where
     match val {
         Value::Foreign(h) => {
             let fo = vm.foreigns.get(*h);
-            let inner: &T = fo.downcast::<T>().ok_or_else(|| {
-                crate::error::Error::Runtime {
-                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), fo.type_name),
+            let inner: &T = fo
+                .downcast::<T>()
+                .ok_or_else(|| crate::error::Error::Runtime {
+                    msg: format!(
+                        "type mismatch: expected {}, got {}",
+                        std::any::type_name::<T>(),
+                        fo.type_name
+                    ),
                     stack_trace: Vec::new(),
-                }
-            })?;
+                })?;
             f(inner)
         }
         _ => Err(crate::error::Error::Runtime {
@@ -173,7 +205,11 @@ where
             let type_name = vm.foreigns.get(*h).type_name;
             let inner: &mut T = vm.foreigns.get_mut(*h).downcast_mut::<T>().ok_or_else(|| {
                 crate::error::Error::Runtime {
-                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), type_name),
+                    msg: format!(
+                        "type mismatch: expected {}, got {}",
+                        std::any::type_name::<T>(),
+                        type_name
+                    ),
                     stack_trace: Vec::new(),
                 }
             })?;
@@ -198,7 +234,11 @@ where
             let type_name = vm.foreigns.get(*h).type_name;
             let inner: &mut T = vm.foreigns.get_mut(*h).downcast_mut::<T>().ok_or_else(|| {
                 crate::error::Error::Runtime {
-                    msg: format!("type mismatch: expected {}, got {}", std::any::type_name::<T>(), type_name),
+                    msg: format!(
+                        "type mismatch: expected {}, got {}",
+                        std::any::type_name::<T>(),
+                        type_name
+                    ),
                     stack_trace: Vec::new(),
                 }
             })?;

@@ -40,7 +40,7 @@ pub fn resolve_modules_with_paths(
 }
 
 fn resolve_stmts(
-    stmts: &mut Vec<Spanned<Stmt>>,
+    stmts: &mut [Spanned<Stmt>],
     parent_dir: &Path,
     loaded: &mut HashSet<String>,
     loaded_paths: &mut Vec<PathBuf>,

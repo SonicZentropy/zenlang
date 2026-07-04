@@ -1,4 +1,5 @@
 #![allow(deprecated)]
+#![allow(clippy::mutable_key_type)]
 
 use std::collections::HashMap;
 
@@ -105,8 +106,14 @@ fn error_to_diagnostics(source: &str, err: &Error) -> Vec<Diagnostic> {
         Error::ModResolution { module, source } => {
             return vec![Diagnostic {
                 range: Range {
-                    start: Position { line: 0, character: 0 },
-                    end: Position { line: 0, character: 0 },
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
                 message: format!("error loading module '{}': {}", module, source),
@@ -494,18 +501,18 @@ fn handle_notification(
                         diags.len()
                     );
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&source, &tokens).parse()
-                    {
-                        let mut p = parser;
-                        let native_names = crate::stdlib::native_names();
-                        let mut s = resolver::resolve_with_natives(&mut p, &native_names)
-                            .ok()
-                            .unwrap_or_else(SymbolTable::new);
-                        let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
-                        (p, s, t)
-                    } else {
-                        (Program::new(), SymbolTable::new(), TypeMap::new())
-                    };
+                    let (program, symbols, types) =
+                        if let Ok(parser) = Parser::new(&source, &tokens).parse() {
+                            let mut p = parser;
+                            let native_names = crate::stdlib::native_names();
+                            let mut s = resolver::resolve_with_natives(&mut p, &native_names)
+                                .ok()
+                                .unwrap_or_default();
+                            let t = typeck::check(&p, &mut s).ok().unwrap_or_default();
+                            (p, s, t)
+                        } else {
+                            (Program::new(), SymbolTable::new(), TypeMap::new())
+                        };
                     docs.insert(
                         uri_clone.clone(),
                         DocumentState {
@@ -579,18 +586,18 @@ fn handle_notification(
                     );
                     // If we can parse, salvage partial state for semantic tokens etc.
                     let tokens = Lexer::new(&source).tokenize().ok().unwrap_or_default();
-                    let (program, symbols, types) = if let Ok(parser) = Parser::new(&source, &tokens).parse()
-                    {
-                        let mut p = parser;
-                        let native_names = crate::stdlib::native_names();
-                        let mut s = resolver::resolve_with_natives(&mut p, &native_names)
-                            .ok()
-                            .unwrap_or_else(SymbolTable::new);
-                        let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
-                        (p, s, t)
-                    } else {
-                        (Program::new(), SymbolTable::new(), TypeMap::new())
-                    };
+                    let (program, symbols, types) =
+                        if let Ok(parser) = Parser::new(&source, &tokens).parse() {
+                            let mut p = parser;
+                            let native_names = crate::stdlib::native_names();
+                            let mut s = resolver::resolve_with_natives(&mut p, &native_names)
+                                .ok()
+                                .unwrap_or_default();
+                            let t = typeck::check(&p, &mut s).ok().unwrap_or_default();
+                            (p, s, t)
+                        } else {
+                            (Program::new(), SymbolTable::new(), TypeMap::new())
+                        };
                     docs.insert(
                         uri_clone.clone(),
                         DocumentState {
@@ -627,8 +634,8 @@ fn handle_notification(
                                 let native_names = crate::stdlib::native_names();
                                 let mut s = resolver::resolve_with_natives(&mut p, &native_names)
                                     .ok()
-                                    .unwrap_or_else(SymbolTable::new);
-                                let t = typeck::check(&p, &mut s).ok().unwrap_or_else(TypeMap::new);
+                                    .unwrap_or_default();
+                                let t = typeck::check(&p, &mut s).ok().unwrap_or_default();
                                 (p, s, t)
                             } else {
                                 (Program::new(), SymbolTable::new(), TypeMap::new())
@@ -729,11 +736,11 @@ fn hover(state: &DocumentState, pos: &Position) -> Option<Hover> {
         .map(|s| s.span);
 
     let mut text = String::new();
-    if let Some(span) = def_span {
-        if let Some(c) = comment_before(&state.source, span.start()) {
-            text.push_str(&c);
-            text.push_str("\n\n");
-        }
+    if let Some(span) = def_span
+        && let Some(c) = comment_before(&state.source, span.start())
+    {
+        text.push_str(&c);
+        text.push_str("\n\n");
     }
     text.push_str(&format!("`{}`: {}", name, symkind_display(kind)));
     Some(Hover {
@@ -808,8 +815,7 @@ fn goto_definition(
     let state = docs.get(uri)?;
     let offset = position_to_offset(&state.source, params.position)?;
     let source = state.source.as_bytes();
-    if offset >= source.len()
-        || !(source[offset].is_ascii_alphanumeric() || source[offset] == b'_')
+    if offset >= source.len() || !(source[offset].is_ascii_alphanumeric() || source[offset] == b'_')
     {
         return None;
     }
@@ -838,11 +844,7 @@ fn goto_definition(
 }
 
 /// Recursively search statements for a definition of `name`.
-fn find_definition_in_stmts(
-    stmts: &[Spanned<Stmt>],
-    source: &str,
-    name: &str,
-) -> Option<Span> {
+fn find_definition_in_stmts(stmts: &[Spanned<Stmt>], source: &str, name: &str) -> Option<Span> {
     for stmt in stmts {
         if let Some(span) = find_definition_in_stmt(stmt, source, name) {
             return Some(span);
@@ -851,28 +853,33 @@ fn find_definition_in_stmts(
     None
 }
 
-fn find_definition_in_stmt(
-    stmt: &Spanned<Stmt>,
-    source: &str,
-    name: &str,
-) -> Option<Span> {
+fn find_definition_in_stmt(stmt: &Spanned<Stmt>, source: &str, name: &str) -> Option<Span> {
     match &stmt.node {
-        Stmt::Fn { name: fn_name, params, body, .. } => {
+        Stmt::Fn {
+            name: fn_name,
+            params,
+            body,
+            ..
+        } => {
             if fn_name.as_str() == name {
-                return Some(name_span_in_source(source, stmt.span, name)?);
+                return name_span_in_source(source, stmt.span, name);
             }
             // Check params
             for param in params {
                 if param.name.as_str() == name {
-                    return Some(name_span_in_source(source, stmt.span, name)?);
+                    return name_span_in_source(source, stmt.span, name);
                 }
             }
             // Check body statements
             find_definition_in_stmts(body, source, name)
         }
-        Stmt::Let { name: let_name, init, .. } => {
+        Stmt::Let {
+            name: let_name,
+            init,
+            ..
+        } => {
             if let_name.as_str() == name {
-                return Some(name_span_in_source(source, stmt.span, name)?);
+                return name_span_in_source(source, stmt.span, name);
             }
             if let Some(init_expr) = init {
                 find_definition_in_expr(init_expr, source, name)
@@ -880,16 +887,24 @@ fn find_definition_in_stmt(
                 None
             }
         }
-        Stmt::Const { name: const_name, init, .. } => {
+        Stmt::Const {
+            name: const_name,
+            init,
+            ..
+        } => {
             if const_name.as_str() == name {
-                return Some(name_span_in_source(source, stmt.span, name)?);
+                return name_span_in_source(source, stmt.span, name);
             }
             find_definition_in_expr(init, source, name)
         }
-        Stmt::Struct { name: struct_name, .. }
-        | Stmt::Enum { name: struct_name, .. } => {
+        Stmt::Struct {
+            name: struct_name, ..
+        }
+        | Stmt::Enum {
+            name: struct_name, ..
+        } => {
             if struct_name.as_str() == name {
-                return Some(name_span_in_source(source, stmt.span, name)?);
+                return name_span_in_source(source, stmt.span, name);
             }
             None
         }
@@ -901,9 +916,13 @@ fn find_definition_in_stmt(
             }
             None
         }
-        Stmt::Trait { name: trait_name, methods, .. } => {
+        Stmt::Trait {
+            name: trait_name,
+            methods,
+            ..
+        } => {
             if trait_name.as_str() == name {
-                return Some(name_span_in_source(source, stmt.span, name)?);
+                return name_span_in_source(source, stmt.span, name);
             }
             for method in methods {
                 if let Some(span) = find_definition_in_stmt(method, source, name) {
@@ -916,9 +935,11 @@ fn find_definition_in_stmt(
         Stmt::Return(Some(expr)) => find_definition_in_expr(expr, source, name),
         Stmt::Return(None) => None,
         Stmt::Use { .. } => None,
-        Stmt::Type { name: type_name, .. } => {
+        Stmt::Type {
+            name: type_name, ..
+        } => {
             if type_name.as_str() == name {
-                return Some(name_span_in_source(source, stmt.span, name)?);
+                return name_span_in_source(source, stmt.span, name);
             }
             None
         }
@@ -929,29 +950,32 @@ fn find_definition_in_stmt(
 fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span> {
     match expr {
         Expr::Block(stmts) => find_definition_in_stmts(stmts, source, name),
-        Expr::Lambda { params: _, body, .. } => {
-            find_definition_in_expr(body, source, name)
-        }
+        Expr::Lambda {
+            params: _, body, ..
+        } => find_definition_in_expr(body, source, name),
         Expr::For { iter, body, .. } => {
             // for-var definitions don't have individual spans, skip
             find_definition_in_expr(iter, source, name)
                 .or_else(|| find_definition_in_expr(body, source, name))
         }
-        Expr::Match { expr: match_expr, arms } => {
+        Expr::Match {
+            expr: match_expr,
+            arms,
+        } => {
             // Check match expr
             if let Some(span) = find_definition_in_expr(match_expr, source, name) {
                 return Some(span);
             }
             for arm in arms {
-                if let Pattern::Ident(pat_name) = &arm.pattern {
-                    if pat_name.as_str() == name {
-                        // pattern identifiers don't have spans; skip
-                    }
+                if let Pattern::Ident(pat_name) = &arm.pattern
+                    && pat_name.as_str() == name
+                {
+                    // pattern identifiers don't have spans; skip
                 }
-                if let Some(guard) = &arm.guard {
-                    if let Some(span) = find_definition_in_expr(guard, source, name) {
-                        return Some(span);
-                    }
+                if let Some(guard) = &arm.guard
+                    && let Some(span) = find_definition_in_expr(guard, source, name)
+                {
+                    return Some(span);
                 }
                 if let Some(span) = find_definition_in_expr(&arm.body, source, name) {
                     return Some(span);
@@ -959,14 +983,13 @@ fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span
             }
             None
         }
-        Expr::If { cond, then, else_ } => {
-            find_definition_in_expr(cond, source, name)
-                .or_else(|| find_definition_in_expr(then, source, name))
-                .or_else(|| {
-                    else_.as_ref()
-                        .and_then(|e| find_definition_in_expr(e, source, name))
-                })
-        }
+        Expr::If { cond, then, else_ } => find_definition_in_expr(cond, source, name)
+            .or_else(|| find_definition_in_expr(then, source, name))
+            .or_else(|| {
+                else_
+                    .as_ref()
+                    .and_then(|e| find_definition_in_expr(e, source, name))
+            }),
         Expr::While { cond, body } => find_definition_in_expr(cond, source, name)
             .or_else(|| find_definition_in_expr(body, source, name)),
         Expr::Loop(body) => find_definition_in_expr(body, source, name),
@@ -1002,10 +1025,10 @@ fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span
                     return Some(span);
                 }
             }
-            if let Some(spread_expr) = spread {
-                if let Some(span) = find_definition_in_expr(spread_expr, source, name) {
-                    return Some(span);
-                }
+            if let Some(spread_expr) = spread
+                && let Some(span) = find_definition_in_expr(spread_expr, source, name)
+            {
+                return Some(span);
             }
             None
         }
@@ -1030,8 +1053,14 @@ fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span
             None
         }
         // Literals and control-flow keywords have no sub-definitions
-        Expr::Int(_) | Expr::Float(_) | Expr::Str(_) | Expr::Bool(_)
-        | Expr::Unit | Expr::Ident(_) | Expr::Break | Expr::Continue
+        Expr::Int(_)
+        | Expr::Float(_)
+        | Expr::Str(_)
+        | Expr::Bool(_)
+        | Expr::Unit
+        | Expr::Ident(_)
+        | Expr::Break
+        | Expr::Continue
         | Expr::Return(None) => None,
     }
 }
@@ -1050,8 +1079,8 @@ fn name_span_in_source(source: &str, hint_span: Span, name: &str) -> Option<Span
             // Check word boundaries
             let before = abs_pos.saturating_sub(1);
             let after = abs_pos + name.len();
-            let prev_ok = before < search_start
-                || !source.as_bytes()[before].is_ascii_alphanumeric();
+            let prev_ok =
+                before < search_start || !source.as_bytes()[before].is_ascii_alphanumeric();
             let next_ok = after >= search_end
                 || after >= source.len()
                 || !source.as_bytes()[after].is_ascii_alphanumeric();
@@ -1064,7 +1093,10 @@ fn name_span_in_source(source: &str, hint_span: Span, name: &str) -> Option<Span
         }
     }
     // Fallback: just use the hint span
-    Some(Span(hint_span.0, hint_span.0 + name.len().min(hint_span.1 - hint_span.0)))
+    Some(Span(
+        hint_span.0,
+        hint_span.0 + name.len().min(hint_span.1 - hint_span.0),
+    ))
 }
 
 fn document_symbols(state: &DocumentState) -> Option<Vec<DocumentSymbol>> {
@@ -1109,7 +1141,7 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
                 .iter()
                 .map(|f| DocumentSymbol {
                     name: f.name.to_string(),
-                    detail: Some(format!("{}", type_display(&f.type_ann))),
+                    detail: Some(type_display(&f.type_ann).to_string()),
                     kind: SymbolKind::FIELD,
                     range,
                     selection_range: range,
@@ -1158,10 +1190,19 @@ fn stmt_to_document_symbol(stmt: &Spanned<Stmt>, source: &str) -> Option<Documen
             let children = methods
                 .iter()
                 .filter_map(|m| {
-                    if let Stmt::Fn { name: fn_name, params, .. } = &m.node {
+                    if let Stmt::Fn {
+                        name: fn_name,
+                        params,
+                        ..
+                    } = &m.node
+                    {
                         let detail = Some(format!(
                             "fn({})",
-                            params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+                            params
+                                .iter()
+                                .map(|p| p.name.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
                         ));
                         Some(DocumentSymbol {
                             name: fn_name.to_string(),
@@ -1295,14 +1336,30 @@ fn emit_expr_semantic_tokens(
         }
         let tok = &spanned.node;
         let token_type = match &tok.kind {
-            TokenKind::Fn | TokenKind::Let | TokenKind::Mut | TokenKind::If
-            | TokenKind::Else | TokenKind::While | TokenKind::For
-            | TokenKind::Loop | TokenKind::Break | TokenKind::Continue
-            | TokenKind::Return | TokenKind::Match | TokenKind::In
-            | TokenKind::Struct | TokenKind::Enum | TokenKind::Impl
-            | TokenKind::Trait | TokenKind::Self_ | TokenKind::Pub
-            | TokenKind::Use | TokenKind::Mod | TokenKind::Const
-            | TokenKind::Type | TokenKind::Underscore => SemanticTokenType::KEYWORD,
+            TokenKind::Fn
+            | TokenKind::Let
+            | TokenKind::Mut
+            | TokenKind::If
+            | TokenKind::Else
+            | TokenKind::While
+            | TokenKind::For
+            | TokenKind::Loop
+            | TokenKind::Break
+            | TokenKind::Continue
+            | TokenKind::Return
+            | TokenKind::Match
+            | TokenKind::In
+            | TokenKind::Struct
+            | TokenKind::Enum
+            | TokenKind::Impl
+            | TokenKind::Trait
+            | TokenKind::Self_
+            | TokenKind::Pub
+            | TokenKind::Use
+            | TokenKind::Mod
+            | TokenKind::Const
+            | TokenKind::Type
+            | TokenKind::Underscore => SemanticTokenType::KEYWORD,
             // Skip nested strings inside interpolation (unusual but safe)
             TokenKind::Str(_) => continue,
             TokenKind::Int(_) | TokenKind::Float(_) => SemanticTokenType::NUMBER,
@@ -1327,7 +1384,15 @@ fn emit_expr_semantic_tokens(
             }
             _ => continue,
         };
-        push_semantic_token(tokens, prev_line, prev_col, source, start + span_start, span_len, token_type);
+        push_semantic_token(
+            tokens,
+            prev_line,
+            prev_col,
+            source,
+            start + span_start,
+            span_len,
+            token_type,
+        );
     }
 }
 
@@ -1355,7 +1420,10 @@ fn emit_interpolated_string_tokens(
 
     while pos < len {
         // Skip \{ and \} escape sequences
-        if bytes[pos] == b'\\' && pos + 1 < len && (bytes[pos + 1] == b'{' || bytes[pos + 1] == b'}') {
+        if bytes[pos] == b'\\'
+            && pos + 1 < len
+            && (bytes[pos + 1] == b'{' || bytes[pos + 1] == b'}')
+        {
             pos += 2;
             continue;
         }
@@ -1371,7 +1439,15 @@ fn emit_interpolated_string_tokens(
         if bytes[pos] == b'{' {
             // Emit literal text before this interpolation
             if text_start < pos {
-                push_semantic_token(tokens, prev_line, prev_col, source, inner_start + text_start, pos - text_start, SemanticTokenType::STRING);
+                push_semantic_token(
+                    tokens,
+                    prev_line,
+                    prev_col,
+                    source,
+                    inner_start + text_start,
+                    pos - text_start,
+                    SemanticTokenType::STRING,
+                );
             }
             pos += 1;
             let expr_byte_start = pos;
@@ -1382,10 +1458,16 @@ fn emit_interpolated_string_tokens(
                     continue;
                 }
                 if bytes[pos] == b'{' {
-                    if pos + 1 < len && bytes[pos + 1] == b'{' { pos += 2; continue; }
+                    if pos + 1 < len && bytes[pos + 1] == b'{' {
+                        pos += 2;
+                        continue;
+                    }
                     depth += 1;
                 } else if bytes[pos] == b'}' {
-                    if pos + 1 < len && bytes[pos + 1] == b'}' { pos += 2; continue; }
+                    if pos + 1 < len && bytes[pos + 1] == b'}' {
+                        pos += 2;
+                        continue;
+                    }
                     depth -= 1;
                     if depth == 0 {
                         pos += 1;
@@ -1398,10 +1480,26 @@ fn emit_interpolated_string_tokens(
             // Emit expression tokens (between { and })
             let expr_len = pos - 1 - expr_byte_start;
             if depth == 0 && expr_len > 0 {
-                emit_expr_semantic_tokens(tokens, prev_line, prev_col, source, inner_start + expr_byte_start, expr_len, &state.symbols);
+                emit_expr_semantic_tokens(
+                    tokens,
+                    prev_line,
+                    prev_col,
+                    source,
+                    inner_start + expr_byte_start,
+                    expr_len,
+                    &state.symbols,
+                );
             } else {
                 // Unterminated or empty — treat remaining as literal text
-                push_semantic_token(tokens, prev_line, prev_col, source, inner_start + text_start, len - text_start, SemanticTokenType::STRING);
+                push_semantic_token(
+                    tokens,
+                    prev_line,
+                    prev_col,
+                    source,
+                    inner_start + text_start,
+                    len - text_start,
+                    SemanticTokenType::STRING,
+                );
             }
             text_start = pos;
         } else {
@@ -1409,7 +1507,15 @@ fn emit_interpolated_string_tokens(
         }
     }
     if text_start < len {
-        push_semantic_token(tokens, prev_line, prev_col, source, inner_start + text_start, len - text_start, SemanticTokenType::STRING);
+        push_semantic_token(
+            tokens,
+            prev_line,
+            prev_col,
+            source,
+            inner_start + text_start,
+            len - text_start,
+            SemanticTokenType::STRING,
+        );
     }
 }
 
@@ -1454,7 +1560,13 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
             | TokenKind::Underscore => SemanticTokenType::KEYWORD,
             TokenKind::Str(_) => {
                 if raw_string_is_interpolated(&state.source, spanned.span) {
-                    emit_interpolated_string_tokens(state, &mut tokens, &mut prev_line, &mut prev_col, spanned.span);
+                    emit_interpolated_string_tokens(
+                        state,
+                        &mut tokens,
+                        &mut prev_line,
+                        &mut prev_col,
+                        spanned.span,
+                    );
                     continue;
                 }
                 SemanticTokenType::STRING
@@ -1467,7 +1579,13 @@ fn semantic_tokens(state: &DocumentState) -> Option<SemanticTokensResult> {
                     match &entry.kind {
                         SymKind::Function(_) => SemanticTokenType::FUNCTION,
                         SymKind::Variable(_) => SemanticTokenType::VARIABLE,
-                        SymKind::Struct(_) | SymKind::Enum(_) | SymKind::EnumConstructor { .. } | SymKind::TypeParam(_) | SymKind::Module(_) | SymKind::Trait(_) | SymKind::TypeAlias { .. } => SemanticTokenType::TYPE,
+                        SymKind::Struct(_)
+                        | SymKind::Enum(_)
+                        | SymKind::EnumConstructor { .. }
+                        | SymKind::TypeParam(_)
+                        | SymKind::Module(_)
+                        | SymKind::Trait(_)
+                        | SymKind::TypeAlias { .. } => SemanticTokenType::TYPE,
                     }
                 } else {
                     SemanticTokenType::VARIABLE
@@ -1579,7 +1697,7 @@ fn symkind_display(kind: &SymKind) -> String {
                 params.join(", "),
                 sig.return_type
                     .as_ref()
-                    .map(|t| type_display(t))
+                    .map(type_display)
                     .unwrap_or_else(|| "?".to_string())
             )
         }
@@ -1600,14 +1718,30 @@ fn symkind_display(kind: &SymKind) -> String {
                 .join(", ")
         ),
         SymKind::Module(_) => "module".to_string(),
-        SymKind::Trait(def) => format!("trait {{ {} }}", def.method_sigs.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", ")),
-        SymKind::EnumConstructor { enum_name, variant_name, tag: _, fields } => {
+        SymKind::Trait(def) => format!(
+            "trait {{ {} }}",
+            def.method_sigs
+                .iter()
+                .map(|m| m.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        SymKind::EnumConstructor {
+            enum_name,
+            variant_name,
+            tag: _,
+            fields,
+        } => {
             let fields_str = if fields.is_empty() {
                 String::new()
             } else {
                 format!(
                     "({})",
-                    fields.iter().map(|t| type_display(t)).collect::<Vec<_>>().join(", ")
+                    fields
+                        .iter()
+                        .map(type_display)
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 )
             };
             format!("{}{} (enum {})", variant_name, fields_str, enum_name)
@@ -1636,7 +1770,9 @@ fn type_display(ty: &crate::ast::Type) -> String {
             format!("fn({}) -> {}", ps.join(", "), type_display(ret))
         }
         crate::ast::Type::Option(inner) => format!("Option<{}>", type_display(inner)),
-        crate::ast::Type::Result(ok, err) => format!("Result<{}, {}>", type_display(ok), type_display(err)),
+        crate::ast::Type::Result(ok, err) => {
+            format!("Result<{}, {}>", type_display(ok), type_display(err))
+        }
     }
 }
 
@@ -1653,7 +1789,11 @@ mod tests {
                 assert!(
                     diags.iter().any(|d| d.message.contains(substr)),
                     "expected diagnostic containing '{substr}', got: {}",
-                    diags.iter().map(|d| d.message.as_str()).collect::<Vec<_>>().join("; ")
+                    diags
+                        .iter()
+                        .map(|d| d.message.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ")
                 );
             }
         }
@@ -1683,27 +1823,126 @@ mod tests {
     #[test]
     fn test_offset_to_position() {
         let src = "hello\nworld\nfoo";
-        assert_eq!(offset_to_position(src, 0), Position { line: 0, character: 0 });
-        assert_eq!(offset_to_position(src, 5), Position { line: 0, character: 5 });
-        assert_eq!(offset_to_position(src, 6), Position { line: 1, character: 0 });
-        assert_eq!(offset_to_position(src, 11), Position { line: 1, character: 5 });
-        assert_eq!(offset_to_position(src, 16), Position { line: 2, character: 3 });
-        assert_eq!(offset_to_position(src, src.len()), Position { line: 2, character: 3 });
+        assert_eq!(
+            offset_to_position(src, 0),
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
+        assert_eq!(
+            offset_to_position(src, 5),
+            Position {
+                line: 0,
+                character: 5
+            }
+        );
+        assert_eq!(
+            offset_to_position(src, 6),
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
+        assert_eq!(
+            offset_to_position(src, 11),
+            Position {
+                line: 1,
+                character: 5
+            }
+        );
+        assert_eq!(
+            offset_to_position(src, 16),
+            Position {
+                line: 2,
+                character: 3
+            }
+        );
+        assert_eq!(
+            offset_to_position(src, src.len()),
+            Position {
+                line: 2,
+                character: 3
+            }
+        );
     }
 
     #[test]
     fn test_position_to_offset() {
         let src = "hello\nworld\nfoo";
-        assert_eq!(position_to_offset(src, Position { line: 0, character: 0 }), Some(0));
-        assert_eq!(position_to_offset(src, Position { line: 0, character: 5 }), Some(5));
-        assert_eq!(position_to_offset(src, Position { line: 1, character: 0 }), Some(6));
-        assert_eq!(position_to_offset(src, Position { line: 1, character: 5 }), Some(11));
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 0,
+                    character: 0
+                }
+            ),
+            Some(0)
+        );
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 0,
+                    character: 5
+                }
+            ),
+            Some(5)
+        );
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 1,
+                    character: 0
+                }
+            ),
+            Some(6)
+        );
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 1,
+                    character: 5
+                }
+            ),
+            Some(11)
+        );
         // Character 3 of line "foo" (past last char) = EOF = source.len()
-        assert_eq!(position_to_offset(src, Position { line: 2, character: 3 }), Some(15));
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 2,
+                    character: 3
+                }
+            ),
+            Some(15)
+        );
         // OOB character
-        assert_eq!(position_to_offset(src, Position { line: 2, character: 4 }), None);
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 2,
+                    character: 4
+                }
+            ),
+            None
+        );
         // OOB line
-        assert_eq!(position_to_offset(src, Position { line: 10, character: 0 }), None);
+        assert_eq!(
+            position_to_offset(
+                src,
+                Position {
+                    line: 10,
+                    character: 0
+                }
+            ),
+            None
+        );
     }
 
     #[test]
@@ -1712,8 +1951,20 @@ mod tests {
         let src = "hello world";
         // A span covering bytes 6..11 = "world"
         let range = span_to_range(src, Span(6, 11));
-        assert_eq!(range.start, Position { line: 0, character: 6 });
-        assert_eq!(range.end, Position { line: 0, character: 11 });
+        assert_eq!(
+            range.start,
+            Position {
+                line: 0,
+                character: 6
+            }
+        );
+        assert_eq!(
+            range.end,
+            Position {
+                line: 0,
+                character: 11
+            }
+        );
     }
 
     #[test]
@@ -1743,8 +1994,14 @@ mod tests {
         assert!(!list.is_empty());
         // Should contain at least function and struct symbols
         let names: Vec<&str> = list.iter().map(|s| s.name.as_str()).collect();
-        assert!(names.contains(&"foo"), "expected 'foo' in symbols, got: {names:?}");
-        assert!(names.contains(&"Bar"), "expected 'Bar' in symbols, got: {names:?}");
+        assert!(
+            names.contains(&"foo"),
+            "expected 'foo' in symbols, got: {names:?}"
+        );
+        assert!(
+            names.contains(&"Bar"),
+            "expected 'Bar' in symbols, got: {names:?}"
+        );
     }
 
     #[test]
@@ -1752,14 +2009,23 @@ mod tests {
         let src = "fn adder(a: int, b: int) -> int { a + b }";
         let state = compile_source(src).expect("compilation failed");
         // Hover over "adder" at line 0, char 3
-        let hover = hover(&state, &Position { line: 0, character: 3 });
+        let hover = hover(
+            &state,
+            &Position {
+                line: 0,
+                character: 3,
+            },
+        );
         assert!(hover.is_some(), "expected hover result for 'adder'");
         let h = hover.unwrap();
         let contents_str = match &h.contents {
             HoverContents::Scalar(MarkedString::String(s)) => s.as_str(),
             _ => panic!("expected Scalar(String) hover contents"),
         };
-        assert!(contents_str.contains("adder"), "hover should mention 'adder'");
+        assert!(
+            contents_str.contains("adder"),
+            "hover should mention 'adder'"
+        );
     }
 
     #[test]
@@ -1771,10 +2037,16 @@ mod tests {
         docs.insert(uri.clone(), state);
 
         // Go to definition of 'x' at its usage on line 1, char 8 (the 'x' in "let y = x;")
-        let result = goto_definition(&docs, &TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: uri.clone() },
-            position: Position { line: 1, character: 8 },
-        });
+        let result = goto_definition(
+            &docs,
+            &TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: Position {
+                    line: 1,
+                    character: 8,
+                },
+            },
+        );
         assert!(result.is_some(), "expected a definition location for 'x'");
         let loc = match result.unwrap() {
             GotoDefinitionResponse::Scalar(loc) => loc,
@@ -1789,7 +2061,13 @@ mod tests {
     fn test_completion() {
         let src = "fn main() {}";
         let state = compile_source(src).expect("compilation failed");
-        let result = completion(&state, &Position { line: 1, character: 0 });
+        let result = completion(
+            &state,
+            &Position {
+                line: 1,
+                character: 0,
+            },
+        );
         assert!(result.is_some(), "expected completion items");
         let items = match result.unwrap() {
             CompletionResponse::Array(items) => items,

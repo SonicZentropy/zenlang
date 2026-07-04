@@ -24,7 +24,11 @@ impl zed::Extension for ZenlangExtension {
 impl ZenlangExtension {
     fn lsp_path(&self, worktree: &zed::Worktree) -> String {
         let root = worktree.root_path();
-        let exe = if zed::current_platform().0 == Os::Windows { "zenc.exe" } else { "zenc" };
+        let exe = if zed::current_platform().0 == Os::Windows {
+            "zenc.exe"
+        } else {
+            "zenc"
+        };
         format!("{root}/target/debug/{exe}")
     }
 }

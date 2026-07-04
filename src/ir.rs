@@ -165,13 +165,23 @@ impl Opcode {
 
     pub fn operand_count(&self) -> usize {
         match self {
-            Opcode::LoadConst(_) | Opcode::LoadLocal(_) | Opcode::StoreLocal(_)
-            | Opcode::LoadGlobal(_) | Opcode::StoreGlobal(_)
-            | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
-            | Opcode::Call(_) | Opcode::MakeArray(_)
-            | Opcode::LoadField(_) | Opcode::StoreField(_)
+            Opcode::LoadConst(_)
+            | Opcode::LoadLocal(_)
+            | Opcode::StoreLocal(_)
+            | Opcode::LoadGlobal(_)
+            | Opcode::StoreGlobal(_)
+            | Opcode::Jump(_)
+            | Opcode::JumpIfFalse(_)
+            | Opcode::Loop(_)
+            | Opcode::Call(_)
+            | Opcode::MakeArray(_)
+            | Opcode::LoadField(_)
+            | Opcode::StoreField(_)
             | Opcode::LoadEnumField(_) => 1,
-            Opcode::NewClosure(_, _) | Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::MakeStruct(_, _) => 2,
+            Opcode::NewClosure(_, _)
+            | Opcode::MakeEnum(_, _)
+            | Opcode::CallMethod(_, _)
+            | Opcode::MakeStruct(_, _) => 2,
             Opcode::MakeRange => 0,
             _ => 0,
         }
@@ -190,9 +200,22 @@ pub struct Chunk {
     pub lines: Vec<usize>,
 }
 
+impl Default for Chunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Chunk {
     pub fn new() -> Self {
-        Self { code: Vec::new(), constants: Vec::new(), locals: 0, field_names: Vec::new(), method_names: Vec::new(), lines: Vec::new() }
+        Self {
+            code: Vec::new(),
+            constants: Vec::new(),
+            locals: 0,
+            field_names: Vec::new(),
+            method_names: Vec::new(),
+            lines: Vec::new(),
+        }
     }
 
     pub fn add_constant(&mut self, val: Value) -> u16 {
@@ -237,18 +260,45 @@ impl Chunk {
     pub fn emit_op(&mut self, op: Opcode, line: usize) {
         self.emit_byte(op.to_byte(), line);
         match op {
-            Opcode::LoadConst(v) | Opcode::LoadLocal(v) | Opcode::StoreLocal(v)
-            | Opcode::LoadGlobal(v) | Opcode::StoreGlobal(v)
-            | Opcode::Jump(v) | Opcode::JumpIfFalse(v) | Opcode::Loop(v)
-            | Opcode::Call(v) | Opcode::MakeArray(v)
-            | Opcode::LoadField(v) | Opcode::StoreField(v)
+            Opcode::LoadConst(v)
+            | Opcode::LoadLocal(v)
+            | Opcode::StoreLocal(v)
+            | Opcode::LoadGlobal(v)
+            | Opcode::StoreGlobal(v)
+            | Opcode::Jump(v)
+            | Opcode::JumpIfFalse(v)
+            | Opcode::Loop(v)
+            | Opcode::Call(v)
+            | Opcode::MakeArray(v)
+            | Opcode::LoadField(v)
+            | Opcode::StoreField(v)
             | Opcode::LoadEnumField(v) => self.emit_u16(v, line),
-            Opcode::And | Opcode::Or | Opcode::BitAnd | Opcode::BitOr | Opcode::BitXor
-            | Opcode::Shl | Opcode::Shr | Opcode::BitNot | Opcode::LoadEnumTag | Opcode::MakeRange => {}
-            Opcode::MakeEnum(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
-            Opcode::MakeStruct(t, f) => { self.emit_u16(t, line); self.emit_u16(f, line); }
-            Opcode::CallMethod(m, a) => { self.emit_u16(m, line); self.emit_u16(a, line); }
-            Opcode::NewClosure(f, n) => { self.emit_u16(f, line); self.emit_u16(n, line); }
+            Opcode::And
+            | Opcode::Or
+            | Opcode::BitAnd
+            | Opcode::BitOr
+            | Opcode::BitXor
+            | Opcode::Shl
+            | Opcode::Shr
+            | Opcode::BitNot
+            | Opcode::LoadEnumTag
+            | Opcode::MakeRange => {}
+            Opcode::MakeEnum(t, f) => {
+                self.emit_u16(t, line);
+                self.emit_u16(f, line);
+            }
+            Opcode::MakeStruct(t, f) => {
+                self.emit_u16(t, line);
+                self.emit_u16(f, line);
+            }
+            Opcode::CallMethod(m, a) => {
+                self.emit_u16(m, line);
+                self.emit_u16(a, line);
+            }
+            Opcode::NewClosure(f, n) => {
+                self.emit_u16(f, line);
+                self.emit_u16(n, line);
+            }
             _ => {}
         }
     }
@@ -278,20 +328,35 @@ impl Chunk {
         self.code.len()
     }
 
+    /// Returns true if the chunk has no bytecode.
+    pub fn is_empty(&self) -> bool {
+        self.code.is_empty()
+    }
+
     /// Decode a single instruction at `offset`, returning (opcode, next_offset).
     fn decode_at(&self, offset: usize) -> Option<(Opcode, usize)> {
         let byte = *self.code.get(offset)?;
         let op = Opcode::from_byte(byte)?;
         let mut off = offset + 1;
         match op {
-            Opcode::MakeEnum(_, _) | Opcode::CallMethod(_, _) | Opcode::NewClosure(_, _) | Opcode::MakeStruct(_, _) => {
+            Opcode::MakeEnum(_, _)
+            | Opcode::CallMethod(_, _)
+            | Opcode::NewClosure(_, _)
+            | Opcode::MakeStruct(_, _) => {
                 off += 4;
             }
-            Opcode::LoadConst(_) | Opcode::LoadLocal(_) | Opcode::StoreLocal(_)
-            | Opcode::LoadGlobal(_) | Opcode::StoreGlobal(_)
-            | Opcode::Jump(_) | Opcode::JumpIfFalse(_) | Opcode::Loop(_)
-            | Opcode::Call(_) | Opcode::MakeArray(_)
-            | Opcode::LoadField(_) | Opcode::StoreField(_)
+            Opcode::LoadConst(_)
+            | Opcode::LoadLocal(_)
+            | Opcode::StoreLocal(_)
+            | Opcode::LoadGlobal(_)
+            | Opcode::StoreGlobal(_)
+            | Opcode::Jump(_)
+            | Opcode::JumpIfFalse(_)
+            | Opcode::Loop(_)
+            | Opcode::Call(_)
+            | Opcode::MakeArray(_)
+            | Opcode::LoadField(_)
+            | Opcode::StoreField(_)
             | Opcode::LoadEnumField(_) => {
                 off += 2;
             }
@@ -313,7 +378,11 @@ impl Chunk {
             };
             // Read actual u16 operands from byte stream (from_byte returns placeholder 0)
             let read_u16 = |off: usize| -> u16 {
-                if off + 1 < self.code.len() { self.read_u16(off) } else { 0 }
+                if off + 1 < self.code.len() {
+                    self.read_u16(off)
+                } else {
+                    0
+                }
             };
             print!("{:04x}  {:>4}  ", offset, line);
             match op {
@@ -337,15 +406,30 @@ impl Chunk {
                 }
                 Opcode::Loop(_) => {
                     let target = read_u16(offset + 1);
-                    println!("Loop       {:>4} -> {:04x}", target, next.wrapping_sub(target as usize + 1));
+                    println!(
+                        "Loop       {:>4} -> {:04x}",
+                        target,
+                        next.wrapping_sub(target as usize + 1)
+                    );
                 }
                 Opcode::MakeStruct(_, _) => {
                     let type_idx = read_u16(offset + 1);
                     let fields = read_u16(offset + 3);
-                    let type_name = self.constants.get(type_idx as usize).and_then(|v| {
-                        if let Value::Str(s) = v { Some(s.clone()) } else { None }
-                    }).unwrap_or_default();
-                    println!("MakeStruct {:>4} '{:?}' fields={}", type_idx, type_name, fields);
+                    let type_name = self
+                        .constants
+                        .get(type_idx as usize)
+                        .and_then(|v| {
+                            if let Value::Str(s) = v {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
+                    println!(
+                        "MakeStruct {:>4} '{:?}' fields={}",
+                        type_idx, type_name, fields
+                    );
                 }
                 Opcode::MakeArray(_) => println!("MakeArray  {:>4}", read_u16(offset + 1)),
                 Opcode::MakeEnum(_, _) => {
@@ -356,17 +440,29 @@ impl Chunk {
                 Opcode::CallMethod(_, _) => {
                     let method = read_u16(offset + 1);
                     let args = read_u16(offset + 3);
-                    let method_name = self.method_names.get(method as usize).map(|s| s.as_str()).unwrap_or("?");
+                    let method_name = self
+                        .method_names
+                        .get(method as usize)
+                        .map(|s| s.as_str())
+                        .unwrap_or("?");
                     println!("CallMethod {:>4} '{}' args={}", method, method_name, args);
                 }
                 Opcode::LoadField(_) => {
                     let idx = read_u16(offset + 1);
-                    let field_name = self.field_names.get(idx as usize).map(|s| s.as_str()).unwrap_or("?");
+                    let field_name = self
+                        .field_names
+                        .get(idx as usize)
+                        .map(|s| s.as_str())
+                        .unwrap_or("?");
                     println!("LoadField  {:>4} '{}'", idx, field_name);
                 }
                 Opcode::StoreField(_) => {
                     let idx = read_u16(offset + 1);
-                    let field_name = self.field_names.get(idx as usize).map(|s| s.as_str()).unwrap_or("?");
+                    let field_name = self
+                        .field_names
+                        .get(idx as usize)
+                        .map(|s| s.as_str())
+                        .unwrap_or("?");
                     println!("StoreField {:>4} '{}'", idx, field_name);
                 }
                 Opcode::NewClosure(_, _) => {
@@ -455,7 +551,13 @@ pub struct BytecodeFn {
 
 impl BytecodeFn {
     pub fn new(name: String, arity: u32) -> Self {
-        Self { chunk: Chunk::new(), upvalues: Vec::new(), name, arity, is_generator: false }
+        Self {
+            chunk: Chunk::new(),
+            upvalues: Vec::new(),
+            name,
+            arity,
+            is_generator: false,
+        }
     }
 
     /// Print the disassembly of this function to stdout.

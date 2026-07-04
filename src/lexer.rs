@@ -2,7 +2,7 @@ use compact_str::CompactString;
 
 use crate::error::{Error, Result};
 use crate::span::{SourceLocation, Span, Spanned};
-use crate::token::{match_keyword, Token, TokenKind};
+use crate::token::{Token, TokenKind, match_keyword};
 
 pub struct Lexer<'a> {
     source: &'a str,
@@ -31,7 +31,10 @@ impl<'a> Lexer<'a> {
         let tokens = self.next_token_loop()?;
         // Comments are discarded by default for backward compatibility.
         // Use tokenize_with_comments() if you need them.
-        Ok(tokens.into_iter().filter(|t| !matches!(t.node.kind, TokenKind::Comment)).collect())
+        Ok(tokens
+            .into_iter()
+            .filter(|t| !matches!(t.node.kind, TokenKind::Comment))
+            .collect())
     }
 
     /// Lex the entire source and return all tokens **including** comments.
@@ -58,7 +61,9 @@ impl<'a> Lexer<'a> {
         if self.errors.is_empty() {
             Ok(tokens)
         } else {
-            Err(Error::ParseMultiple { errors: std::mem::take(&mut self.errors) })
+            Err(Error::ParseMultiple {
+                errors: std::mem::take(&mut self.errors),
+            })
         }
     }
 
@@ -203,9 +208,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Caret)
                 }
             }
-            '~' => {
-                self.make_token(TokenKind::Tilde)
-            }
+            '~' => self.make_token(TokenKind::Tilde),
             '.' => {
                 if self.r#match('.') {
                     if self.r#match('=') {
@@ -316,7 +319,10 @@ impl<'a> Lexer<'a> {
 
     fn make_token(&self, kind: TokenKind) -> Spanned<Token> {
         let lexeme = CompactString::from(&self.source[self.start..self.current]);
-        Spanned::new(Token::new(kind, lexeme), Span::new(self.start, self.current))
+        Spanned::new(
+            Token::new(kind, lexeme),
+            Span::new(self.start, self.current),
+        )
     }
 
     fn error_token(&mut self, msg: &str) -> Spanned<Token> {
@@ -333,7 +339,12 @@ impl<'a> Lexer<'a> {
     }
 
     fn current_location(&self) -> SourceLocation {
-        SourceLocation::new(None, Span::new(self.start, self.current), self.line, self.column)
+        SourceLocation::new(
+            None,
+            Span::new(self.start, self.current),
+            self.line,
+            self.column,
+        )
     }
 
     // ---------- lexing specific token types ----------
@@ -343,9 +354,8 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
         let ident = &self.source[self.start..self.current];
-        let kind = match_keyword(ident).unwrap_or_else(|| {
-            TokenKind::Ident(CompactString::from(ident))
-        });
+        let kind =
+            match_keyword(ident).unwrap_or_else(|| TokenKind::Ident(CompactString::from(ident)));
         self.make_token(kind)
     }
 
@@ -541,22 +551,36 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let tokens = Lexer::new("fn let mut if else while for loop return true false struct enum").tokenize().unwrap();
-        let kinds: Vec<&str> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Eof => None,
-            _ => Some(t.node.lexeme.as_str()),
-        }).collect();
-        assert_eq!(kinds, vec!["fn", "let", "mut", "if", "else", "while", "for", "loop", "return", "true", "false", "struct", "enum"]);
+        let tokens = Lexer::new("fn let mut if else while for loop return true false struct enum")
+            .tokenize()
+            .unwrap();
+        let kinds: Vec<&str> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Eof => None,
+                _ => Some(t.node.lexeme.as_str()),
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                "fn", "let", "mut", "if", "else", "while", "for", "loop", "return", "true",
+                "false", "struct", "enum"
+            ]
+        );
     }
 
     #[test]
     fn test_identifiers() {
         let tokens = Lexer::new("foo bar _baz my_var123").tokenize().unwrap();
-        let kinds: Vec<&str> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Ident(_) => Some(t.node.lexeme.as_str()),
-            TokenKind::Eof => None,
-            _ => None,
-        }).collect();
+        let kinds: Vec<&str> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Ident(_) => Some(t.node.lexeme.as_str()),
+                TokenKind::Eof => None,
+                _ => None,
+            })
+            .collect();
         assert_eq!(kinds, vec!["foo", "bar", "_baz", "my_var123"]);
     }
 
@@ -570,51 +594,95 @@ mod tests {
             TokenKind::Int(63),
             TokenKind::Int(10),
         ];
-        let kinds: Vec<TokenKind> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Eof => None,
-            k => Some(k.clone()),
-        }).collect();
+        let kinds: Vec<TokenKind> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Eof => None,
+                k => Some(k.clone()),
+            })
+            .collect();
         assert_eq!(kinds, expected);
     }
 
     #[test]
     fn test_operators() {
-        let tokens = Lexer::new("+ - * / % == != < > <= >= && || ! & | .. ..= -> => :: ; : , . # @ ? ^ ~ << >>").tokenize().unwrap();
+        let tokens = Lexer::new(
+            "+ - * / % == != < > <= >= && || ! & | .. ..= -> => :: ; : , . # @ ? ^ ~ << >>",
+        )
+        .tokenize()
+        .unwrap();
         let expected: Vec<TokenKind> = vec![
-            TokenKind::Plus, TokenKind::Minus, TokenKind::Star, TokenKind::Slash,
-            TokenKind::Percent, TokenKind::EqEq, TokenKind::Ne, TokenKind::Lt,
-            TokenKind::Gt, TokenKind::Le, TokenKind::Ge, TokenKind::AndAnd,
-            TokenKind::OrOr, TokenKind::Bang, TokenKind::And, TokenKind::Or, TokenKind::DotDot, TokenKind::DotDotEq,
-            TokenKind::Arrow, TokenKind::FatArrow, TokenKind::ColonColon,
-            TokenKind::Semi, TokenKind::Colon, TokenKind::Comma, TokenKind::Dot,
-            TokenKind::Hash, TokenKind::At, TokenKind::Question,
-            TokenKind::Caret, TokenKind::Tilde, TokenKind::Shl, TokenKind::Shr,
+            TokenKind::Plus,
+            TokenKind::Minus,
+            TokenKind::Star,
+            TokenKind::Slash,
+            TokenKind::Percent,
+            TokenKind::EqEq,
+            TokenKind::Ne,
+            TokenKind::Lt,
+            TokenKind::Gt,
+            TokenKind::Le,
+            TokenKind::Ge,
+            TokenKind::AndAnd,
+            TokenKind::OrOr,
+            TokenKind::Bang,
+            TokenKind::And,
+            TokenKind::Or,
+            TokenKind::DotDot,
+            TokenKind::DotDotEq,
+            TokenKind::Arrow,
+            TokenKind::FatArrow,
+            TokenKind::ColonColon,
+            TokenKind::Semi,
+            TokenKind::Colon,
+            TokenKind::Comma,
+            TokenKind::Dot,
+            TokenKind::Hash,
+            TokenKind::At,
+            TokenKind::Question,
+            TokenKind::Caret,
+            TokenKind::Tilde,
+            TokenKind::Shl,
+            TokenKind::Shr,
         ];
-        let kinds: Vec<TokenKind> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Eof => None,
-            k => Some(k.clone()),
-        }).collect();
+        let kinds: Vec<TokenKind> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Eof => None,
+                k => Some(k.clone()),
+            })
+            .collect();
         assert_eq!(kinds, expected);
     }
 
     #[test]
     fn test_strings() {
-        let tokens = Lexer::new(r#""hello" "world\n" "\"quoted\"" "#).tokenize().unwrap();
+        let tokens = Lexer::new(r#""hello" "world\n" "\"quoted\"" "#)
+            .tokenize()
+            .unwrap();
         let expected: Vec<&str> = vec!["hello", "world\n", "\"quoted\""];
-        let strings: Vec<&str> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Str(s) => Some(s.as_str()),
-            _ => None,
-        }).collect();
+        let strings: Vec<&str> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Str(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .collect();
         assert_eq!(strings, expected);
     }
 
     #[test]
     fn test_comments() {
-        let tokens = Lexer::new("// line comment\n42 /* block /* nested */ */ true").tokenize().unwrap();
-        let kinds: Vec<&str> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Eof => None,
-            _ => Some(t.node.lexeme.as_str()),
-        }).collect();
+        let tokens = Lexer::new("// line comment\n42 /* block /* nested */ */ true")
+            .tokenize()
+            .unwrap();
+        let kinds: Vec<&str> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Eof => None,
+                _ => Some(t.node.lexeme.as_str()),
+            })
+            .collect();
         assert_eq!(kinds, vec!["42", "true"]);
     }
 
@@ -622,24 +690,33 @@ mod tests {
     fn test_grouping() {
         let tokens = Lexer::new("( ) { } [ ]").tokenize().unwrap();
         let expected: Vec<TokenKind> = vec![
-            TokenKind::OpenParen, TokenKind::CloseParen,
-            TokenKind::OpenBrace, TokenKind::CloseBrace,
-            TokenKind::OpenBracket, TokenKind::CloseBracket,
+            TokenKind::OpenParen,
+            TokenKind::CloseParen,
+            TokenKind::OpenBrace,
+            TokenKind::CloseBrace,
+            TokenKind::OpenBracket,
+            TokenKind::CloseBracket,
         ];
-        let kinds: Vec<TokenKind> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Eof => None,
-            k => Some(k.clone()),
-        }).collect();
+        let kinds: Vec<TokenKind> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Eof => None,
+                k => Some(k.clone()),
+            })
+            .collect();
         assert_eq!(kinds, expected);
     }
 
     #[test]
     fn test_ampersand_as_token() {
         let tokens = Lexer::new("& foo").tokenize().unwrap();
-        let kinds: Vec<TokenKind> = tokens.iter().filter_map(|t| match &t.node.kind {
-            TokenKind::Eof => None,
-            k => Some(k.clone()),
-        }).collect();
+        let kinds: Vec<TokenKind> = tokens
+            .iter()
+            .filter_map(|t| match &t.node.kind {
+                TokenKind::Eof => None,
+                k => Some(k.clone()),
+            })
+            .collect();
         assert_eq!(kinds, vec![TokenKind::And, TokenKind::Ident("foo".into())]);
     }
 

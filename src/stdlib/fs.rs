@@ -1,23 +1,29 @@
 use std::fs;
 use std::rc::Rc;
 
+use crate::Result;
 use crate::ast::Type;
 use crate::symbol::FnSignature;
 use crate::value::{ArrayData, EnumData, Value};
 use crate::vm::{VM, VMContext};
-use crate::Result;
 
 // --- Helpers ---
 
 fn ok_val(ctx: &mut VMContext, val: Value) -> Value {
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-    let h = vm.enums.insert(EnumData { tag: 0, fields: vec![val] });
+    let h = vm.enums.insert(EnumData {
+        tag: 0,
+        fields: vec![val],
+    });
     Value::Enum(h)
 }
 
 fn err_val(ctx: &mut VMContext, msg: &str) -> Value {
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-    let h = vm.enums.insert(EnumData { tag: 1, fields: vec![Value::Str(msg.into())] });
+    let h = vm.enums.insert(EnumData {
+        tag: 1,
+        fields: vec![Value::Str(msg.into())],
+    });
     Value::Enum(h)
 }
 
@@ -26,7 +32,10 @@ fn result_str_str() -> Type {
 }
 
 fn result_array_str_str() -> Type {
-    Type::Result(Box::new(Type::Array(Box::new(Type::Str))), Box::new(Type::Str))
+    Type::Result(
+        Box::new(Type::Array(Box::new(Type::Str))),
+        Box::new(Type::Str),
+    )
 }
 
 fn result_unit_str() -> Type {
@@ -58,24 +67,102 @@ pub fn register(vm: &mut VM) {
 
 pub fn signatures() -> Vec<FnSignature> {
     vec![
-        FnSignature { type_params: vec![], name: "read_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_str_str()) },
-        FnSignature { type_params: vec![], name: "read_lines".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_array_str_str()) },
-        FnSignature { type_params: vec![], name: "write_file".into(), params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { type_params: vec![], name: "append_file".into(), params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)], return_type: Some(result_unit_str()) },
-
-        FnSignature { type_params: vec![], name: "list_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_array_str_str()) },
-        FnSignature { type_params: vec![], name: "is_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "is_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
-        FnSignature { type_params: vec![], name: "create_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { type_params: vec![], name: "create_dirs".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { type_params: vec![], name: "remove_file".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-        FnSignature { type_params: vec![], name: "remove_dir".into(), params: vec![("path".into(), Type::Str)], return_type: Some(result_unit_str()) },
-
-        FnSignature { type_params: vec![], name: "path_join".into(), params: vec![("a".into(), Type::Str), ("b".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "path_dirname".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "path_basename".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "path_extension".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Str) },
-        FnSignature { type_params: vec![], name: "path_exists".into(), params: vec![("path".into(), Type::Str)], return_type: Some(Type::Bool) },
+        FnSignature {
+            type_params: vec![],
+            name: "read_file".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_str_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "read_lines".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_array_str_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "write_file".into(),
+            params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)],
+            return_type: Some(result_unit_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "append_file".into(),
+            params: vec![("path".into(), Type::Str), ("content".into(), Type::Str)],
+            return_type: Some(result_unit_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "list_dir".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_array_str_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "is_dir".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "is_file".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(Type::Bool),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "create_dir".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_unit_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "create_dirs".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_unit_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "remove_file".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_unit_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "remove_dir".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(result_unit_str()),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "path_join".into(),
+            params: vec![("a".into(), Type::Str), ("b".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "path_dirname".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "path_basename".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "path_extension".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(Type::Str),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "path_exists".into(),
+            params: vec![("path".into(), Type::Str)],
+            return_type: Some(Type::Bool),
+        },
     ]
 }
 
@@ -204,7 +291,8 @@ fn path_join_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn path_dirname_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
-    let parent = std::path::Path::new(&path).parent()
+    let parent = std::path::Path::new(&path)
+        .parent()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
     Ok(Value::Str(parent.into()))
@@ -212,7 +300,8 @@ fn path_dirname_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn path_basename_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
-    let name = std::path::Path::new(&path).file_name()
+    let name = std::path::Path::new(&path)
+        .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("");
     Ok(Value::Str(name.into()))
@@ -220,7 +309,8 @@ fn path_basename_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 
 fn path_extension_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let path = args.first().and_then(|v| v.as_str()).unwrap_or_default();
-    let ext = std::path::Path::new(&path).extension()
+    let ext = std::path::Path::new(&path)
+        .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
     Ok(Value::Str(ext.into()))

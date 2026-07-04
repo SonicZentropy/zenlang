@@ -193,7 +193,10 @@ pub struct Token {
 
 impl Token {
     pub fn new(kind: TokenKind, lexeme: impl Into<CompactString>) -> Self {
-        Self { kind, lexeme: lexeme.into() }
+        Self {
+            kind,
+            lexeme: lexeme.into(),
+        }
     }
 }
 

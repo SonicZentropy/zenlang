@@ -613,14 +613,20 @@ fn to_str_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 /// script-visible `Option<T>` back (iterators, map lookups, etc).
 pub(crate) fn option_some(ctx: &mut VMContext, v: Value) -> Value {
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-    let h = vm.enums.insert(EnumData { tag: 0, fields: vec![v] });
+    let h = vm.enums.insert(EnumData {
+        tag: 0,
+        fields: vec![v],
+    });
     Value::Enum(h)
 }
 
 /// Build a `None` value using the built-in `Option` enum's convention (tag 1 = None).
 pub(crate) fn option_none(ctx: &mut VMContext) -> Value {
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-    let h = vm.enums.insert(EnumData { tag: 1, fields: vec![] });
+    let h = vm.enums.insert(EnumData {
+        tag: 1,
+        fields: vec![],
+    });
     Value::Enum(h)
 }
 
@@ -636,25 +642,25 @@ fn enum_tag(ctx: &mut VMContext, val: &Value) -> Option<u16> {
 
 fn is_some_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(0)),
+        args.first().is_some_and(|v| enum_tag(ctx, v) == Some(0)),
     ))
 }
 
 fn is_none_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(1)),
+        args.first().is_some_and(|v| enum_tag(ctx, v) == Some(1)),
     ))
 }
 
 fn is_ok_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(0)),
+        args.first().is_some_and(|v| enum_tag(ctx, v) == Some(0)),
     ))
 }
 
 fn is_err_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Bool(
-        args.first().map_or(false, |v| enum_tag(ctx, v) == Some(1)),
+        args.first().is_some_and(|v| enum_tag(ctx, v) == Some(1)),
     ))
 }
 
@@ -683,7 +689,11 @@ fn unwrap_or_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             let vm: &VM = unsafe { &*ctx.raw_vm };
             let data = vm.enums.get(*h);
             if data.tag == 0 {
-                Ok(data.fields.first().cloned().unwrap_or_else(|| default.clone()))
+                Ok(data
+                    .fields
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| default.clone()))
             } else {
                 Ok(default.clone())
             }
@@ -714,7 +724,7 @@ fn set_timeout_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         _ => {
             return Err(crate::error::Error::Script {
                 msg: "set_timeout seconds must be a number".into(),
-            })
+            });
         }
     };
     let id = ctx.register_timer(callback, seconds, None);
@@ -739,7 +749,7 @@ fn set_interval_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         _ => {
             return Err(crate::error::Error::Script {
                 msg: "set_interval seconds must be a number".into(),
-            })
+            });
         }
     };
     let id = ctx.register_timer(callback, seconds, Some(seconds));
@@ -765,7 +775,7 @@ fn after_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         _ => {
             return Err(crate::error::Error::Script {
                 msg: "after seconds must be a number".into(),
-            })
+            });
         }
     };
     let callback = args[1].clone();
@@ -858,7 +868,7 @@ fn make_weak_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
             });
             Ok(Value::Weak(w))
         }
-        _ => return Err(crate::error::Error::Script {
+        _ => Err(crate::error::Error::Script {
             msg: format!("cannot create weak reference from {}", val.type_name()),
         }),
     }

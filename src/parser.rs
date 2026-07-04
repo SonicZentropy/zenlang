@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
         let source = self.source;
         let mut line = 1usize;
         let mut col = 1usize;
-        for (_, c) in source[..offset.min(source.len())].chars().enumerate() {
+        for c in source[..offset.min(source.len())].chars() {
             if c == '\n' {
                 line += 1;
                 col = 1;
@@ -600,7 +600,7 @@ impl<'a> Parser<'a> {
                 vis,
                 name: name.into(),
                 type_params,
-                methods: methods,
+                methods,
             },
             span,
         ))
@@ -729,7 +729,11 @@ impl<'a> Parser<'a> {
                 } else {
                     vec![]
                 };
-                expr = Expr::EnumCtor { enum_name, variant_name: variant.into(), args };
+                expr = Expr::EnumCtor {
+                    enum_name,
+                    variant_name: variant.into(),
+                    args,
+                };
             } else if matches!(tok, TokenKind::Question) {
                 self.advance();
                 // Desugar expr?  →  match expr { Ok(val) => val, Err(e) => return Err(e) }
@@ -1273,7 +1277,11 @@ impl<'a> Parser<'a> {
                     Expr::Ident(ref name) => name.clone(),
                     _ => return Err(self.error("expected enum name before '::'")),
                 };
-                expr = Expr::EnumCtor { enum_name, variant_name: variant.into(), args };
+                expr = Expr::EnumCtor {
+                    enum_name,
+                    variant_name: variant.into(),
+                    args,
+                };
             } else {
                 break;
             }
@@ -1440,21 +1448,13 @@ impl<'a> Parser<'a> {
                     self.expect(TokenKind::Gt)?;
                     // Map known generic types
                     if args.len() == 1 {
-                        match name.as_str() {
-                            "Option" => {
-                                return Ok(Type::Option(Box::new(args.into_iter().next().unwrap())));
-                            }
-                            _ => {}
+                        if name.as_str() == "Option" {
+                            return Ok(Type::Option(Box::new(args.into_iter().next().unwrap())));
                         }
-                    } else if args.len() == 2 {
-                        match name.as_str() {
-                            "Result" => {
-                                let err = args.pop().unwrap();
-                                let ok = args.pop().unwrap();
-                                return Ok(Type::Result(Box::new(ok), Box::new(err)));
-                            }
-                            _ => {}
-                        }
+                    } else if args.len() == 2 && name.as_str() == "Result" {
+                        let err = args.pop().unwrap();
+                        let ok = args.pop().unwrap();
+                        return Ok(Type::Result(Box::new(ok), Box::new(err)));
                     }
                     // For user-defined generic types, store as Named with args in the name for now
                     // The resolver/typeck will handle proper substitution
@@ -1556,14 +1556,12 @@ impl<'a> Parser<'a> {
             return true;
         }
         // Struct with fields: Foo { field: value, ... } or Foo { field, ... }
-        if matches!(after_brace, TokenKind::Ident(_)) {
-            if i + 2 < self.tokens.len() {
-                let after_ident = &self.tokens[i + 2].node.kind;
-                return matches!(
-                    after_ident,
-                    TokenKind::Colon | TokenKind::Comma | TokenKind::CloseBrace
-                );
-            }
+        if matches!(after_brace, TokenKind::Ident(_)) && i + 2 < self.tokens.len() {
+            let after_ident = &self.tokens[i + 2].node.kind;
+            return matches!(
+                after_ident,
+                TokenKind::Colon | TokenKind::Comma | TokenKind::CloseBrace
+            );
         }
         // Spread struct: Foo { ..expr }
         if matches!(after_brace, TokenKind::DotDot) {

@@ -2,7 +2,6 @@
 /// and scripts define functions/globals that Rust reads after execution.
 ///
 /// Run with: cargo run --example cross_call
-
 use zenlang::compiler::compile;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
@@ -11,32 +10,40 @@ use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
 use zenlang::value::ArrayData;
 use zenlang::vm::VMContext;
-use zenlang::{Value, VM};
+use zenlang::{VM, Value};
 
 fn main() -> zenlang::Result<()> {
     let mut vm = VM::new();
     register_builtins(&mut vm);
 
     // --- Rust-provided function #1: compute stats ---
-    vm.register_native("compute_stats", std::rc::Rc::new(|ctx: &mut VMContext, args: &[Value]| {
-        let base = args.first().and_then(|v| v.as_int()).unwrap_or(0);
-        let level = args.get(1).and_then(|v| v.as_int()).unwrap_or(1);
-        let hp = base * 10 + level * 5;
-        let atk = base + level * 2;
-        let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-        let h = vm.arrays.insert(ArrayData { values: vec![Value::Int(hp), Value::Int(atk)] });
-        Ok(Value::Array(h))
-    }));
+    vm.register_native(
+        "compute_stats",
+        std::rc::Rc::new(|ctx: &mut VMContext, args: &[Value]| {
+            let base = args.first().and_then(|v| v.as_int()).unwrap_or(0);
+            let level = args.get(1).and_then(|v| v.as_int()).unwrap_or(1);
+            let hp = base * 10 + level * 5;
+            let atk = base + level * 2;
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            let h = vm.arrays.insert(ArrayData {
+                values: vec![Value::Int(hp), Value::Int(atk)],
+            });
+            Ok(Value::Array(h))
+        }),
+    );
 
     // --- Rust-provided function #2: damage formula ---
-    vm.register_native("damage_formula", std::rc::Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
-        let atk = args.first().and_then(|v| v.as_int()).unwrap_or(0);
-        let def = args.get(1).and_then(|v| v.as_int()).unwrap_or(0);
-        let multiplier = args.get(2).and_then(|v| v.as_float()).unwrap_or(1.0);
-        let raw = (atk as f64) - (def as f64 * 0.5);
-        let dmg = (raw.max(1.0) * multiplier) as i64;
-        Ok(Value::Int(dmg))
-    }));
+    vm.register_native(
+        "damage_formula",
+        std::rc::Rc::new(|_ctx: &mut VMContext, args: &[Value]| {
+            let atk = args.first().and_then(|v| v.as_int()).unwrap_or(0);
+            let def = args.get(1).and_then(|v| v.as_int()).unwrap_or(0);
+            let multiplier = args.get(2).and_then(|v| v.as_float()).unwrap_or(1.0);
+            let raw = (atk as f64) - (def as f64 * 0.5);
+            let dmg = (raw.max(1.0) * multiplier) as i64;
+            Ok(Value::Int(dmg))
+        }),
+    );
 
     let mut names = vm.native_names();
     for n in &stdlib_names() {

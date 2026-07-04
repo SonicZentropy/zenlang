@@ -31,7 +31,12 @@ impl VMContext {
         let id = vm.timer_id_counter;
         vm.timer_id_counter += 1;
         let fire_time = vm.time + delay.max(0.0);
-        vm.pending_timers.push(TimerEntry { id, callback, fire_time, interval });
+        vm.pending_timers.push(TimerEntry {
+            id,
+            callback,
+            fire_time,
+            interval,
+        });
         id
     }
 
@@ -67,8 +72,11 @@ impl VMContext {
                 }
                 let bp = vm.stack.len();
                 vm.frames.push(CallFrame {
-                    function_idx: *idx, ip: 0, bp,
-                    is_method: false, is_closure: true,
+                    function_idx: *idx,
+                    ip: 0,
+                    bp,
+                    is_method: false,
+                    is_closure: true,
                 });
                 for arg in args {
                     vm.stack.push(arg.clone());
@@ -86,8 +94,11 @@ impl VMContext {
                 let fn_def = &vm.functions[fn_idx];
                 let bp = vm.stack.len();
                 vm.frames.push(CallFrame {
-                    function_idx: fn_idx, ip: 0, bp,
-                    is_method: false, is_closure: true,
+                    function_idx: fn_idx,
+                    ip: 0,
+                    bp,
+                    is_method: false,
+                    is_closure: true,
                 });
                 for uv in &data.upvalues {
                     vm.stack.push(uv.clone());
@@ -122,12 +133,23 @@ struct CallFrame {
 
 impl CallFrame {
     fn new(function_idx: usize, bp: usize) -> Self {
-        Self { function_idx, ip: 0, bp, is_method: false, is_closure: false }
+        Self {
+            function_idx,
+            ip: 0,
+            bp,
+            is_method: false,
+            is_closure: false,
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DebugStepMode { None, StepInto, StepOver, StepOut }
+pub enum DebugStepMode {
+    None,
+    StepInto,
+    StepOver,
+    StepOut,
+}
 
 #[derive(Debug, Clone)]
 pub struct DebugFrameInfo {
@@ -154,14 +176,22 @@ pub struct DebugState {
 }
 
 fn source_loc_from_frame(
-    functions: &[BytecodeFn], function_idx: usize, ip: usize,
+    functions: &[BytecodeFn],
+    function_idx: usize,
+    ip: usize,
 ) -> crate::span::SourceLocation {
-    let line = functions.get(function_idx).map(|f| f.chunk.get_line(ip.saturating_sub(1))).unwrap_or(0);
+    let line = functions
+        .get(function_idx)
+        .map(|f| f.chunk.get_line(ip.saturating_sub(1)))
+        .unwrap_or(0);
     crate::span::SourceLocation::new(None, crate::span::Span::new(0, 0), line, 0)
 }
 
 struct TimerEntry {
-    id: u64, callback: Value, fire_time: f64, interval: Option<f64>,
+    id: u64,
+    callback: Value,
+    fire_time: f64,
+    interval: Option<f64>,
 }
 
 pub struct VM {
@@ -199,24 +229,41 @@ pub struct VM {
 impl VM {
     pub fn new() -> Self {
         Self {
-            stack: Vec::new(), frames: Vec::new(),
-            globals: Vec::new(), functions: Vec::new(),
-            global_names: Vec::new(), function_name_map: HashMap::new(),
-            natives: HashMap::new(), native_fns: Vec::new(),
+            stack: Vec::new(),
+            frames: Vec::new(),
+            globals: Vec::new(),
+            functions: Vec::new(),
+            global_names: Vec::new(),
+            function_name_map: HashMap::new(),
+            natives: HashMap::new(),
+            native_fns: Vec::new(),
             foreign_registry: Rc::new(ForeignTypeRegistry::new()),
-            instruction_limit: 0, instruction_count: 0,
-            active_generator: None, time: 0.0,
-            timers: Vec::new(), pending_timers: Vec::new(),
-            frame_callbacks: Vec::new(), timer_id_counter: 1,
+            instruction_limit: 0,
+            instruction_count: 0,
+            active_generator: None,
+            time: 0.0,
+            timers: Vec::new(),
+            pending_timers: Vec::new(),
+            frame_callbacks: Vec::new(),
+            timer_id_counter: 1,
             debug_state: DebugState {
-                enabled: false, paused: false, step_mode: DebugStepMode::None,
-                step_start_depth: 0, breakpoints: Vec::new(),
-                resolved_breakpoints: Vec::new(), skip_offset: None,
+                enabled: false,
+                paused: false,
+                step_mode: DebugStepMode::None,
+                step_start_depth: 0,
+                breakpoints: Vec::new(),
+                resolved_breakpoints: Vec::new(),
+                skip_offset: None,
             },
             return_to_depth: None,
-            arrays: Slab::new(), structs: Slab::new(), enums: Slab::new(),
-            maps: Slab::new(), closures: Slab::new(), generators: Slab::new(),
-            foreigns: Slab::new(), weaks: Slab::new(),
+            arrays: Slab::new(),
+            structs: Slab::new(),
+            enums: Slab::new(),
+            maps: Slab::new(),
+            closures: Slab::new(),
+            generators: Slab::new(),
+            foreigns: Slab::new(),
+            weaks: Slab::new(),
         }
     }
 
@@ -228,19 +275,36 @@ impl VM {
 
     pub fn set_debug(&mut self, enabled: bool) {
         self.debug_state.enabled = enabled;
-        if !enabled { self.debug_state.paused = false; self.debug_state.step_mode = DebugStepMode::None; }
+        if !enabled {
+            self.debug_state.paused = false;
+            self.debug_state.step_mode = DebugStepMode::None;
+        }
     }
 
     pub fn set_breakpoint(&mut self, function: &str, line: usize) -> bool {
-        if !self.function_name_map.contains_key(function) { return false; }
-        if self.debug_state.breakpoints.iter().any(|b| b.function == function && b.line == line) { return true; }
-        self.debug_state.breakpoints.push(Breakpoint { function: function.to_string(), line });
+        if !self.function_name_map.contains_key(function) {
+            return false;
+        }
+        if self
+            .debug_state
+            .breakpoints
+            .iter()
+            .any(|b| b.function == function && b.line == line)
+        {
+            return true;
+        }
+        self.debug_state.breakpoints.push(Breakpoint {
+            function: function.to_string(),
+            line,
+        });
         self.rebuild_breakpoints();
         true
     }
 
     pub fn remove_breakpoint(&mut self, function: &str, line: usize) {
-        self.debug_state.breakpoints.retain(|b| b.function != function || b.line != line);
+        self.debug_state
+            .breakpoints
+            .retain(|b| b.function != function || b.line != line);
         self.rebuild_breakpoints();
     }
 
@@ -253,12 +317,12 @@ impl VM {
         let mut count = 0;
         let names: Vec<String> = self.function_name_map.keys().cloned().collect();
         for name in &names {
-            if let Some(&idx) = self.function_name_map.get(name) {
-                if let Some(f) = self.functions.get(idx) {
-                    if f.chunk.lines.iter().any(|l| *l + 1 == line) {
-                        if self.set_breakpoint(name, line) { count += 1; }
-                    }
-                }
+            if let Some(&idx) = self.function_name_map.get(name)
+                && let Some(f) = self.functions.get(idx)
+                && f.chunk.lines.iter().any(|l| *l + 1 == line)
+                && self.set_breakpoint(name, line)
+            {
+                count += 1;
             }
         }
         count
@@ -267,8 +331,12 @@ impl VM {
     fn rebuild_breakpoints(&mut self) {
         self.debug_state.resolved_breakpoints.clear();
         for bp in &self.debug_state.breakpoints {
-            let Some(&fn_idx) = self.function_name_map.get(&bp.function) else { continue };
-            let Some(fn_def) = self.functions.get(fn_idx) else { continue };
+            let Some(&fn_idx) = self.function_name_map.get(&bp.function) else {
+                continue;
+            };
+            let Some(fn_def) = self.functions.get(fn_idx) else {
+                continue;
+            };
             for (offset, &l) in fn_def.chunk.lines.iter().enumerate() {
                 if l + 1 == bp.line {
                     self.debug_state.resolved_breakpoints.push((fn_idx, offset));
@@ -279,14 +347,18 @@ impl VM {
     }
 
     pub fn debug_continue(&mut self) -> Result<Value> {
-        if !self.debug_state.paused { return Err(self.runtime_error("not paused")); }
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
         self.debug_state.step_mode = DebugStepMode::None;
         self.debug_state.paused = false;
         self.execute_debug()
     }
 
     pub fn debug_step_into(&mut self) -> Result<Value> {
-        if !self.debug_state.paused { return Err(self.runtime_error("not paused")); }
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
         self.debug_state.step_mode = DebugStepMode::StepInto;
         self.debug_state.step_start_depth = self.frames.len();
         self.debug_state.paused = false;
@@ -294,7 +366,9 @@ impl VM {
     }
 
     pub fn debug_step_over(&mut self) -> Result<Value> {
-        if !self.debug_state.paused { return Err(self.runtime_error("not paused")); }
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
         self.debug_state.step_mode = DebugStepMode::StepOver;
         self.debug_state.step_start_depth = self.frames.len();
         self.debug_state.paused = false;
@@ -302,35 +376,57 @@ impl VM {
     }
 
     pub fn debug_step_out(&mut self) -> Result<Value> {
-        if !self.debug_state.paused { return Err(self.runtime_error("not paused")); }
+        if !self.debug_state.paused {
+            return Err(self.runtime_error("not paused"));
+        }
         self.debug_state.step_mode = DebugStepMode::StepOut;
         self.debug_state.step_start_depth = self.frames.len();
         self.debug_state.paused = false;
         self.execute_debug()
     }
 
-    pub fn is_paused(&self) -> bool { self.debug_state.paused }
+    pub fn is_paused(&self) -> bool {
+        self.debug_state.paused
+    }
 
     pub fn debug_current_location(&self) -> Option<crate::span::SourceLocation> {
         let frame = self.frames.last()?;
-        Some(source_loc_from_frame(&self.functions, frame.function_idx, frame.ip))
+        Some(source_loc_from_frame(
+            &self.functions,
+            frame.function_idx,
+            frame.ip,
+        ))
     }
 
     pub fn debug_stack_frames(&self) -> Vec<DebugFrameInfo> {
-        self.frames.iter().enumerate().map(|(depth, frame)| {
-            let loc = source_loc_from_frame(&self.functions, frame.function_idx, frame.ip);
-            DebugFrameInfo { depth, function: self.functions[frame.function_idx].name.clone(), source_location: loc }
-        }).collect()
+        self.frames
+            .iter()
+            .enumerate()
+            .map(|(depth, frame)| {
+                let loc = source_loc_from_frame(&self.functions, frame.function_idx, frame.ip);
+                DebugFrameInfo {
+                    depth,
+                    function: self.functions[frame.function_idx].name.clone(),
+                    source_location: loc,
+                }
+            })
+            .collect()
     }
 
     pub fn debug_locals(&self, depth: usize) -> Vec<(String, Value)> {
-        if depth >= self.frames.len() { return Vec::new(); }
+        if depth >= self.frames.len() {
+            return Vec::new();
+        }
         let frame = &self.frames[self.frames.len() - 1 - depth];
         let fn_def = &self.functions[frame.function_idx];
         let local_count = fn_def.chunk.locals as usize;
         let mut locals = Vec::with_capacity(local_count);
         for i in 0..local_count {
-            let name = if i < fn_def.arity as usize { format!("param_{}", i) } else { format!("local_{}", i - fn_def.arity as usize) };
+            let name = if i < fn_def.arity as usize {
+                format!("param_{}", i)
+            } else {
+                format!("local_{}", i - fn_def.arity as usize)
+            };
             let val = self.stack.get(frame.bp + i).cloned().unwrap_or(Value::Nil);
             locals.push((name, val));
         }
@@ -338,16 +434,20 @@ impl VM {
     }
 
     fn execute_debug(&mut self) -> Result<Value> {
-        loop {
-            self.execute()?;
-            if self.debug_state.paused { return Ok(Value::Nil); }
-            return Ok(self.stack.pop().unwrap_or(Value::Nil));
+        self.execute()?;
+        if self.debug_state.paused {
+            return Ok(Value::Nil);
         }
+        Ok(self.stack.pop().unwrap_or(Value::Nil))
     }
 
     fn debug_check(&mut self) -> bool {
-        if !self.debug_state.enabled || self.debug_state.paused { return false; }
-        let Some(frame) = self.frames.last() else { return false };
+        if !self.debug_state.enabled || self.debug_state.paused {
+            return false;
+        }
+        let Some(frame) = self.frames.last() else {
+            return false;
+        };
         let (fn_idx, ip) = (frame.function_idx, frame.ip);
         if self.debug_state.skip_offset == Some((fn_idx, ip)) {
             self.debug_state.skip_offset = None;
@@ -385,7 +485,9 @@ impl VM {
         false
     }
 
-    pub fn set_instruction_limit(&mut self, limit: u64) { self.instruction_limit = limit; }
+    pub fn set_instruction_limit(&mut self, limit: u64) {
+        self.instruction_limit = limit;
+    }
 
     pub fn register_type<T: 'static>(&mut self, name: &'static str) -> &mut ForeignTypeDef {
         let def = ForeignTypeDef::new(name);
@@ -407,7 +509,9 @@ impl VM {
             let idx = offset + i;
             self.function_name_map.insert(f.name.clone(), idx);
             self.functions.push(f);
-            if i == 0 { self.natives.insert("__main__".into(), idx); }
+            if i == 0 {
+                self.natives.insert("__main__".into(), idx);
+            }
         }
         self.global_names = global_names;
         self.populate_globals();
@@ -419,8 +523,12 @@ impl VM {
             let val = if let Some(&idx) = self.natives.get(name.as_str()) {
                 if idx < self.native_fns.len() && self.native_fns[idx].0 == *name {
                     Value::NativeFunction(self.native_fns[idx].1.clone())
-                } else { Value::Nil }
-            } else { Value::Nil };
+                } else {
+                    Value::Nil
+                }
+            } else {
+                Value::Nil
+            };
             self.globals.push(val);
         }
         self.globals.resize(self.global_names.len(), Value::Nil);
@@ -489,15 +597,31 @@ impl VM {
     pub fn restore_globals_by_name(&mut self, snapshot: &HashMap<String, Value>) {
         for (i, name) in self.global_names.iter().enumerate() {
             if let Some(val) = snapshot.get(name) {
-                if i < self.globals.len() { self.globals[i] = val.clone(); }
-                else { self.globals.push(val.clone()); }
+                if i < self.globals.len() {
+                    self.globals[i] = val.clone();
+                } else {
+                    self.globals.push(val.clone());
+                }
             }
         }
     }
 
-    pub fn reload_functions(&mut self, fns: Vec<BytecodeFn>, new_global_names: Vec<String>) -> Result<()> {
-        let old_name_to_idx: HashMap<String, usize> = self.functions.iter().enumerate().map(|(i, f)| (f.name.clone(), i)).collect();
-        let new_name_to_idx: HashMap<String, usize> = fns.iter().enumerate().map(|(i, f)| (f.name.clone(), i)).collect();
+    pub fn reload_functions(
+        &mut self,
+        fns: Vec<BytecodeFn>,
+        new_global_names: Vec<String>,
+    ) -> Result<()> {
+        let old_name_to_idx: HashMap<String, usize> = self
+            .functions
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.clone(), i))
+            .collect();
+        let new_name_to_idx: HashMap<String, usize> = fns
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.clone(), i))
+            .collect();
 
         let mut snapshot = self.snapshot_globals_by_name();
         for val in snapshot.values_mut() {
@@ -507,7 +631,12 @@ impl VM {
         self.functions = fns;
         self.global_names = new_global_names;
 
-        self.function_name_map = self.functions.iter().enumerate().map(|(i, f)| (f.name.clone(), i)).collect();
+        self.function_name_map = self
+            .functions
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.clone(), i))
+            .collect();
         self.populate_globals();
         self.restore_globals_by_name(&snapshot);
         self.natives.insert("__main__".into(), 0);
@@ -518,12 +647,16 @@ impl VM {
     }
 
     pub fn call_if_exists(&mut self, name: &str) -> Result<Option<Value>> {
-        let Some(&idx) = self.function_name_map.get(name) else { return Ok(None); };
+        let Some(&idx) = self.function_name_map.get(name) else {
+            return Ok(None);
+        };
         let fn_def = &self.functions[idx];
         let bp = self.stack.len();
         self.frames.push(CallFrame::new(idx, bp));
         let slot_count = fn_def.chunk.locals as usize;
-        while self.stack.len() < bp + slot_count { self.stack.push(Value::Nil); }
+        while self.stack.len() < bp + slot_count {
+            self.stack.push(Value::Nil);
+        }
         self.execute()?;
         Ok(Some(self.stack.pop().unwrap_or(Value::Nil)))
     }
@@ -532,26 +665,36 @@ impl VM {
         let id = self.timer_id_counter;
         self.timer_id_counter += 1;
         let fire_time = self.time + delay.max(0.0);
-        self.timers.push(TimerEntry { id, callback, fire_time, interval });
+        self.timers.push(TimerEntry {
+            id,
+            callback,
+            fire_time,
+            interval,
+        });
         id
     }
 
-    pub fn remove_timer(&mut self, id: u64) { self.timers.retain(|t| t.id != id); }
+    pub fn remove_timer(&mut self, id: u64) {
+        self.timers.retain(|t| t.id != id);
+    }
 
-    pub fn add_frame_callback(&mut self, callback: Value) { self.frame_callbacks.push(callback); }
+    pub fn add_frame_callback(&mut self, callback: Value) {
+        self.frame_callbacks.push(callback);
+    }
 
     pub fn remove_frame_callback(&mut self, callback: &Value) {
         self.frame_callbacks.retain(|c| !std::ptr::eq(c, callback));
     }
 
     fn flush_pending_timers(&mut self) {
-        while let Some(t) = self.pending_timers.pop() { self.timers.push(t); }
+        while let Some(t) = self.pending_timers.pop() {
+            self.timers.push(t);
+        }
     }
 
     pub fn tick(&mut self, dt: f64) -> Result<()> {
         self.time += dt;
-        loop {
-            let idx = match self.timers.iter().position(|t| self.time >= t.fire_time) { Some(i) => i, None => break };
+        while let Some(idx) = self.timers.iter().position(|t| self.time >= t.fire_time) {
             let timer = self.timers.remove(idx);
             if matches!(timer.callback, Value::Function(_) | Value::Closure(_)) {
                 self.call_value(&timer.callback, &[])?;
@@ -559,8 +702,17 @@ impl VM {
             }
             if let Some(interval) = timer.interval {
                 let next = timer.fire_time + interval;
-                let fire_time = if next <= self.time { self.time + interval } else { next };
-                self.timers.push(TimerEntry { id: timer.id, callback: timer.callback, fire_time, interval: Some(interval) });
+                let fire_time = if next <= self.time {
+                    self.time + interval
+                } else {
+                    next
+                };
+                self.timers.push(TimerEntry {
+                    id: timer.id,
+                    callback: timer.callback,
+                    fire_time,
+                    interval: Some(interval),
+                });
             }
         }
         let callbacks = std::mem::take(&mut self.frame_callbacks);
@@ -577,12 +729,18 @@ impl VM {
         match callee {
             Value::Function(idx) => {
                 let fn_def = &self.functions[*idx];
-                if fn_def.is_generator { return Err(self.runtime_error("cannot call generator via timer")); }
+                if fn_def.is_generator {
+                    return Err(self.runtime_error("cannot call generator via timer"));
+                }
                 let frame = CallFrame::new(*idx, 0);
                 self.frames.push(frame);
-                for arg in args { self.stack.push(arg.clone()); }
+                for arg in args {
+                    self.stack.push(arg.clone());
+                }
                 let slot_count = fn_def.chunk.locals as usize;
-                while self.stack.len() < slot_count { self.stack.push(Value::Nil); }
+                while self.stack.len() < slot_count {
+                    self.stack.push(Value::Nil);
+                }
                 self.execute()?;
                 Ok(self.stack.pop().unwrap_or(Value::Nil))
             }
@@ -593,10 +751,16 @@ impl VM {
                 let mut frame = CallFrame::new(fn_idx, 0);
                 frame.is_closure = true;
                 self.frames.push(frame);
-                for uv in &data.upvalues { self.stack.push(uv.clone()); }
-                for arg in args { self.stack.push(arg.clone()); }
+                for uv in &data.upvalues {
+                    self.stack.push(uv.clone());
+                }
+                for arg in args {
+                    self.stack.push(arg.clone());
+                }
                 let slot_count = fn_def.chunk.locals as usize;
-                while self.stack.len() < slot_count { self.stack.push(Value::Nil); }
+                while self.stack.len() < slot_count {
+                    self.stack.push(Value::Nil);
+                }
                 self.execute()?;
                 Ok(self.stack.pop().unwrap_or(Value::Nil))
             }
@@ -605,38 +769,73 @@ impl VM {
     }
 
     pub fn run_main(&mut self) -> Result<Value> {
-        let main_idx = match self.natives.get("__main__") { Some(&idx) => idx, None => return Err(self.runtime_error("no main function found")) };
+        let main_idx = match self.natives.get("__main__") {
+            Some(&idx) => idx,
+            None => return Err(self.runtime_error("no main function found")),
+        };
         let fn_def = &self.functions[main_idx];
         self.globals.resize(self.globals.len().max(1), Value::Nil);
         let frame = CallFrame::new(main_idx, 0);
         self.frames.push(frame);
         let local_count = fn_def.chunk.locals as usize;
-        while self.stack.len() < local_count { self.stack.push(Value::Nil); }
+        while self.stack.len() < local_count {
+            self.stack.push(Value::Nil);
+        }
         self.execute_debug()
     }
 
     fn runtime_error(&self, msg: impl Into<String>) -> Error {
-        let mut stack_trace: Vec<crate::span::SourceLocation> = self.frames.iter().map(|frame| source_loc_from_frame(&self.functions, frame.function_idx, frame.ip)).collect();
+        let mut stack_trace: Vec<crate::span::SourceLocation> = self
+            .frames
+            .iter()
+            .map(|frame| source_loc_from_frame(&self.functions, frame.function_idx, frame.ip))
+            .collect();
         stack_trace.reverse();
         let msg = msg.into();
-        let trace_str: String = stack_trace.iter().enumerate().map(|(i, loc)| {
-            let fn_name = if i < self.frames.len() { let idx = self.frames[self.frames.len() - 1 - i].function_idx; &self.functions[idx].name } else { "?" };
-            format!("  {}: at {} (in {})", i, loc, fn_name)
-        }).collect::<Vec<_>>().join("\n");
-        Error::Runtime { msg: if stack_trace.is_empty() { msg } else { format!("{}\nstack trace:\n{}", msg, trace_str) }, stack_trace }
+        let trace_str: String = stack_trace
+            .iter()
+            .enumerate()
+            .map(|(i, loc)| {
+                let fn_name = if i < self.frames.len() {
+                    let idx = self.frames[self.frames.len() - 1 - i].function_idx;
+                    &self.functions[idx].name
+                } else {
+                    "?"
+                };
+                format!("  {}: at {} (in {})", i, loc, fn_name)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        Error::Runtime {
+            msg: if stack_trace.is_empty() {
+                msg
+            } else {
+                format!("{}\nstack trace:\n{}", msg, trace_str)
+            },
+            stack_trace,
+        }
     }
 
-    fn chunk(&self) -> &Chunk { let idx = self.frames.last().unwrap().function_idx; &self.functions[idx].chunk }
+    fn chunk(&self) -> &Chunk {
+        let idx = self.frames.last().unwrap().function_idx;
+        &self.functions[idx].chunk
+    }
 
     fn read_byte(&mut self) -> u8 {
-        let ip = { let frame = self.frames.last().unwrap(); frame.ip };
+        let ip = {
+            let frame = self.frames.last().unwrap();
+            frame.ip
+        };
         let b = self.chunk().code[ip];
         self.frames.last_mut().unwrap().ip += 1;
         b
     }
 
     fn read_u16(&mut self) -> u16 {
-        let ip = { let frame = self.frames.last().unwrap(); frame.ip };
+        let ip = {
+            let frame = self.frames.last().unwrap();
+            frame.ip
+        };
         let val = Chunk::read_u16_static(&self.chunk().code, ip);
         self.frames.last_mut().unwrap().ip += 2;
         val
@@ -651,14 +850,22 @@ impl VM {
                 let va = self.arrays.get(*ha);
                 let vb = self.arrays.get(*hb);
                 va.values.len() == vb.values.len()
-                    && va.values.iter().zip(vb.values.iter()).all(|(a, b)| self.values_equal(a, b))
+                    && va
+                        .values
+                        .iter()
+                        .zip(vb.values.iter())
+                        .all(|(a, b)| self.values_equal(a, b))
             }
             (Value::Struct(ha, an), Value::Struct(hb, bn)) => {
                 an == bn && {
                     let va = self.structs.get(*ha);
                     let vb = self.structs.get(*hb);
                     va.values.len() == vb.values.len()
-                        && va.values.iter().zip(vb.values.iter()).all(|(a, b)| self.values_equal(a, b))
+                        && va
+                            .values
+                            .iter()
+                            .zip(vb.values.iter())
+                            .all(|(a, b)| self.values_equal(a, b))
                 }
             }
             (Value::Enum(ha), Value::Enum(hb)) if ha == hb => true,
@@ -667,7 +874,11 @@ impl VM {
                 let eb = self.enums.get(*hb);
                 ea.tag == eb.tag
                     && ea.fields.len() == eb.fields.len()
-                    && ea.fields.iter().zip(eb.fields.iter()).all(|(a, b)| self.values_equal(a, b))
+                    && ea
+                        .fields
+                        .iter()
+                        .zip(eb.fields.iter())
+                        .all(|(a, b)| self.values_equal(a, b))
             }
             (Value::Map(ha), Value::Map(hb)) => ha == hb,
             (Value::Closure(ha), Value::Closure(hb)) => ha == hb,
@@ -681,15 +892,24 @@ impl VM {
     fn execute(&mut self) -> Result<()> {
         self.instruction_count = 0;
         loop {
-            if self.debug_check() { self.debug_state.paused = true; return Ok(()); }
+            if self.debug_check() {
+                self.debug_state.paused = true;
+                return Ok(());
+            }
             let frame = self.frames.last().unwrap();
-            if frame.ip >= self.chunk().code.len() { break; }
+            if frame.ip >= self.chunk().code.len() {
+                break;
+            }
             self.instruction_count += 1;
             if self.instruction_limit > 0 && self.instruction_count > self.instruction_limit {
-                return Err(self.runtime_error(format!("script timeout: executed {} instructions (limit: {})", self.instruction_count, self.instruction_limit)));
+                return Err(self.runtime_error(format!(
+                    "script timeout: executed {} instructions (limit: {})",
+                    self.instruction_count, self.instruction_limit
+                )));
             }
             let byte = self.read_byte();
-            let op = Opcode::from_byte(byte).ok_or_else(|| self.runtime_error(format!("unknown opcode: {}", byte)))?;
+            let op = Opcode::from_byte(byte)
+                .ok_or_else(|| self.runtime_error(format!("unknown opcode: {}", byte)))?;
             match op {
                 Opcode::LoadConst(_) => {
                     let idx = self.read_u16();
@@ -708,16 +928,24 @@ impl VM {
                 }
                 Opcode::LoadGlobal(_) => {
                     let idx = self.read_u16() as usize;
-                    if idx >= self.globals.len() { self.globals.resize(idx + 1, Value::Nil); }
+                    if idx >= self.globals.len() {
+                        self.globals.resize(idx + 1, Value::Nil);
+                    }
                     self.stack.push(self.globals[idx].clone());
                 }
                 Opcode::StoreGlobal(_) => {
                     let idx = self.read_u16() as usize;
-                    if idx >= self.globals.len() { self.globals.resize(idx + 1, Value::Nil); }
+                    if idx >= self.globals.len() {
+                        self.globals.resize(idx + 1, Value::Nil);
+                    }
                     self.globals[idx] = self.stack.pop().unwrap();
                 }
-                Opcode::Pop => { self.stack.pop(); }
-                Opcode::Dup => { self.stack.push(self.stack.last().unwrap().clone()); }
+                Opcode::Pop => {
+                    self.stack.pop();
+                }
+                Opcode::Dup => {
+                    self.stack.push(self.stack.last().unwrap().clone());
+                }
                 Opcode::And => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
@@ -733,14 +961,27 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai + bi)),
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af + bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 + bf)),
-                        (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af + *bi as f64)),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af + bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 + bf))
+                        }
+                        (Value::Float(af), Value::Int(bi)) => {
+                            self.stack.push(Value::Float(af + *bi as f64))
+                        }
                         (Value::Str(as_), Value::Str(bs)) => {
-                            let mut result = as_.to_string(); result.push_str(bs);
+                            let mut result = as_.to_string();
+                            result.push_str(bs);
                             self.stack.push(Value::Str(result.into()));
                         }
-                        _ => return Err(self.runtime_error(format!("cannot add {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot add {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Sub => {
@@ -748,10 +989,22 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai - bi)),
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af - bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 - bf)),
-                        (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af - *bi as f64)),
-                        _ => return Err(self.runtime_error(format!("cannot subtract {} and {}", a.type_name(), b.type_name()))),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af - bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 - bf))
+                        }
+                        (Value::Float(af), Value::Int(bi)) => {
+                            self.stack.push(Value::Float(af - *bi as f64))
+                        }
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot subtract {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Mul => {
@@ -759,10 +1012,22 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai * bi)),
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af * bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 * bf)),
-                        (Value::Float(af), Value::Int(bi)) => self.stack.push(Value::Float(af * *bi as f64)),
-                        _ => return Err(self.runtime_error(format!("cannot multiply {} and {}", a.type_name(), b.type_name()))),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af * bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 * bf))
+                        }
+                        (Value::Float(af), Value::Int(bi)) => {
+                            self.stack.push(Value::Float(af * *bi as f64))
+                        }
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot multiply {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Div => {
@@ -770,16 +1035,30 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => {
-                            if *bi == 0 { return Err(self.runtime_error("division by zero")); }
+                            if *bi == 0 {
+                                return Err(self.runtime_error("division by zero"));
+                            }
                             self.stack.push(Value::Int(ai / bi));
                         }
-                        (Value::Float(af), Value::Float(bf)) => self.stack.push(Value::Float(af / bf)),
-                        (Value::Int(ai), Value::Float(bf)) => self.stack.push(Value::Float(*ai as f64 / bf)),
+                        (Value::Float(af), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(af / bf))
+                        }
+                        (Value::Int(ai), Value::Float(bf)) => {
+                            self.stack.push(Value::Float(*ai as f64 / bf))
+                        }
                         (Value::Float(af), Value::Int(bi)) => {
-                            if *bi == 0 { return Err(self.runtime_error("division by zero")); }
+                            if *bi == 0 {
+                                return Err(self.runtime_error("division by zero"));
+                            }
                             self.stack.push(Value::Float(af / *bi as f64));
                         }
-                        _ => return Err(self.runtime_error(format!("cannot divide {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot divide {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Mod => {
@@ -787,10 +1066,18 @@ impl VM {
                     let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => {
-                            if *bi == 0 { return Err(self.runtime_error("modulo by zero")); }
+                            if *bi == 0 {
+                                return Err(self.runtime_error("modulo by zero"));
+                            }
                             self.stack.push(Value::Int(ai % bi));
                         }
-                        _ => return Err(self.runtime_error(format!("cannot mod {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot mod {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Neg => {
@@ -798,10 +1085,17 @@ impl VM {
                     match a {
                         Value::Int(n) => self.stack.push(Value::Int(-n)),
                         Value::Float(n) => self.stack.push(Value::Float(-n)),
-                        _ => return Err(self.runtime_error(format!("cannot negate {}", a.type_name()))),
+                        _ => {
+                            return Err(
+                                self.runtime_error(format!("cannot negate {}", a.type_name()))
+                            );
+                        }
                     }
                 }
-                Opcode::Not => { let a = self.stack.pop().unwrap(); self.stack.push(Value::Bool(!a.is_truthy())); }
+                Opcode::Not => {
+                    let a = self.stack.pop().unwrap();
+                    self.stack.push(Value::Bool(!a.is_truthy()));
+                }
                 Opcode::Eq => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
@@ -813,28 +1107,40 @@ impl VM {
                     self.stack.push(Value::Bool(!self.values_equal(&a, &b)));
                 }
                 Opcode::Lt => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(compare_lt(&a, &b)));
                 }
                 Opcode::Le => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(!compare_lt(&b, &a)));
                 }
                 Opcode::Gt => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(compare_lt(&b, &a)));
                 }
                 Opcode::Ge => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(!compare_lt(&a, &b)));
                 }
-                Opcode::Jump(_) => { let target = self.read_u16() as usize; self.frames.last_mut().unwrap().ip = target; }
+                Opcode::Jump(_) => {
+                    let target = self.read_u16() as usize;
+                    self.frames.last_mut().unwrap().ip = target;
+                }
                 Opcode::JumpIfFalse(_) => {
                     let target = self.read_u16() as usize;
                     let cond = self.stack.pop().unwrap();
-                    if !cond.is_truthy() { self.frames.last_mut().unwrap().ip = target; }
+                    if !cond.is_truthy() {
+                        self.frames.last_mut().unwrap().ip = target;
+                    }
                 }
-                Opcode::Loop(_) => { let target = self.read_u16() as usize; self.frames.last_mut().unwrap().ip = target; }
+                Opcode::Loop(_) => {
+                    let target = self.read_u16() as usize;
+                    self.frames.last_mut().unwrap().ip = target;
+                }
                 Opcode::Call(_) => {
                     let arg_count = self.read_u16() as usize;
                     let args_start = self.stack.len() - arg_count;
@@ -844,7 +1150,11 @@ impl VM {
                             let fn_def = &self.functions[*idx];
                             if fn_def.is_generator {
                                 let g_handle = self.generators.insert(GeneratorState {
-                                    function_idx: *idx, ip: 0, first_call: true, exhausted: false, locals: Vec::new(),
+                                    function_idx: *idx,
+                                    ip: 0,
+                                    first_call: true,
+                                    exhausted: false,
+                                    locals: Vec::new(),
                                 });
                                 self.stack.truncate(args_start - 1);
                                 self.stack.push(Value::Generator(g_handle));
@@ -853,7 +1163,9 @@ impl VM {
                                 let frame = CallFrame::new(*idx, bp);
                                 self.frames.push(frame);
                                 let slot_count = fn_def.chunk.locals as usize;
-                                while self.stack.len() < bp + slot_count { self.stack.push(Value::Nil); }
+                                while self.stack.len() < bp + slot_count {
+                                    self.stack.push(Value::Nil);
+                                }
                             }
                         }
                         Value::Closure(h) => {
@@ -862,24 +1174,37 @@ impl VM {
                             let up_count = data.upvalues.len();
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop();
-                            for uv in &data.upvalues { self.stack.push(uv.clone()); }
-                            for arg in &args { self.stack.push(arg.clone()); }
+                            for uv in &data.upvalues {
+                                self.stack.push(uv.clone());
+                            }
+                            for arg in &args {
+                                self.stack.push(arg.clone());
+                            }
                             let bp = self.stack.len() - up_count - args.len();
                             let mut frame = CallFrame::new(fn_idx, bp);
                             frame.is_closure = true;
                             self.frames.push(frame);
                             let fn_def = &self.functions[fn_idx];
                             let slot_count = fn_def.chunk.locals as usize;
-                            while self.stack.len() < bp + slot_count { self.stack.push(Value::Nil); }
+                            while self.stack.len() < bp + slot_count {
+                                self.stack.push(Value::Nil);
+                            }
                         }
                         Value::NativeFunction(f) => {
                             let args: Vec<Value> = self.stack.drain(args_start..).collect();
                             self.stack.pop();
-                            let mut ctx = VMContext { registry: self.foreign_registry.clone(), raw_vm: self as *mut VM };
+                            let mut ctx = VMContext {
+                                registry: self.foreign_registry.clone(),
+                                raw_vm: self as *mut VM,
+                            };
                             let result = f(&mut ctx, &args)?;
                             self.stack.push(result);
                         }
-                        _ => return Err(self.runtime_error(format!("cannot call {}", callee.type_name()))),
+                        _ => {
+                            return Err(
+                                self.runtime_error(format!("cannot call {}", callee.type_name()))
+                            );
+                        }
                     }
                 }
                 Opcode::CallMethod(_, _) => {
@@ -889,16 +1214,34 @@ impl VM {
                     let obj = &self.stack[args_start - 1].clone();
                     match obj {
                         Value::Foreign(h) => {
-                            let method_name = self.chunk().method_names.get(method_idx).cloned().unwrap_or_default();
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
                             let fo = self.foreigns.get(*h);
                             let type_id = fo.type_id;
                             let type_name = fo.type_name;
                             let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
-                            let mut ctx = VMContext { registry: self.foreign_registry.clone(), raw_vm: self as *mut VM };
-                            match self.foreign_registry.call_method(&type_id, &method_name, &mut ctx, &args) {
+                            let mut ctx = VMContext {
+                                registry: self.foreign_registry.clone(),
+                                raw_vm: self as *mut VM,
+                            };
+                            match self.foreign_registry.call_method(
+                                &type_id,
+                                &method_name,
+                                &mut ctx,
+                                &args,
+                            ) {
                                 Some(Ok(result)) => self.stack.push(result),
                                 Some(Err(e)) => return Err(e),
-                                None => return Err(self.runtime_error(format!("foreign type '{}' has no method '{}'", type_name, method_name))),
+                                None => {
+                                    return Err(self.runtime_error(format!(
+                                        "foreign type '{}' has no method '{}'",
+                                        type_name, method_name
+                                    )));
+                                }
                             }
                         }
                         Value::Function(idx) => {
@@ -906,10 +1249,17 @@ impl VM {
                             let bp = args_start;
                             self.frames.push(CallFrame::new(*idx, bp));
                             let slot_count = fn_def.chunk.locals as usize;
-                            while self.stack.len() < bp + slot_count { self.stack.push(Value::Nil); }
+                            while self.stack.len() < bp + slot_count {
+                                self.stack.push(Value::Nil);
+                            }
                         }
                         Value::Struct(_h, type_name) => {
-                            let method_name = self.chunk().method_names.get(method_idx).cloned().unwrap_or_default();
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
                             let qualified = format!("{}::{}", type_name, method_name);
                             match self.function_name_map.get(&qualified).copied() {
                                 Some(fn_idx) => {
@@ -919,12 +1269,24 @@ impl VM {
                                     frame.is_method = true;
                                     self.frames.push(frame);
                                     let slot_count = fn_def.chunk.locals as usize;
-                                    while self.stack.len() < bp + slot_count { self.stack.push(Value::Nil); }
+                                    while self.stack.len() < bp + slot_count {
+                                        self.stack.push(Value::Nil);
+                                    }
                                 }
-                                None => return Err(self.runtime_error(format!("type '{}' has no method '{}'", type_name, method_name))),
+                                None => {
+                                    return Err(self.runtime_error(format!(
+                                        "type '{}' has no method '{}'",
+                                        type_name, method_name
+                                    )));
+                                }
                             }
                         }
-                        _ => return Err(self.runtime_error(format!("cannot call method on {}", obj.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot call method on {}",
+                                obj.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Return => {
@@ -937,7 +1299,8 @@ impl VM {
                     let gen_active = self.active_generator.is_some();
                     if gen_active {
                         self.stack.truncate(frame.bp);
-                        if self.frames.len() <= 0 { // generator_base_frame_count is implicit
+                        if self.frames.is_empty() {
+                            // generator_base_frame_count is implicit
                             self.stack.push(result);
                             break;
                         }
@@ -972,16 +1335,25 @@ impl VM {
                     for _ in 0..field_count {
                         let val = self.stack.pop().unwrap();
                         let name = self.stack.pop().unwrap();
-                        if let Value::Str(s) = name { field_names_vec.push(s.to_string()); values.push(val); }
+                        if let Value::Str(s) = name {
+                            field_names_vec.push(s.to_string());
+                            values.push(val);
+                        }
                     }
-                    field_names_vec.reverse(); values.reverse();
-                    let h = self.structs.insert(StructData { values, field_names: field_names_vec });
+                    field_names_vec.reverse();
+                    values.reverse();
+                    let h = self.structs.insert(StructData {
+                        values,
+                        field_names: field_names_vec,
+                    });
                     self.stack.push(Value::Struct(h, type_name));
                 }
                 Opcode::MakeArray(_) => {
                     let count = self.read_u16() as usize;
                     let mut elems = Vec::with_capacity(count);
-                    for _ in 0..count { elems.push(self.stack.pop().unwrap()); }
+                    for _ in 0..count {
+                        elems.push(self.stack.pop().unwrap());
+                    }
                     elems.reverse();
                     let h = self.arrays.insert(ArrayData { values: elems });
                     self.stack.push(Value::Array(h));
@@ -991,53 +1363,92 @@ impl VM {
                     let end = self.stack.pop().unwrap();
                     let start = self.stack.pop().unwrap();
                     match (&start, &end, &inclusive) {
-                        (Value::Int(s), Value::Int(e), Value::Bool(inc)) => self.stack.push(Value::Range(*s, *e, *inc)),
-                        _ => return Err(self.runtime_error(format!("range requires integer bounds, got {} and {}", start.type_name(), end.type_name()))),
+                        (Value::Int(s), Value::Int(e), Value::Bool(inc)) => {
+                            self.stack.push(Value::Range(*s, *e, *inc))
+                        }
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "range requires integer bounds, got {} and {}",
+                                start.type_name(),
+                                end.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::MakeEnum(_, _) => {
                     let tag = self.read_u16();
                     let data_count = self.read_u16() as usize;
                     let mut data = Vec::new();
-                    for _ in 0..data_count { data.push(self.stack.pop().unwrap()); }
+                    for _ in 0..data_count {
+                        data.push(self.stack.pop().unwrap());
+                    }
                     data.reverse();
                     let h = self.enums.insert(EnumData { tag, fields: data });
                     self.stack.push(Value::Enum(h));
                 }
                 Opcode::LoadField(_) => {
                     let field_idx = self.read_u16() as usize;
-                    let field_name = self.chunk().field_names.get(field_idx).cloned().unwrap_or_default();
+                    let field_name = self
+                        .chunk()
+                        .field_names
+                        .get(field_idx)
+                        .cloned()
+                        .unwrap_or_default();
                     let obj = self.stack.pop().unwrap();
                     match &obj {
                         Value::Struct(h, _) => {
                             let d = self.structs.get(*h);
-                            let val = if field_idx < d.values.len() { d.values[field_idx].clone() }
-                            else { d.get_field(&field_name).cloned().unwrap_or(Value::Nil) };
+                            let val = if field_idx < d.values.len() {
+                                d.values[field_idx].clone()
+                            } else {
+                                d.get_field(&field_name).cloned().unwrap_or(Value::Nil)
+                            };
                             self.stack.push(val);
                         }
                         Value::Foreign(h) => {
                             let fo = self.foreigns.get(*h);
                             let type_id = fo.type_id;
-                            match self.foreign_registry.get_field(self, &type_id, &field_name, &obj) {
+                            match self
+                                .foreign_registry
+                                .get_field(self, &type_id, &field_name, &obj)
+                            {
                                 Some(Ok(val)) => self.stack.push(val),
                                 Some(Err(e)) => return Err(e),
-                                None => return Err(self.runtime_error(format!("foreign type '{}' has no field '{}'", fo.type_name, field_name))),
+                                None => {
+                                    return Err(self.runtime_error(format!(
+                                        "foreign type '{}' has no field '{}'",
+                                        fo.type_name, field_name
+                                    )));
+                                }
                             }
                         }
-                        _ => return Err(self.runtime_error(format!("cannot access field on {}", obj.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot access field on {}",
+                                obj.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::StoreField(_) => {
                     let field_idx = self.read_u16() as usize;
-                    let field_name = self.chunk().field_names.get(field_idx).cloned().unwrap_or_default();
+                    let field_name = self
+                        .chunk()
+                        .field_names
+                        .get(field_idx)
+                        .cloned()
+                        .unwrap_or_default();
                     let val = self.stack.pop().unwrap();
                     let mut obj = self.stack.pop().unwrap();
                     let result_val = val.clone();
                     match obj {
                         Value::Struct(h, _) => {
                             let d = self.structs.get_mut(h);
-                            if field_idx < d.values.len() { d.values[field_idx] = val; }
-                            else if let Some(field) = d.get_field_mut(&field_name) { *field = val; }
+                            if field_idx < d.values.len() {
+                                d.values[field_idx] = val;
+                            } else if let Some(field) = d.get_field_mut(&field_name) {
+                                *field = val;
+                            }
                             self.stack.push(result_val);
                         }
                         Value::Foreign(h) => {
@@ -1046,10 +1457,20 @@ impl VM {
                             match reg.set_field(self, &type_id, &field_name, &mut obj, val) {
                                 Some(Ok(())) => self.stack.push(result_val),
                                 Some(Err(e)) => return Err(e),
-                                None => return Err(self.runtime_error(format!("foreign type has no field '{}'", field_name))),
+                                None => {
+                                    return Err(self.runtime_error(format!(
+                                        "foreign type has no field '{}'",
+                                        field_name
+                                    )));
+                                }
                             }
                         }
-                        _ => return Err(self.runtime_error(format!("cannot set field on {}", obj.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot set field on {}",
+                                obj.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::LoadIndex => {
@@ -1064,17 +1485,30 @@ impl VM {
                         }
                         (Value::Str(s), Value::Int(i)) => {
                             let idx = *i as usize;
-                            let c = s.chars().nth(idx).map(|c| c.to_string()).unwrap_or_default();
+                            let c = s
+                                .chars()
+                                .nth(idx)
+                                .map(|c| c.to_string())
+                                .unwrap_or_default();
                             self.stack.push(Value::Str(c.into()));
                         }
                         (Value::Range(start, end, inclusive), Value::Int(i)) => {
                             let val = start + i;
-                            if (!*inclusive && val >= *end) || (*inclusive && val > *end) || val < *start.min(end) {
+                            if (!*inclusive && val >= *end)
+                                || (*inclusive && val > *end)
+                                || val < *start.min(end)
+                            {
                                 return Err(self.runtime_error("index out of range bounds"));
                             }
                             self.stack.push(Value::Int(val));
                         }
-                        _ => return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot index {} with {}",
+                                obj.type_name(),
+                                index.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::StoreIndex => {
@@ -1086,72 +1520,137 @@ impl VM {
                         (Value::Array(h), Value::Int(i)) => {
                             let idx = *i as usize;
                             let arr = self.arrays.get_mut(*h);
-                            if idx < arr.values.len() { arr.values[idx] = val; }
+                            if idx < arr.values.len() {
+                                arr.values[idx] = val;
+                            }
                             self.stack.push(result_val);
                         }
-                        _ => return Err(self.runtime_error(format!("cannot index {} with {}", obj.type_name(), index.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot index {} with {}",
+                                obj.type_name(),
+                                index.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Len => {
                     let val = self.stack.pop().unwrap();
                     match val {
                         Value::Str(s) => self.stack.push(Value::Int(s.len() as i64)),
-                        Value::Array(h) => self.stack.push(Value::Int(self.arrays.get(h).values.len() as i64)),
+                        Value::Array(h) => self
+                            .stack
+                            .push(Value::Int(self.arrays.get(h).values.len() as i64)),
                         Value::Range(start, end, inclusive) => {
-                            let len = if inclusive { end - start + 1 } else { end - start };
+                            let len = if inclusive {
+                                end - start + 1
+                            } else {
+                                end - start
+                            };
                             self.stack.push(Value::Int(len.max(0)));
                         }
-                        Value::Map(h) => self.stack.push(Value::Int(self.maps.get(h).entries.len() as i64)),
-                        _ => return Err(self.runtime_error(format!("cannot get length of {}", val.type_name()))),
+                        Value::Map(h) => self
+                            .stack
+                            .push(Value::Int(self.maps.get(h).entries.len() as i64)),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot get length of {}",
+                                val.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::NewClosure(_, _) => {
                     let fn_idx = self.read_u16() as usize;
                     let up_count = self.read_u16() as usize;
                     let mut upvalues = Vec::with_capacity(up_count);
-                    for _ in 0..up_count { upvalues.push(self.stack.pop().unwrap()); }
+                    for _ in 0..up_count {
+                        upvalues.push(self.stack.pop().unwrap());
+                    }
                     upvalues.reverse();
                     let h = self.closures.insert(ClosureData { fn_idx, upvalues });
                     self.stack.push(Value::Closure(h));
                 }
                 Opcode::BitAnd => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai & bi)),
-                        _ => return Err(self.runtime_error(format!("cannot bitwise-and {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot bitwise-and {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::BitOr => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai | bi)),
-                        _ => return Err(self.runtime_error(format!("cannot bitwise-or {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot bitwise-or {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::BitXor => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai ^ bi)),
-                        _ => return Err(self.runtime_error(format!("cannot bitwise-xor {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot bitwise-xor {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Shl => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai << bi)),
-                        _ => return Err(self.runtime_error(format!("cannot shift left {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot shift left {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::Shr => {
-                    let b = self.stack.pop().unwrap(); let a = self.stack.pop().unwrap();
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
                     match (&a, &b) {
                         (Value::Int(ai), Value::Int(bi)) => self.stack.push(Value::Int(ai >> bi)),
-                        _ => return Err(self.runtime_error(format!("cannot shift right {} and {}", a.type_name(), b.type_name()))),
+                        _ => {
+                            return Err(self.runtime_error(format!(
+                                "cannot shift right {} and {}",
+                                a.type_name(),
+                                b.type_name()
+                            )));
+                        }
                     }
                 }
                 Opcode::BitNot => {
                     let a = self.stack.pop().unwrap();
-                    match a { Value::Int(n) => self.stack.push(Value::Int(!n)), _ => return Err(self.runtime_error(format!("cannot bitwise-not {}", a.type_name()))), }
+                    match a {
+                        Value::Int(n) => self.stack.push(Value::Int(!n)),
+                        _ => {
+                            return Err(
+                                self.runtime_error(format!("cannot bitwise-not {}", a.type_name()))
+                            );
+                        }
+                    }
                 }
                 Opcode::LoadEnumTag => {
                     let val = self.stack.pop().unwrap();
@@ -1165,7 +1664,13 @@ impl VM {
                     let val = self.stack.pop().unwrap();
                     match val {
                         Value::Enum(h) => {
-                            let field = self.enums.get(h).fields.get(idx).cloned().unwrap_or(Value::Nil);
+                            let field = self
+                                .enums
+                                .get(h)
+                                .fields
+                                .get(idx)
+                                .cloned()
+                                .unwrap_or(Value::Nil);
                             self.stack.push(field);
                         }
                         _ => return Err(self.runtime_error("LoadEnumField on non-enum value")),
@@ -1202,7 +1707,9 @@ impl VM {
     /// Resume a generator. Returns the yielded value or `None` if exhausted.
     pub fn resume_generator(&mut self, gen_handle: Handle) -> Result<Option<Value>> {
         let state = self.generators.get(gen_handle);
-        if state.exhausted { return Ok(None); }
+        if state.exhausted {
+            return Ok(None);
+        }
         let fn_idx = state.function_idx;
         let first_call = state.first_call;
         let saved_locals = state.locals.clone();
@@ -1215,7 +1722,9 @@ impl VM {
 
         if first_call {
             let local_count = fn_def.chunk.locals as usize;
-            while self.stack.len() < bp + local_count { self.stack.push(Value::Nil); }
+            while self.stack.len() < bp + local_count {
+                self.stack.push(Value::Nil);
+            }
         } else {
             self.stack.extend(saved_locals);
         }
@@ -1228,17 +1737,28 @@ impl VM {
 
         match result_val {
             Ok(val) => {
-                if self.debug_state.paused { return Ok(None); }
+                if self.debug_state.paused {
+                    return Ok(None);
+                }
                 let state = self.generators.get(gen_handle);
-                if state.exhausted { Ok(None) } else { Ok(Some(val)) }
+                if state.exhausted {
+                    Ok(None)
+                } else {
+                    Ok(Some(val))
+                }
             }
-            Err(e) => { self.generators.get_mut(gen_handle).exhausted = true; Err(e) }
+            Err(e) => {
+                self.generators.get_mut(gen_handle).exhausted = true;
+                Err(e)
+            }
         }
     }
 }
 
 impl Default for VM {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Helper functions ──
@@ -1263,11 +1783,14 @@ impl VM {
         new_name_to_idx: &HashMap<String, usize>,
     ) {
         let remap_idx = |idx: &mut usize| {
-            let name = old_name_to_idx.iter().find(|&(_, &v)| v == *idx).map(|(k, _)| k.clone());
-            if let Some(name) = name {
-                if let Some(&new_idx) = new_name_to_idx.get(&name) {
-                    *idx = new_idx;
-                }
+            let name = old_name_to_idx
+                .iter()
+                .find(|&(_, &v)| v == *idx)
+                .map(|(k, _)| k.clone());
+            if let Some(name) = name
+                && let Some(&new_idx) = new_name_to_idx.get(&name)
+            {
+                *idx = new_idx;
             }
         };
         match val {
@@ -1331,9 +1854,11 @@ pub mod tests {
         let parser = Parser::new(source, &tokens);
         let mut program = parser.parse().unwrap();
         let native_names = crate::stdlib::native_names();
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -1347,7 +1872,8 @@ pub mod tests {
         let native_names = crate::stdlib::native_names();
         let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
         let types = crate::typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source)?;
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source)?;
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
@@ -1361,56 +1887,204 @@ pub mod tests {
         let native_names = crate::stdlib::native_names();
         let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names)?;
         let types = crate::typeck::check(&program, &mut symbols)?;
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source)?;
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source)?;
         let mut vm = VM::new();
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
         vm.run_main()
     }
 
-    #[test] fn test_nil() { assert_eq!(run(""), Value::Nil); }
-    #[test] fn test_int_literal() { assert_eq!(run("42"), Value::Int(42)); }
-    #[test] fn test_float_literal() { assert_eq!(run("3.14"), Value::Float(3.14)); }
-    #[test] fn test_bool_literal() { assert_eq!(run("true"), Value::Bool(true)); }
-    #[test] fn test_string_literal() { assert_eq!(run("\"hello\""), Value::Str("hello".into())); }
-    #[test] fn test_string_interpolation_basic() { assert_eq!(run("let name = \"world\"; \"hello {name}\""), Value::Str("hello world".into())); }
-    #[test] fn test_string_interpolation_int() { assert_eq!(run("\"the answer is {42}\""), Value::Str("the answer is 42".into())); }
-    #[test] fn test_string_interpolation_multiple() { assert_eq!(run("let a = 1; let b = 2; \"{a} + {b} = {a + b}\""), Value::Str("1 + 2 = 3".into())); }
-    #[test] fn test_string_interpolation_no_interp() { assert_eq!(run("\"hello world\""), Value::Str("hello world".into())); }
-    #[test] fn test_string_interpolation_escaped_brace() { assert_eq!(run("\"hello {{name}}\""), Value::Str("hello {name}".into())); }
-    #[test] fn test_add_ints() { assert_eq!(run("1 + 2"), Value::Int(3)); }
-    #[test] fn test_sub_ints() { assert_eq!(run("10 - 3"), Value::Int(7)); }
-    #[test] fn test_mul_ints() { assert_eq!(run("3 * 4"), Value::Int(12)); }
-    #[test] fn test_div_ints() { assert_eq!(run("10 / 3"), Value::Int(3)); }
-    #[test] fn test_let_binding() { assert_eq!(run("let x = 42; x"), Value::Int(42)); }
-    #[test] fn test_if_true() { assert_eq!(run("if true { 1 } else { 2 }"), Value::Int(1)); }
-    #[test] fn test_if_false() { assert_eq!(run("if false { 1 } else { 2 }"), Value::Int(2)); }
-    #[test] fn test_while_loop() { assert_eq!(run("let i = 0; while i < 5 { i = i + 1 }; i"), Value::Int(5)); }
-    #[test] fn test_comparison() { assert_eq!(run("3 < 5"), Value::Bool(true)); assert_eq!(run("5 < 3"), Value::Bool(false)); }
-    #[test] fn test_equality() { assert_eq!(run("3 == 3"), Value::Bool(true)); assert_eq!(run("3 == 4"), Value::Bool(false)); }
-    #[test] fn test_block_expr() { assert_eq!(run("{ let x = 10; x + 5 }"), Value::Int(15)); }
-    #[test] fn test_negation() { assert_eq!(run("-5"), Value::Int(-5)); }
-    #[test] fn test_boolean_not() { assert_eq!(run("!true"), Value::Bool(false)); }
-    #[test] fn test_for_loop() { assert_eq!(run("let s = 0; for i in 0..3 { s = s + i }; s"), Value::Int(3)); }
-    #[test] fn test_match_int() { assert_eq!(run("match 2 { 1 => 10, 2 => 20, 3 => 30 }"), Value::Int(20)); }
-    #[test] fn test_match_wildcard() { assert_eq!(run("match 99 { 1 => 10, _ => 99 }"), Value::Int(99)); }
-    #[test] fn test_function_call() { assert_eq!(run("fn add(a: int, b: int) -> int { a + b } add(3, 4)"), Value::Int(7)); }
-    #[test] fn test_function_return() { assert_eq!(run("fn make(n: int) -> int { return n * 2 } make(5)"), Value::Int(10)); }
-    #[test] fn test_nested_scopes() { assert_eq!(run("let x = 1; { let x = 2; x } + x"), Value::Int(3)); }
-    #[test] fn test_closure() { assert_eq!(run("let f = |x| x + 1; f(41)"), Value::Int(42)); }
-    #[test] fn test_closures_share_upvalue() { assert_eq!(run("let x = 0; let f = || { x = x + 1; x }; f(); f()"), Value::Int(2)); }
-    #[test] fn test_trait_impl_pipeline() {
+    #[test]
+    fn test_nil() {
+        assert_eq!(run(""), Value::Nil);
+    }
+    #[test]
+    fn test_int_literal() {
+        assert_eq!(run("42"), Value::Int(42));
+    }
+    #[test]
+    fn test_float_literal() {
+        assert_eq!(run("3.14"), Value::Float(3.14));
+    }
+    #[test]
+    fn test_bool_literal() {
+        assert_eq!(run("true"), Value::Bool(true));
+    }
+    #[test]
+    fn test_string_literal() {
+        assert_eq!(run("\"hello\""), Value::Str("hello".into()));
+    }
+    #[test]
+    fn test_string_interpolation_basic() {
+        assert_eq!(
+            run("let name = \"world\"; \"hello {name}\""),
+            Value::Str("hello world".into())
+        );
+    }
+    #[test]
+    fn test_string_interpolation_int() {
+        assert_eq!(
+            run("\"the answer is {42}\""),
+            Value::Str("the answer is 42".into())
+        );
+    }
+    #[test]
+    fn test_string_interpolation_multiple() {
+        assert_eq!(
+            run("let a = 1; let b = 2; \"{a} + {b} = {a + b}\""),
+            Value::Str("1 + 2 = 3".into())
+        );
+    }
+    #[test]
+    fn test_string_interpolation_no_interp() {
+        assert_eq!(run("\"hello world\""), Value::Str("hello world".into()));
+    }
+    #[test]
+    fn test_string_interpolation_escaped_brace() {
+        assert_eq!(run("\"hello {{name}}\""), Value::Str("hello {name}".into()));
+    }
+    #[test]
+    fn test_add_ints() {
+        assert_eq!(run("1 + 2"), Value::Int(3));
+    }
+    #[test]
+    fn test_sub_ints() {
+        assert_eq!(run("10 - 3"), Value::Int(7));
+    }
+    #[test]
+    fn test_mul_ints() {
+        assert_eq!(run("3 * 4"), Value::Int(12));
+    }
+    #[test]
+    fn test_div_ints() {
+        assert_eq!(run("10 / 3"), Value::Int(3));
+    }
+    #[test]
+    fn test_let_binding() {
+        assert_eq!(run("let x = 42; x"), Value::Int(42));
+    }
+    #[test]
+    fn test_if_true() {
+        assert_eq!(run("if true { 1 } else { 2 }"), Value::Int(1));
+    }
+    #[test]
+    fn test_if_false() {
+        assert_eq!(run("if false { 1 } else { 2 }"), Value::Int(2));
+    }
+    #[test]
+    fn test_while_loop() {
+        assert_eq!(
+            run("let i = 0; while i < 5 { i = i + 1 }; i"),
+            Value::Int(5)
+        );
+    }
+    #[test]
+    fn test_comparison() {
+        assert_eq!(run("3 < 5"), Value::Bool(true));
+        assert_eq!(run("5 < 3"), Value::Bool(false));
+    }
+    #[test]
+    fn test_equality() {
+        assert_eq!(run("3 == 3"), Value::Bool(true));
+        assert_eq!(run("3 == 4"), Value::Bool(false));
+    }
+    #[test]
+    fn test_block_expr() {
+        assert_eq!(run("{ let x = 10; x + 5 }"), Value::Int(15));
+    }
+    #[test]
+    fn test_negation() {
+        assert_eq!(run("-5"), Value::Int(-5));
+    }
+    #[test]
+    fn test_boolean_not() {
+        assert_eq!(run("!true"), Value::Bool(false));
+    }
+    #[test]
+    fn test_for_loop() {
+        assert_eq!(
+            run("let s = 0; for i in 0..3 { s = s + i }; s"),
+            Value::Int(3)
+        );
+    }
+    #[test]
+    fn test_match_int() {
+        assert_eq!(run("match 2 { 1 => 10, 2 => 20, 3 => 30 }"), Value::Int(20));
+    }
+    #[test]
+    fn test_match_wildcard() {
+        assert_eq!(run("match 99 { 1 => 10, _ => 99 }"), Value::Int(99));
+    }
+    #[test]
+    fn test_function_call() {
+        assert_eq!(
+            run("fn add(a: int, b: int) -> int { a + b } add(3, 4)"),
+            Value::Int(7)
+        );
+    }
+    #[test]
+    fn test_function_return() {
+        assert_eq!(
+            run("fn make(n: int) -> int { return n * 2 } make(5)"),
+            Value::Int(10)
+        );
+    }
+    #[test]
+    fn test_nested_scopes() {
+        assert_eq!(run("let x = 1; { let x = 2; x } + x"), Value::Int(3));
+    }
+    #[test]
+    fn test_closure() {
+        assert_eq!(run("let f = |x| x + 1; f(41)"), Value::Int(42));
+    }
+    #[test]
+    fn test_closures_share_upvalue() {
+        assert_eq!(
+            run("let x = 0; let f = || { x = x + 1; x }; f(); f()"),
+            Value::Int(2)
+        );
+    }
+    #[test]
+    fn test_trait_impl_pipeline() {
         let source = r#"struct Circle { radius: f64 } trait Shape { fn area(&self) -> f64; } impl Shape for Circle { fn area(&self) -> f64 { self.radius * self.radius * 3.14159 } } let c = Circle { radius: 2.0 }; c.area()"#;
         let result = run(source);
         assert!((result.as_float().unwrap() - 12.56636).abs() < 0.001);
     }
-    #[test] fn test_array() { assert_eq!(run("let a = [1, 2, 3]; a[1]"), Value::Int(2)); }
-    #[test] fn test_struct() { assert_eq!(run("struct P { x: int, y: int } let p = P { x: 10, y: 20 }; p.x + p.y"), Value::Int(30)); }
-    #[test] fn test_enum_match() {
-        assert_eq!(run("enum O { Some(int), None } let v = O::Some(42); match v { O::Some(n) => n, O::None => 0 }"), Value::Int(42));
+    #[test]
+    fn test_array() {
+        assert_eq!(run("let a = [1, 2, 3]; a[1]"), Value::Int(2));
     }
-    #[test] fn test_range_for() { assert_eq!(run("let s = 0; for i in 0..=3 { s = s + i }; s"), Value::Int(6)); }
-    #[test] fn test_map_operations() { assert_eq!(run("let m = map_new(); map_set(m, \"k\", 42); map_get(m, \"k\")"), run("Option::Some(42)")); }
+    #[test]
+    fn test_struct() {
+        assert_eq!(
+            run("struct P { x: int, y: int } let p = P { x: 10, y: 20 }; p.x + p.y"),
+            Value::Int(30)
+        );
+    }
+    #[test]
+    fn test_enum_match() {
+        assert_eq!(
+            run(
+                "enum O { Some(int), None } let v = O::Some(42); match v { O::Some(n) => n, O::None => 0 }"
+            ),
+            Value::Int(42)
+        );
+    }
+    #[test]
+    fn test_range_for() {
+        assert_eq!(
+            run("let s = 0; for i in 0..=3 { s = s + i }; s"),
+            Value::Int(6)
+        );
+    }
+    #[test]
+    fn test_map_operations() {
+        assert_eq!(
+            run("let m = map_new(); map_set(m, \"k\", 42); map_get(m, \"k\")"),
+            run("Option::Some(42)")
+        );
+    }
 
     #[test]
     fn test_call_value_calls_script_function_from_native() {
@@ -1425,14 +2099,19 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut native_names = crate::stdlib::native_names();
         native_names.push("call_with_42".into());
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
-        vm.register_native("call_with_42", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
-            let closure = &args[0];
-            ctx.call_value(closure, &[Value::Int(42)])
-        }));
+        vm.register_native(
+            "call_with_42",
+            Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+                let closure = &args[0];
+                ctx.call_value(closure, &[Value::Int(42)])
+            }),
+        );
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
         let result = vm.run_main().unwrap();
@@ -1451,14 +2130,19 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut native_names = crate::stdlib::native_names();
         native_names.push("call_with_42".into());
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
-        vm.register_native("call_with_42", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
-            let closure = &args[0];
-            ctx.call_value(closure, &[Value::Int(42)])
-        }));
+        vm.register_native(
+            "call_with_42",
+            Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+                let closure = &args[0];
+                ctx.call_value(closure, &[Value::Int(42)])
+            }),
+        );
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
         let result = vm.run_main().unwrap();
@@ -1478,14 +2162,19 @@ pub mod tests {
         let mut program = parser.parse().unwrap();
         let mut native_names = crate::stdlib::native_names();
         native_names.push("call_with_2".into());
-        let mut symbols = crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
+        let mut symbols =
+            crate::resolver::resolve_with_natives(&mut program, &native_names).unwrap();
         let types = crate::typeck::check(&program, &mut symbols).unwrap();
-        let (fns, global_names) = compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
+        let (fns, global_names) =
+            compiler::compile(&program, &types, &symbols, &native_names, source).unwrap();
         let mut vm = VM::new();
-        vm.register_native("call_with_2", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
-            let closure = &args[0];
-            ctx.call_value(closure, &[Value::Int(100), Value::Int(23)])
-        }));
+        vm.register_native(
+            "call_with_2",
+            Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+                let closure = &args[0];
+                ctx.call_value(closure, &[Value::Int(100), Value::Int(23)])
+            }),
+        );
         crate::stdlib::register_builtins(&mut vm);
         vm.load_bytecode(fns, global_names);
         let result = vm.run_main().unwrap();
@@ -1539,7 +2228,10 @@ pub mod tests {
 
     #[test]
     fn test_json_roundtrip_string() {
-        assert_eq!(run(r#"let s = to_json("hi"); from_json(s)"#), run(r#""hi""#));
+        assert_eq!(
+            run(r#"let s = to_json("hi"); from_json(s)"#),
+            run(r#""hi""#)
+        );
     }
 
     #[test]
@@ -1608,7 +2300,7 @@ pub mod tests {
         let val = vm.make_struct(
             crate::value::StructBuilder::new("Point")
                 .field("x", 10i64)
-                .field("y", 20i64)
+                .field("y", 20i64),
         );
         let (h, name) = match &val {
             Value::Struct(h, name) => (*h, name.clone()),
@@ -1660,7 +2352,10 @@ pub mod tests {
 
     #[test]
     fn test_stdlib_contains() {
-        assert_eq!(run(r#"contains("hello world", "world")"#), Value::Bool(true));
+        assert_eq!(
+            run(r#"contains("hello world", "world")"#),
+            Value::Bool(true)
+        );
         assert_eq!(run(r#"contains("hello world", "xyz")"#), Value::Bool(false));
     }
 
@@ -1736,7 +2431,10 @@ pub mod tests {
             accept(b)
         "#;
         let result = try_run(source);
-        assert!(result.is_err(), "should fail: B missing field 'y' required by A");
+        assert!(
+            result.is_err(),
+            "should fail: B missing field 'y' required by A"
+        );
     }
 
     #[test]
@@ -1750,7 +2448,10 @@ pub mod tests {
             accept(b)
         "#;
         let result = try_run(source);
-        assert!(result.is_err(), "should fail: field 'x' has incompatible types");
+        assert!(
+            result.is_err(),
+            "should fail: field 'x' has incompatible types"
+        );
     }
 
     #[test]
@@ -1764,7 +2465,10 @@ pub mod tests {
             accept(p)
         "#;
         let result = try_run(source);
-        assert!(result.is_err(), "should fail: opaque type Distance is not compatible with Point");
+        assert!(
+            result.is_err(),
+            "should fail: opaque type Distance is not compatible with Point"
+        );
     }
 
     #[test]
@@ -1777,7 +2481,10 @@ pub mod tests {
             w.value
         "#;
         let result = try_run(source);
-        assert!(result.is_err(), "should fail: opaque type fields not accessible");
+        assert!(
+            result.is_err(),
+            "should fail: opaque type fields not accessible"
+        );
     }
 
     #[test]
@@ -1882,7 +2589,10 @@ pub mod tests {
             y
         "#;
         let result = try_run(source);
-        assert!(result.is_err(), "should fail: unknown not compatible with i64");
+        assert!(
+            result.is_err(),
+            "should fail: unknown not compatible with i64"
+        );
     }
 
     #[test]
@@ -1895,7 +2605,11 @@ pub mod tests {
         assert!(result.is_err(), "assert_eq should return error on mismatch");
         let err = result.unwrap_err();
         let msg = format!("{}", err);
-        assert!(msg.contains("assert_eq failed"), "error should mention assert_eq failed, got: {}", msg);
+        assert!(
+            msg.contains("assert_eq failed"),
+            "error should mention assert_eq failed, got: {}",
+            msg
+        );
     }
 
     #[test]
@@ -1905,6 +2619,10 @@ pub mod tests {
             assert_eq(42, 42);
         "#;
         let result = try_run(source);
-        assert!(result.is_ok(), "assert_eq should pass on matching values: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "assert_eq should pass on matching values: {:?}",
+            result.err()
+        );
     }
 }

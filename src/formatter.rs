@@ -187,7 +187,9 @@ fn must_start_line(kind: &TokenKind, _prev: &Option<TokenKind>) -> bool {
         | TokenKind::Impl
         | TokenKind::Trait => true,
         // Statement keywords that start a line
-        TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop | TokenKind::Match => true,
+        TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Loop | TokenKind::Match => {
+            true
+        }
         // Let/const binding
         TokenKind::Let | TokenKind::Const => true,
         // Return keyword
@@ -226,10 +228,7 @@ fn needs_space_before(kind: &TokenKind, prev: &Option<TokenKind>) -> bool {
         // `in` keyword (`for x in iter`) always needs a space before it
         TokenKind::In => true,
         // After keywords that need a space before their argument
-        _ => match prev {
-            Some(p) if is_keyword_that_needs_space(p) => true,
-            _ => false,
-        },
+        _ => matches!(prev, Some(p) if is_keyword_that_needs_space(p)),
     }
 }
 

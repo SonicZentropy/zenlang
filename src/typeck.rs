@@ -18,6 +18,12 @@ pub struct TypeMap {
     _sentinel: Vec<Expr>,
 }
 
+impl Default for TypeMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypeMap {
     pub fn new() -> Self {
         Self {
@@ -150,7 +156,8 @@ impl<'a> TypeChecker<'a> {
             | (Type::Bool, Type::Bool)
             | (Type::Str, Type::Str)
             | (Type::Unit, Type::Unit)
-            | (Type::Any, _) | (_, Type::Any) => true,
+            | (Type::Any, _)
+            | (_, Type::Any) => true,
             // Numeric coercion
             (Type::I64, Type::F64) | (Type::F64, Type::I64) => true,
             (Type::I64, Type::F32) | (Type::F32, Type::I64) => true,
@@ -167,16 +174,23 @@ impl<'a> TypeChecker<'a> {
                 true
             }
             // Named types — delegate to types_compatible
-            (Type::Named(_), _) | (_, Type::Named(_)) => {
-                self.types_compatible(&a, &b)
-            }
+            (Type::Named(_), _) | (_, Type::Named(_)) => self.types_compatible(&a, &b),
             // Compound types — recurse
             (Type::Array(ae), Type::Array(be)) => self.unify(ae, be),
             (Type::Option(ao), Type::Option(bo)) => self.unify(ao, bo),
             (Type::Result(oka, erra), Type::Result(okb, errb)) => {
                 self.unify(oka, okb) && self.unify(erra, errb)
             }
-            (Type::Fn { params: pa, ret: ra }, Type::Fn { params: pb, ret: rb }) => {
+            (
+                Type::Fn {
+                    params: pa,
+                    ret: ra,
+                },
+                Type::Fn {
+                    params: pb,
+                    ret: rb,
+                },
+            ) => {
                 if pa.len() != pb.len() {
                     return false;
                 }
@@ -240,14 +254,14 @@ impl<'a> TypeChecker<'a> {
             } => {
                 let declared = type_ann.as_ref();
                 let ty = self.check_expr(init);
-                if let Some(dt) = declared {
-                    if !self.types_compatible(&ty, dt) {
-                        self.error(format!(
-                            "type mismatch: expected '{}', got '{}'",
-                            self.type_display(dt),
-                            self.type_display(&ty),
-                        ));
-                    }
+                if let Some(dt) = declared
+                    && !self.types_compatible(&ty, dt)
+                {
+                    self.error(format!(
+                        "type mismatch: expected '{}', got '{}'",
+                        self.type_display(dt),
+                        self.type_display(&ty),
+                    ));
                 }
                 self.symbols
                     .insert_into_current_scope(name, SymKind::Variable(ty));
@@ -257,24 +271,24 @@ impl<'a> TypeChecker<'a> {
             }
             Stmt::Return(Some(expr)) => {
                 let ty = self.check_expr(expr);
-                if let Some(rt) = _return_type {
-                    if !self.types_compatible(&ty, rt) {
-                        self.error(format!(
-                            "return type mismatch: expected '{}', got '{}'",
-                            self.type_display(rt),
-                            self.type_display(&ty),
-                        ));
-                    }
+                if let Some(rt) = _return_type
+                    && !self.types_compatible(&ty, rt)
+                {
+                    self.error(format!(
+                        "return type mismatch: expected '{}', got '{}'",
+                        self.type_display(rt),
+                        self.type_display(&ty),
+                    ));
                 }
             }
             Stmt::Return(None) => {
-                if let Some(rt) = _return_type {
-                    if !self.types_compatible(&Type::Unit, rt) {
-                        self.error(format!(
-                            "return type mismatch: expected '{}', got '()'",
-                            self.type_display(rt),
-                        ));
-                    }
+                if let Some(rt) = _return_type
+                    && !self.types_compatible(&Type::Unit, rt)
+                {
+                    self.error(format!(
+                        "return type mismatch: expected '{}', got '()'",
+                        self.type_display(rt),
+                    ));
                 }
             }
             Stmt::Fn {
@@ -304,21 +318,21 @@ impl<'a> TypeChecker<'a> {
                     self.check_stmt(&stmt.node, expected_ret);
                 }
                 // Last expression's type should match return type
-                if let Some(last) = body.last() {
-                    if let Stmt::Expr(e) = &last.node {
-                        let ty = self.check_expr(e);
-                        if let Some(rt) = expected_ret {
-                            if !self.types_compatible(&ty, rt) {
-                                self.error_at(
-                                    last.span,
-                                    format!(
-                                        "function return type mismatch: expected '{}', got '{}'",
-                                        self.type_display(rt),
-                                        self.type_display(&ty),
-                                    ),
-                                );
-                            }
-                        }
+                if let Some(last) = body.last()
+                    && let Stmt::Expr(e) = &last.node
+                {
+                    let ty = self.check_expr(e);
+                    if let Some(rt) = expected_ret
+                        && !self.types_compatible(&ty, rt)
+                    {
+                        self.error_at(
+                            last.span,
+                            format!(
+                                "function return type mismatch: expected '{}', got '{}'",
+                                self.type_display(rt),
+                                self.type_display(&ty),
+                            ),
+                        );
                     }
                 }
                 self.symbols.exit_scope();
@@ -370,18 +384,21 @@ impl<'a> TypeChecker<'a> {
                         for stmt in body {
                             self.check_stmt(&stmt.node, expected_ret);
                         }
-                        if let Some(last) = body.last() {
-                            if let Stmt::Expr(e) = &last.node {
-                                let ty = self.check_expr(e);
-                                if let Some(rt) = expected_ret {
-                                    if !self.types_compatible(&ty, rt) {
-                                        self.error_at(last.span, format!(
-                                            "function return type mismatch: expected '{}', got '{}'",
-                                            self.type_display(rt),
-                                            self.type_display(&ty),
-                                        ));
-                                    }
-                                }
+                        if let Some(last) = body.last()
+                            && let Stmt::Expr(e) = &last.node
+                        {
+                            let ty = self.check_expr(e);
+                            if let Some(rt) = expected_ret
+                                && !self.types_compatible(&ty, rt)
+                            {
+                                self.error_at(
+                                    last.span,
+                                    format!(
+                                        "function return type mismatch: expected '{}', got '{}'",
+                                        self.type_display(rt),
+                                        self.type_display(&ty),
+                                    ),
+                                );
                             }
                         }
                         self.symbols.exit_scope();
@@ -570,15 +587,15 @@ impl<'a> TypeChecker<'a> {
                             }
                             for (i, arg) in args.iter().enumerate() {
                                 let arg_ty = self.check_expr(arg);
-                                if let Some(param_ty) = params.get(i) {
-                                    if !self.types_compatible(&arg_ty, param_ty) {
-                                        self.error(format!(
-                                            "argument {} type mismatch: expected '{}', got '{}'",
-                                            i,
-                                            self.type_display(param_ty),
-                                            self.type_display(&arg_ty),
-                                        ));
-                                    }
+                                if let Some(param_ty) = params.get(i)
+                                    && !self.types_compatible(&arg_ty, param_ty)
+                                {
+                                    self.error(format!(
+                                        "argument {} type mismatch: expected '{}', got '{}'",
+                                        i,
+                                        self.type_display(param_ty),
+                                        self.type_display(&arg_ty),
+                                    ));
                                 }
                             }
                         } else {
@@ -609,14 +626,19 @@ impl<'a> TypeChecker<'a> {
                     }
                 }
             }
-            Expr::EnumCtor { enum_name, variant_name, args } => {
+            Expr::EnumCtor {
+                enum_name,
+                variant_name,
+                args,
+            } => {
                 let qualified = format!("{}::{}", enum_name, variant_name);
-                let lookup_fields = self.symbols.lookup(&qualified).and_then(|entry| {
-                    match &entry.kind {
+                let lookup_fields = self
+                    .symbols
+                    .lookup(&qualified)
+                    .and_then(|entry| match &entry.kind {
                         SymKind::EnumConstructor { fields, .. } => Some(fields.clone()),
                         _ => None,
-                    }
-                });
+                    });
                 if let Some(fields) = lookup_fields {
                     if args.len() != fields.len() {
                         self.error(format!(
@@ -625,7 +647,9 @@ impl<'a> TypeChecker<'a> {
                             fields.len(),
                             args.len()
                         ));
-                        for arg in args { self.check_expr(arg); }
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
                         return Type::Unit;
                     }
                     for (arg, field_ty) in args.iter().zip(fields.iter()) {
@@ -639,7 +663,7 @@ impl<'a> TypeChecker<'a> {
                             ));
                         }
                     }
-                    return Type::Named(enum_name.clone().into());
+                    return Type::Named(enum_name.clone());
                 }
                 for arg in args {
                     self.check_expr(arg);
@@ -683,15 +707,15 @@ impl<'a> TypeChecker<'a> {
                                 }
                                 for (i, arg) in args.iter().enumerate() {
                                     let arg_ty = self.check_expr(arg);
-                                    if let Some(param_ty) = param_tys.get(i) {
-                                        if !self.types_compatible(&arg_ty, param_ty) {
-                                            self.error(format!(
+                                    if let Some(param_ty) = param_tys.get(i)
+                                        && !self.types_compatible(&arg_ty, param_ty)
+                                    {
+                                        self.error(format!(
                                                 "argument {} type mismatch for '{}::{}': expected '{}', got '{}'",
                                                 i, struct_name, method,
                                                 self.type_display(param_ty),
                                                 self.type_display(&arg_ty),
                                             ));
-                                        }
                                     }
                                 }
                                 ret_ty
@@ -725,7 +749,9 @@ impl<'a> TypeChecker<'a> {
                         for arg in args {
                             self.check_expr(arg);
                         }
-                        self.error("cannot call method on 'unknown' type; narrow via match or cast first");
+                        self.error(
+                            "cannot call method on 'unknown' type; narrow via match or cast first",
+                        );
                         Type::Unit
                     }
                     _ => {
@@ -773,7 +799,9 @@ impl<'a> TypeChecker<'a> {
                     Type::Any => Type::Any,
                     // `Type::Unknown` requires narrowing before field access
                     Type::Unknown => {
-                        self.error("cannot access field on 'unknown' type; narrow via match or cast first");
+                        self.error(
+                            "cannot access field on 'unknown' type; narrow via match or cast first",
+                        );
                         Type::Unit
                     }
                     _ => {
@@ -1045,10 +1073,11 @@ impl<'a> TypeChecker<'a> {
                 // compatibility check — they never produce a value and should
                 // not constrain the match type.  This mirrors Rust's treatment
                 // of the never type `!`.
-                let diverges = |body: &Expr| matches!(body,
-                    Expr::Return(..) | Expr::Break | Expr::Continue
-                );
-                let non_diverging: Vec<Type> = arm_types.iter().zip(arms.iter())
+                let diverges =
+                    |body: &Expr| matches!(body, Expr::Return(..) | Expr::Break | Expr::Continue);
+                let non_diverging: Vec<Type> = arm_types
+                    .iter()
+                    .zip(arms.iter())
                     .filter(|(_, arm)| !diverges(&arm.body))
                     .map(|(ty, _)| ty.clone())
                     .collect();
@@ -1078,7 +1107,15 @@ impl<'a> TypeChecker<'a> {
                 let entry = self.symbols.lookup(name).cloned();
                 // Resolve through type aliases to find the actual struct
                 let resolved = match &entry {
-                    Some(SymEntry { kind: SymKind::TypeAlias { alias, opaque: false, .. }, .. }) => {
+                    Some(SymEntry {
+                        kind:
+                            SymKind::TypeAlias {
+                                alias,
+                                opaque: false,
+                                ..
+                            },
+                        ..
+                    }) => {
                         if let Type::Named(base) = alias {
                             self.symbols.lookup(base).cloned()
                         } else {
@@ -1183,7 +1220,9 @@ impl<'a> TypeChecker<'a> {
             (Type::Named(a), Type::Named(b)) => {
                 if a == b {
                     true
-                } else if self.is_opaque(&Type::Named(a.clone())) || self.is_opaque(&Type::Named(b.clone())) {
+                } else if self.is_opaque(&Type::Named(a.clone()))
+                    || self.is_opaque(&Type::Named(b.clone()))
+                {
                     // Opaque types: name mismatch → incompatible
                     false
                 } else {
@@ -1241,24 +1280,26 @@ impl<'a> TypeChecker<'a> {
     /// Returns `true` if `ty` is an opaque type alias (nominally distinct,
     /// not structurally compatible with its base).
     fn is_opaque(&self, ty: &Type) -> bool {
-        if let Type::Named(s) = ty {
-            if let Some(entry) = self.symbols.lookup(s) {
-                if let SymKind::TypeAlias { opaque, .. } = &entry.kind {
-                    return *opaque;
-                }
-            }
+        if let Type::Named(s) = ty
+            && let Some(entry) = self.symbols.lookup(s)
+            && let SymKind::TypeAlias { opaque, .. } = &entry.kind
+        {
+            return *opaque;
         }
         false
     }
 
     /// If `name` is a transparent type alias, resolve to the underlying type name.
     fn resolve_type_alias_name(&self, name: &str) -> CompactString {
-        if let Some(entry) = self.symbols.lookup(name) {
-            if let SymKind::TypeAlias { alias, opaque: false, .. } = &entry.kind {
-                if let Type::Named(base) = alias {
-                    return base.clone();
-                }
-            }
+        if let Some(entry) = self.symbols.lookup(name)
+            && let SymKind::TypeAlias {
+                alias,
+                opaque: false,
+                ..
+            } = &entry.kind
+            && let Type::Named(base) = alias
+        {
+            return base.clone();
         }
         name.into()
     }
@@ -1293,13 +1334,20 @@ impl<'a> TypeChecker<'a> {
         if let Some(entry) = self.symbols.lookup(name) {
             match &entry.kind {
                 SymKind::Struct(def) => {
-                    return Some(def.fields.iter().map(|f| (f.name.to_string(), f.type_ann.clone())).collect());
+                    return Some(
+                        def.fields
+                            .iter()
+                            .map(|f| (f.name.to_string(), f.type_ann.clone()))
+                            .collect(),
+                    );
                 }
-                SymKind::TypeAlias { alias, opaque: false, .. } => {
+                SymKind::TypeAlias {
+                    alias: Type::Named(base),
+                    opaque: false,
+                    ..
+                } => {
                     // Transparent alias — resolve and recurse
-                    if let Type::Named(base) = alias {
-                        return self.get_struct_fields(base);
-                    }
+                    return self.get_struct_fields(base);
                 }
                 _ => {}
             }

@@ -13,16 +13,28 @@ use snafu::prelude::*;
 #[snafu(visibility(pub))]
 pub enum Error {
     #[snafu(display("parse error at {location}: {msg}"))]
-    Parse { location: SourceLocation, msg: String },
+    Parse {
+        location: SourceLocation,
+        msg: String,
+    },
 
     #[snafu(display("type error at {location}: {msg}"))]
-    TypeError { location: SourceLocation, msg: String },
+    TypeError {
+        location: SourceLocation,
+        msg: String,
+    },
 
     #[snafu(display("resolution error at {location}: {msg}"))]
-    Resolve { location: SourceLocation, msg: String },
+    Resolve {
+        location: SourceLocation,
+        msg: String,
+    },
 
     #[snafu(display("runtime error: {msg}"))]
-    Runtime { msg: String, stack_trace: Vec<SourceLocation> },
+    Runtime {
+        msg: String,
+        stack_trace: Vec<SourceLocation>,
+    },
 
     #[snafu(display("I/O error: {source}"))]
     Io { source: std::io::Error },
@@ -31,7 +43,10 @@ pub enum Error {
     Script { msg: String },
 
     #[snafu(display("compile error at {location}: {msg}"))]
-    Compile { location: SourceLocation, msg: String },
+    Compile {
+        location: SourceLocation,
+        msg: String,
+    },
 
     #[snafu(display("multiple compile errors"))]
     CompileMultiple { errors: Vec<Error> },

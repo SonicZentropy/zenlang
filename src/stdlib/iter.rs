@@ -39,11 +39,11 @@ fn array_iter_next(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Foreign(h)) => {
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
             let fo = vm.foreigns.get_mut(*h);
-            let state: &mut ArrayIterState = fo.downcast_mut().ok_or_else(|| {
-                crate::error::Error::Script {
-                    msg: "ArrayIter.next called on wrong foreign type".into(),
-                }
-            })?;
+            let state: &mut ArrayIterState =
+                fo.downcast_mut()
+                    .ok_or_else(|| crate::error::Error::Script {
+                        msg: "ArrayIter.next called on wrong foreign type".into(),
+                    })?;
             let item = vm.arrays.get(state.data).values.get(state.idx).cloned();
             match item {
                 Some(v) => {
@@ -64,11 +64,11 @@ fn range_iter_next(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Foreign(h)) => {
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
             let fo = vm.foreigns.get_mut(*h);
-            let state: &mut RangeIterState = fo.downcast_mut().ok_or_else(|| {
-                crate::error::Error::Script {
-                    msg: "RangeIter.next called on wrong foreign type".into(),
-                }
-            })?;
+            let state: &mut RangeIterState =
+                fo.downcast_mut()
+                    .ok_or_else(|| crate::error::Error::Script {
+                        msg: "RangeIter.next called on wrong foreign type".into(),
+                    })?;
             let has_next = if state.inclusive {
                 state.cur <= state.end
             } else {
@@ -93,11 +93,11 @@ fn str_iter_next(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Foreign(h)) => {
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
             let fo = vm.foreigns.get_mut(*h);
-            let state: &mut StrIterState = fo.downcast_mut().ok_or_else(|| {
-                crate::error::Error::Script {
-                    msg: "StrIter.next called on wrong foreign type".into(),
-                }
-            })?;
+            let state: &mut StrIterState =
+                fo.downcast_mut()
+                    .ok_or_else(|| crate::error::Error::Script {
+                        msg: "StrIter.next called on wrong foreign type".into(),
+                    })?;
             let item = state.chars.get(state.idx).copied();
             match item {
                 Some(c) => {
@@ -118,11 +118,11 @@ fn map_iter_next(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Foreign(h)) => {
             let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
             let fo = vm.foreigns.get_mut(*h);
-            let state: &mut MapIterState = fo.downcast_mut().ok_or_else(|| {
-                crate::error::Error::Script {
-                    msg: "MapIter.next called on wrong foreign type".into(),
-                }
-            })?;
+            let state: &mut MapIterState =
+                fo.downcast_mut()
+                    .ok_or_else(|| crate::error::Error::Script {
+                        msg: "MapIter.next called on wrong foreign type".into(),
+                    })?;
             let item = state.entries.get(state.idx).cloned();
             match item {
                 Some((k, v)) => {
@@ -160,19 +160,30 @@ pub fn iter_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
         Some(Value::Range(s, e, inc)) => {
             let fh = vm.foreigns.insert(ForeignObject::new(
                 "RangeIter",
-                RangeIterState { cur: *s, end: *e, inclusive: *inc },
+                RangeIterState {
+                    cur: *s,
+                    end: *e,
+                    inclusive: *inc,
+                },
             ));
             Ok(Value::Foreign(fh))
         }
         Some(Value::Str(s)) => {
             let fh = vm.foreigns.insert(ForeignObject::new(
                 "StrIter",
-                StrIterState { chars: s.chars().collect(), idx: 0 },
+                StrIterState {
+                    chars: s.chars().collect(),
+                    idx: 0,
+                },
             ));
             Ok(Value::Foreign(fh))
         }
         Some(Value::Map(h)) => {
-            let entries: Vec<(Value, Value)> = vm.maps.get(*h).entries.iter()
+            let entries: Vec<(Value, Value)> = vm
+                .maps
+                .get(*h)
+                .entries
+                .iter()
                 .map(|(k, v)| (k.to_value(), v.clone()))
                 .collect();
             let fh = vm.foreigns.insert(ForeignObject::new(

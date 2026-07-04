@@ -20,7 +20,9 @@ pub struct ArrayData {
 
 impl Clone for ArrayData {
     fn clone(&self) -> Self {
-        Self { values: self.values.clone() }
+        Self {
+            values: self.values.clone(),
+        }
     }
 }
 
@@ -32,7 +34,10 @@ pub struct StructData {
 
 impl Clone for StructData {
     fn clone(&self) -> Self {
-        Self { values: self.values.clone(), field_names: self.field_names.clone() }
+        Self {
+            values: self.values.clone(),
+            field_names: self.field_names.clone(),
+        }
     }
 }
 
@@ -59,7 +64,10 @@ pub struct EnumData {
 
 impl Clone for EnumData {
     fn clone(&self) -> Self {
-        Self { tag: self.tag, fields: self.fields.clone() }
+        Self {
+            tag: self.tag,
+            fields: self.fields.clone(),
+        }
     }
 }
 
@@ -71,7 +79,10 @@ pub struct ClosureData {
 
 impl Clone for ClosureData {
     fn clone(&self) -> Self {
-        Self { fn_idx: self.fn_idx, upvalues: self.upvalues.clone() }
+        Self {
+            fn_idx: self.fn_idx,
+            upvalues: self.upvalues.clone(),
+        }
     }
 }
 
@@ -103,7 +114,9 @@ pub struct MapData {
 
 impl Clone for MapData {
     fn clone(&self) -> Self {
-        Self { entries: self.entries.clone() }
+        Self {
+            entries: self.entries.clone(),
+        }
     }
 }
 
@@ -124,7 +137,11 @@ pub struct WeakData {
 
 impl Clone for WeakData {
     fn clone(&self) -> Self {
-        Self { kind: self.kind, target: self.target, type_name: self.type_name.clone() }
+        Self {
+            kind: self.kind,
+            target: self.target,
+            type_name: self.type_name.clone(),
+        }
     }
 }
 
@@ -159,7 +176,9 @@ impl ForeignObject {
             type_name,
             data: Box::new(data),
             clone_fn: Rc::new(move |any: &dyn Any| {
-                let typed = any.downcast_ref::<T>().expect("ForeignObject clone: type mismatch");
+                let typed = any
+                    .downcast_ref::<T>()
+                    .expect("ForeignObject clone: type mismatch");
                 Box::new(typed.clone())
             }),
         }
@@ -387,7 +406,10 @@ impl Value {
     /// assert_eq!(Value::Float(3.0).as_int(), None);
     /// ```
     pub fn as_int(&self) -> Option<i64> {
-        match self { Value::Int(n) => Some(*n), _ => None }
+        match self {
+            Value::Int(n) => Some(*n),
+            _ => None,
+        }
     }
 
     /// Extract the float value if this is `Value::Float`, or coerce from `Int`.
@@ -416,7 +438,10 @@ impl Value {
     /// assert_eq!(Value::Int(1).as_bool(), None);
     /// ```
     pub fn as_bool(&self) -> Option<bool> {
-        match self { Value::Bool(b) => Some(*b), _ => None }
+        match self {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        }
     }
 
     /// Extract the string value as an owned `String` if this is `Value::Str`.
@@ -428,7 +453,10 @@ impl Value {
     /// assert_eq!(s, "hello");
     /// ```
     pub fn as_str(&self) -> Option<String> {
-        match self { Value::Str(s) => Some(s.to_string()), _ => None }
+        match self {
+            Value::Str(s) => Some(s.to_string()),
+            _ => None,
+        }
     }
 }
 
@@ -441,7 +469,9 @@ impl From<&str> for Value {
     /// let v: Value = "hello".into();
     /// assert_eq!(v.as_str(), Some("hello".into()));
     /// ```
-    fn from(s: &str) -> Self { Value::Str(s.into()) }
+    fn from(s: &str) -> Self {
+        Value::Str(s.into())
+    }
 }
 
 impl From<String> for Value {
@@ -453,7 +483,9 @@ impl From<String> for Value {
     /// let v: Value = String::from("world").into();
     /// assert_eq!(v.as_str(), Some("world".into()));
     /// ```
-    fn from(s: String) -> Self { Value::Str(s.into()) }
+    fn from(s: String) -> Self {
+        Value::Str(s.into())
+    }
 }
 
 impl From<i64> for Value {
@@ -465,7 +497,9 @@ impl From<i64> for Value {
     /// let v: Value = 42i64.into();
     /// assert_eq!(v.as_int(), Some(42));
     /// ```
-    fn from(n: i64) -> Self { Value::Int(n) }
+    fn from(n: i64) -> Self {
+        Value::Int(n)
+    }
 }
 
 impl From<f64> for Value {
@@ -477,7 +511,9 @@ impl From<f64> for Value {
     /// let v: Value = 3.14f64.into();
     /// assert_eq!(v.as_float(), Some(3.14));
     /// ```
-    fn from(n: f64) -> Self { Value::Float(n) }
+    fn from(n: f64) -> Self {
+        Value::Float(n)
+    }
 }
 
 impl From<bool> for Value {
@@ -489,7 +525,9 @@ impl From<bool> for Value {
     /// let v: Value = true.into();
     /// assert_eq!(v.as_bool(), Some(true));
     /// ```
-    fn from(b: bool) -> Self { Value::Bool(b) }
+    fn from(b: bool) -> Self {
+        Value::Bool(b)
+    }
 }
 
 impl TryFrom<Value> for i64 {
@@ -596,7 +634,11 @@ impl StructBuilder {
     /// assert_eq!(builder.name(), "Point");
     /// ```
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), values: Vec::new(), field_names: Vec::new() }
+        Self {
+            name: name.into(),
+            values: Vec::new(),
+            field_names: Vec::new(),
+        }
     }
 
     /// Add a named field with an auto-converted value.
@@ -630,7 +672,10 @@ impl StructBuilder {
     /// assert!(data.get_field("x").is_some());
     /// ```
     pub fn build(self) -> StructData {
-        StructData { values: self.values, field_names: self.field_names }
+        StructData {
+            values: self.values,
+            field_names: self.field_names,
+        }
     }
 
     /// Borrow the struct type name.
@@ -806,31 +851,58 @@ mod tests {
     // ── ForeignObject ───────────────────────────────────────────────────
 
     #[derive(Clone, Debug, PartialEq)]
-    struct TestObj { name: String, value: i64 }
+    struct TestObj {
+        name: String,
+        value: i64,
+    }
 
     #[test]
     fn test_foreign_new_downcast() {
-        let fo = ForeignObject::new("TestObj", TestObj { name: "foo".into(), value: 42 });
+        let fo = ForeignObject::new(
+            "TestObj",
+            TestObj {
+                name: "foo".into(),
+                value: 42,
+            },
+        );
         let inner: &TestObj = fo.downcast().unwrap();
         assert_eq!(inner.name, "foo");
         assert_eq!(inner.value, 42);
     }
     #[test]
     fn test_foreign_downcast_wrong_type() {
-        let fo = ForeignObject::new("TestObj", TestObj { name: "x".into(), value: 1 });
+        let fo = ForeignObject::new(
+            "TestObj",
+            TestObj {
+                name: "x".into(),
+                value: 1,
+            },
+        );
         let result: Option<&String> = fo.downcast();
         assert!(result.is_none());
     }
     #[test]
     fn test_foreign_downcast_mut() {
-        let mut fo = ForeignObject::new("TestObj", TestObj { name: "x".into(), value: 0 });
+        let mut fo = ForeignObject::new(
+            "TestObj",
+            TestObj {
+                name: "x".into(),
+                value: 0,
+            },
+        );
         let inner: &mut TestObj = fo.downcast_mut().unwrap();
         inner.value = 99;
         assert_eq!(fo.downcast::<TestObj>().unwrap().value, 99);
     }
     #[test]
     fn test_foreign_clone() {
-        let fo = ForeignObject::new("TestObj", TestObj { name: "orig".into(), value: 7 });
+        let fo = ForeignObject::new(
+            "TestObj",
+            TestObj {
+                name: "orig".into(),
+                value: 7,
+            },
+        );
         let cloned = fo.clone();
         let a: &TestObj = fo.downcast().unwrap();
         let b: &TestObj = cloned.downcast().unwrap();
@@ -838,7 +910,13 @@ mod tests {
     }
     #[test]
     fn test_foreign_type_name() {
-        let fo = ForeignObject::new("TestObj", TestObj { name: "".into(), value: 0 });
+        let fo = ForeignObject::new(
+            "TestObj",
+            TestObj {
+                name: "".into(),
+                value: 0,
+            },
+        );
         assert_eq!(fo.type_name, "TestObj");
     }
 

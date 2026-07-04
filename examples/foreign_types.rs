@@ -1,7 +1,6 @@
 /// Register Rust types with fields and methods accessible from Zenlang scripts.
 ///
 /// Run with: cargo run --example foreign_types
-
 use zenlang::compiler::compile;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
@@ -10,7 +9,7 @@ use zenlang::stdlib::{native_names as stdlib_names, register_builtins};
 use zenlang::typeck::check;
 use zenlang::value::ForeignObject;
 use zenlang::vm::VMContext;
-use zenlang::{Value, VM, ZenForeign, zen_methods};
+use zenlang::{VM, Value, ZenForeign, zen_methods};
 
 // A Rust struct we want to expose to scripts.
 // The derive macro generates `register_zen_foreign()` with field accessors,
@@ -25,7 +24,11 @@ struct Player {
 #[zen_methods]
 impl Player {
     fn new(name: &str) -> Self {
-        Self { name: name.to_string(), health: 100, max_health: 100 }
+        Self {
+            name: name.to_string(),
+            health: 100,
+            max_health: 100,
+        }
     }
 
     fn heal_percent(&self) -> f64 {
@@ -42,13 +45,16 @@ fn main() -> zenlang::Result<()> {
     Player::register_zen_methods(&mut vm);
 
     // Register a native function to create a Player from the script side
-    vm.register_native("create_player", std::rc::Rc::new(|ctx: &mut VMContext, args: &[Value]| {
-        let name = args.first().and_then(|v| v.as_str()).unwrap_or_default();
-        let player = Player::new(&name);
-        let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
-        let h = vm.foreigns.insert(ForeignObject::new("Player", player));
-        Ok(Value::Foreign(h))
-    }));
+    vm.register_native(
+        "create_player",
+        std::rc::Rc::new(|ctx: &mut VMContext, args: &[Value]| {
+            let name = args.first().and_then(|v| v.as_str()).unwrap_or_default();
+            let player = Player::new(&name);
+            let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+            let h = vm.foreigns.insert(ForeignObject::new("Player", player));
+            Ok(Value::Foreign(h))
+        }),
+    );
 
     let mut names = vm.native_names();
     for n in &stdlib_names() {

@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Fields, FnArg, ImplItem, ItemImpl, ReturnType, Type,
+    Data, DeriveInput, Fields, FnArg, ImplItem, ItemImpl, ReturnType, Type, parse_macro_input,
 };
 
 /// Attribute macro to generate a `FnSignature` for a native function.
@@ -19,7 +19,11 @@ pub fn zen_native_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as ZenNativeFnArgs);
     let func = parse_macro_input!(item as syn::ItemFn);
     let fn_name = &func.sig.ident;
-    let fn_name_str = args.name.as_deref().unwrap_or(&fn_name.to_string()).to_string();
+    let fn_name_str = args
+        .name
+        .as_deref()
+        .unwrap_or(&fn_name.to_string())
+        .to_string();
     let sig_name = syn::Ident::new(&format!("{}_sig", fn_name), proc_macro2::Span::call_site());
 
     let param_types = &args.params;
@@ -75,13 +79,21 @@ impl syn::parse::Parse for ZenNativeFnArgs {
                 "params" => {
                     let content;
                     syn::bracketed!(content in input);
-                    params = Some(content.parse_terminated(syn::Ident::parse, syn::Token![,])?.into_iter().collect());
+                    params = Some(
+                        content
+                            .parse_terminated(syn::Ident::parse, syn::Token![,])?
+                            .into_iter()
+                            .collect(),
+                    );
                 }
                 "returns" => {
                     returns = Some(input.parse::<syn::Ident>()?);
                 }
                 _ => {
-                    return Err(syn::Error::new(key.span(), format!("unknown key '{}'", key)));
+                    return Err(syn::Error::new(
+                        key.span(),
+                        format!("unknown key '{}'", key),
+                    ));
                 }
             }
 
@@ -94,7 +106,11 @@ impl syn::parse::Parse for ZenNativeFnArgs {
         let params = params.ok_or_else(|| input.error("missing required 'params:' key"))?;
         let returns = returns.ok_or_else(|| input.error("missing required 'returns:' key"))?;
 
-        Ok(ZenNativeFnArgs { name, params, returns })
+        Ok(ZenNativeFnArgs {
+            name,
+            params,
+            returns,
+        })
     }
 }
 
@@ -134,13 +150,13 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
                     "ZenForeign only supports structs with named fields",
                 )
                 .to_compile_error()
-                .into()
+                .into();
             }
         },
         _ => {
             return syn::Error::new_spanned(&input, "ZenForeign only supports structs")
                 .to_compile_error()
-                .into()
+                .into();
         }
     };
 
@@ -261,7 +277,6 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
                         ),
                     )
                     .to_compile_error()
-                    .into()
                 }
             };
 
@@ -386,7 +401,6 @@ pub fn derive_zen_foreign(input: TokenStream) -> TokenStream {
                         ),
                     )
                     .to_compile_error()
-                    .into()
                 }
             };
 
@@ -452,15 +466,17 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
             _ => continue,
         };
 
-        let has_self = method.sig.inputs.first().map_or(false, |arg| {
-            matches!(arg, FnArg::Receiver(_))
-        });
+        let has_self = method
+            .sig
+            .inputs
+            .first()
+            .is_some_and(|arg| matches!(arg, FnArg::Receiver(_)));
         let method_name = method.sig.ident.to_string();
         let method_ident = &method.sig.ident;
 
         // ── Detect constructor: no self receiver, returns Self ──
-        let is_constructor = !has_self
-            && matches!(&method.sig.output, ReturnType::Type(_, ty) if is_self_type(ty));
+        let is_constructor =
+            !has_self && matches!(&method.sig.output, ReturnType::Type(_, ty) if is_self_type(ty));
 
         if is_constructor {
             let mut param_types = Vec::new();
@@ -517,16 +533,15 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                             quote! { let #pname = args[#fi].clone(); }
                         }
                         FieldType::Unknown => {
-                            return syn::Error::new_spanned(
+                            syn::Error::new_spanned(
                                 ty,
                                 format!(
-                                    "unsupported parameter type '{}' in constructor '{}'",
+                                    "unsupported field type '{}' in ZenForeign struct '{}'",
                                     quote!(#ty),
-                                    method_name
+                                    quote!(#self_ty)
                                 ),
                             )
                             .to_compile_error()
-                            .into();
                         }
                     }
                 })
@@ -567,9 +582,11 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
             continue;
         }
 
-        let is_mut = method.sig.inputs.first().map_or(false, |arg| {
-            matches!(arg, FnArg::Receiver(r) if r.mutability.is_some())
-        });
+        let is_mut = method
+            .sig
+            .inputs
+            .first()
+            .is_some_and(|arg| matches!(arg, FnArg::Receiver(r) if r.mutability.is_some()));
 
         let mut param_types = Vec::new();
         for arg in method.sig.inputs.iter().skip(1) {
@@ -625,16 +642,15 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         quote! { let #pname = args[#fi].clone(); }
                     }
                     FieldType::Unknown => {
-                        return syn::Error::new_spanned(
+                        syn::Error::new_spanned(
                             ty,
                             format!(
-                                "unsupported parameter type '{}' in method '{}'",
+                                "unsupported field type '{}' in ZenForeign struct '{}'",
                                 quote!(#ty),
-                                method_name
+                                quote!(#self_ty)
                             ),
                         )
                         .to_compile_error()
-                        .into();
                     }
                 }
             })
@@ -671,8 +687,13 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         ::std::result::Result::Ok(::zenlang::value::Value::Int(s.#method_ident(#(#param_idents)*)))
                     }
                 }
-                FieldType::I32 | FieldType::I16 | FieldType::I8
-                | FieldType::U64 | FieldType::U32 | FieldType::U16 | FieldType::U8 => {
+                FieldType::I32
+                | FieldType::I16
+                | FieldType::I8
+                | FieldType::U64
+                | FieldType::U32
+                | FieldType::U16
+                | FieldType::U8 => {
                     quote! {
                         ::std::result::Result::Ok(::zenlang::value::Value::Int(s.#method_ident(#(#param_idents)*) as i64))
                     }
@@ -707,7 +728,7 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         ),
                     )
                     .to_compile_error()
-                    .into()
+                    .into();
                 }
             },
         };
@@ -769,7 +790,11 @@ enum FieldType {
 fn ty_to_field_type(ty: &Type) -> FieldType {
     let ty_str = quote!(#ty).to_string();
     match ty_str.as_str() {
-        "String" | "std :: string :: String" | "alloc :: string :: String" | "& str" | "&mut str" => FieldType::String,
+        "String"
+        | "std :: string :: String"
+        | "alloc :: string :: String"
+        | "& str"
+        | "&mut str" => FieldType::String,
         "i64" => FieldType::I64,
         "i32" => FieldType::I32,
         "i16" => FieldType::I16,

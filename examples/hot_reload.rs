@@ -5,12 +5,11 @@
 /// This creates a temporary script that defines a counter. When you edit the
 /// file, the HotReloader detects the change, recompiles, and the counter
 /// state is preserved across reloads.
-
 use std::io::Write;
 
+use zenlang::VM;
 use zenlang::hotreload::HotReloader;
 use zenlang::stdlib::{native_names, register_builtins};
-use zenlang::VM;
 
 fn main() -> zenlang::Result<()> {
     // Create a temp directory with a script file
@@ -37,7 +36,8 @@ fn main() {
     let names = native_names();
     let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &names)?;
     let types = zenlang::typeck::check(&program, &mut symbols)?;
-    let (fns, global_names) = zenlang::compiler::compile(&program, &types, &symbols, &names, &source)?;
+    let (fns, global_names) =
+        zenlang::compiler::compile(&program, &types, &symbols, &names, &source)?;
 
     let mut vm = VM::new();
     register_builtins(&mut vm);

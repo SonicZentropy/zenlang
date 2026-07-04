@@ -1,4 +1,3 @@
-
 use compact_str::CompactString;
 
 use crate::span::Spanned;
@@ -74,17 +73,33 @@ pub enum Type {
 /// Binary operator — arithmetic, comparison, logical, bitwise, assignment.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinOp {
-    Add, Sub, Mul, Div, Mod,
-    Eq, Ne, Lt, Le, Gt, Ge,
-    And, Or,
-    BitAnd, BitOr, BitXor, Shl, Shr,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
     Assign,
 }
 
 /// Unary operator — negation, logical not, bitwise not.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnOp {
-    Neg, Not, BitNot,
+    Neg,
+    Not,
+    BitNot,
 }
 
 // ---------- Patterns (simplified match) ----------
@@ -105,7 +120,11 @@ pub enum Pattern {
     /// Literal boolean pattern.
     Bool(bool),
     /// Enum variant destructuring: `Some(val)` or `O::Some(val)`.
-    EnumVariant { enum_name: Option<CompactString>, variant_name: CompactString, bindings: Vec<CompactString> },
+    EnumVariant {
+        enum_name: Option<CompactString>,
+        variant_name: CompactString,
+        bindings: Vec<CompactString>,
+    },
 }
 
 // ---------- Statements ----------
@@ -211,10 +230,7 @@ pub enum Stmt {
         methods: Vec<Spanned<Stmt>>,
     },
     /// `[pub] use path::to::item;`
-    Use {
-        vis: Vis,
-        path: Vec<CompactString>,
-    },
+    Use { vis: Vis, path: Vec<CompactString> },
     /// `[pub] mod name { ... }`
     Mod {
         vis: Vis,
@@ -246,35 +262,69 @@ pub enum Expr {
 
     // Operators
     /// Binary operation: `a + b`, `x == y`, etc.
-    Binary { op: BinOp, lhs: Box<Expr>, rhs: Box<Expr> },
+    Binary {
+        op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
     /// Unary operation: `-x`, `!flag`, `~bits`.
-    Unary { op: UnOp, expr: Box<Expr> },
+    Unary {
+        op: UnOp,
+        expr: Box<Expr>,
+    },
 
     // Call & Access
     /// Function/constructor call: `foo(a, b)`.
-    Call { func: Box<Expr>, args: Vec<Expr> },
+    Call {
+        func: Box<Expr>,
+        args: Vec<Expr>,
+    },
     /// Method call: `obj.method(a, b)`.
-    MethodCall { obj: Box<Expr>, method: CompactString, args: Vec<Expr> },
+    MethodCall {
+        obj: Box<Expr>,
+        method: CompactString,
+        args: Vec<Expr>,
+    },
     /// Field access: `obj.field`.
-    Field { obj: Box<Expr>, field: CompactString },
+    Field {
+        obj: Box<Expr>,
+        field: CompactString,
+    },
     /// Index access: `arr[i]`.
-    Index { obj: Box<Expr>, index: Box<Expr> },
+    Index {
+        obj: Box<Expr>,
+        index: Box<Expr>,
+    },
 
     // Blocks & Control Flow
     /// A block expression: `{ stmts; expr }`.
     Block(Vec<Spanned<Stmt>>),
     /// If expression: `if cond { then } else { else_ }`.
-    If { cond: Box<Expr>, then: Box<Expr>, else_: Option<Box<Expr>> },
+    If {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        else_: Option<Box<Expr>>,
+    },
     /// While loop: `while cond { body }`.
-    While { cond: Box<Expr>, body: Box<Expr> },
+    While {
+        cond: Box<Expr>,
+        body: Box<Expr>,
+    },
     /// For loop: `for var in iter { body }`.
-    For { var: CompactString, iter: Box<Expr>, body: Box<Expr> },
+    For {
+        var: CompactString,
+        iter: Box<Expr>,
+        body: Box<Expr>,
+    },
     /// Infinite loop: `loop { body }`.
     Loop(Box<Expr>),
 
     // Match
     /// Match expression: `match expr { pattern => body, ... }`.
-    Match { expr: Box<Expr>, arms: Vec<MatchArm> },
+    Match {
+        expr: Box<Expr>,
+        arms: Vec<MatchArm>,
+    },
 
     // Return / Break / Continue / Yield
     Return(Option<Box<Expr>>),
@@ -285,16 +335,32 @@ pub enum Expr {
 
     // Data literals
     /// Struct literal: `Point { x: 1, y: 2 }` or `Point { x, y }` or `Point { ..base }`.
-    StructLit { name: CompactString, fields: Vec<(CompactString, Expr)>, spread: Option<Box<Expr>> },
+    StructLit {
+        name: CompactString,
+        fields: Vec<(CompactString, Expr)>,
+        spread: Option<Box<Expr>>,
+    },
     /// Array literal: `[1, 2, 3]`.
     Array(Vec<Expr>),
     /// Range literal: `0..5` or `0..=5`.
-    Range { start: Box<Expr>, end: Box<Expr>, inclusive: bool },
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        inclusive: bool,
+    },
 
     /// Lambda/closure: `\|x, y\| x + y`.
-    Lambda { params: Vec<Param>, return_type: Option<Type>, body: Box<Expr> },
+    Lambda {
+        params: Vec<Param>,
+        return_type: Option<Type>,
+        body: Box<Expr>,
+    },
     /// Qualified enum variant constructor: `O::Some(x)` or `Option::None`.
-    EnumCtor { enum_name: CompactString, variant_name: CompactString, args: Vec<Expr> },
+    EnumCtor {
+        enum_name: CompactString,
+        variant_name: CompactString,
+        args: Vec<Expr>,
+    },
 }
 
 // ---------- Program ----------
@@ -303,6 +369,12 @@ pub enum Expr {
 #[derive(Debug, Clone)]
 pub struct Program {
     pub stmts: Vec<Spanned<Stmt>>,
+}
+
+impl Default for Program {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Program {

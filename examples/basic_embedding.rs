@@ -1,14 +1,13 @@
 /// Basic embedding: compile and run a Zenlang script from Rust.
 ///
 /// Run with: cargo run --example basic_embedding
-
 use zenlang::compiler::compile;
 use zenlang::lexer::Lexer;
 use zenlang::parser::Parser;
 use zenlang::resolver::resolve_with_natives;
 use zenlang::stdlib::{native_names, register_builtins};
 use zenlang::typeck::check;
-use zenlang::{Value, VM};
+use zenlang::{VM, Value};
 
 fn main() -> zenlang::Result<()> {
     // 1. Source code

@@ -3,4 +3,3 @@ node_modules/
 *.wasm
 *.d
 extension.wasm
-Cargo.lock

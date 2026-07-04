@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use compact_str::CompactString;
 use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::ir::*;
@@ -10,6 +9,7 @@ use crate::span::{SourceLocation, Span, Spanned};
 use crate::symbol::*;
 use crate::typeck::TypeMap;
 use crate::value::Value;
+use compact_str::CompactString;
 
 /// Build a line offset table from source text for byte-offset → line-number conversion.
 pub fn build_line_offsets(source: &str) -> Vec<usize> {
@@ -68,7 +68,7 @@ pub fn compile(
 
     // First pass: register all global variables and function indices
     for stmt in &program.stmts {
-        register_global_stmt(&stmt.node, &mut *globals.borrow_mut(), &mut global_order);
+        register_global_stmt(&stmt.node, &mut globals.borrow_mut(), &mut global_order);
         register_function_names(&stmt.node, &mut function_names);
     }
 
@@ -166,12 +166,13 @@ pub fn compile(
     );
 
     // Helper to compile function declarations from a list of stmts (handles Mod recursion)
+    #[allow(clippy::too_many_arguments)]
     fn compile_functions(
         stmts: &[Spanned<Stmt>],
         functions: &mut Vec<BytecodeFn>,
         globals: &Rc<RefCell<HashMap<String, u16>>>,
         function_names: &HashMap<String, usize>,
-        mut errors: &mut Vec<Error>,
+        errors: &mut Vec<Error>,
         line_offsets: &[usize],
         lambda_counter: &Rc<RefCell<usize>>,
         lambda_fns: &Rc<RefCell<Vec<BytecodeFn>>>,
@@ -192,9 +193,9 @@ pub fn compile(
                     name.to_string(),
                     arity,
                     globals.clone(),
-                    &function_names,
-                    &mut errors,
-                    &line_offsets,
+                    function_names,
+                    errors,
+                    line_offsets,
                     lambda_counter.clone(),
                     lambda_fns.clone(),
                     symbols,
@@ -250,9 +251,9 @@ pub fn compile(
                             qualified,
                             arity,
                             globals.clone(),
-                            &function_names,
-                            &mut errors,
-                            &line_offsets,
+                            function_names,
+                            errors,
+                            line_offsets,
                             lambda_counter.clone(),
                             lambda_fns.clone(),
                             symbols,
@@ -319,7 +320,7 @@ fn count_lambdas_in_stmts(stmts: &[Spanned<Stmt>]) -> usize {
 fn count_lambdas_in_stmt(stmt: &Stmt) -> usize {
     match stmt {
         Stmt::Fn { body, .. } => count_lambdas_in_stmts(body),
-        Stmt::Let { init, .. } => init.as_ref().map_or(0, |e| count_lambdas_in_expr(e)),
+        Stmt::Let { init, .. } => init.as_ref().map_or(0, count_lambdas_in_expr),
         Stmt::Const { init, .. } => count_lambdas_in_expr(init),
         Stmt::Expr(expr) | Stmt::Return(Some(expr)) => count_lambdas_in_expr(expr),
         Stmt::Impl { methods, .. } => methods.iter().map(|m| count_lambdas_in_stmt(&m.node)).sum(),
@@ -592,6 +593,7 @@ struct Local {
 }
 
 impl<'a> FunctionCompiler<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
         arity: u32,
@@ -840,11 +842,10 @@ impl<'a> FunctionCompiler<'a> {
                         tag,
                         fields,
                     } = &entry.kind
+                        && fields.is_empty()
                     {
-                        if fields.is_empty() {
-                            self.emit_op(Opcode::MakeEnum(*tag, 0));
-                            return;
-                        }
+                        self.emit_op(Opcode::MakeEnum(*tag, 0));
+                        return;
                     }
                     self.error(format!("undefined name '{}'", name));
                 } else {
@@ -873,22 +874,20 @@ impl<'a> FunctionCompiler<'a> {
 
             Expr::Call { func, args } => {
                 // Check if this is an enum constructor call
-                if let Expr::Ident(name) = func.as_ref() {
-                    if let Some(entry) = self.symbols.lookup(name) {
-                        if let SymKind::EnumConstructor {
-                            enum_name: _,
-                            variant_name: _,
-                            tag,
-                            fields: _,
-                        } = &entry.kind
-                        {
-                            for arg in args {
-                                self.compile_expr(arg);
-                            }
-                            self.emit_op(Opcode::MakeEnum(*tag, args.len() as u16));
-                            return;
-                        }
+                if let Expr::Ident(name) = func.as_ref()
+                    && let Some(entry) = self.symbols.lookup(name)
+                    && let SymKind::EnumConstructor {
+                        enum_name: _,
+                        variant_name: _,
+                        tag,
+                        fields: _,
+                    } = &entry.kind
+                {
+                    for arg in args {
+                        self.compile_expr(arg);
                     }
+                    self.emit_op(Opcode::MakeEnum(*tag, args.len() as u16));
+                    return;
                 }
                 self.compile_expr(func);
                 for arg in args {
@@ -897,22 +896,25 @@ impl<'a> FunctionCompiler<'a> {
                 self.emit_op(Opcode::Call(args.len() as u16));
             }
 
-            Expr::EnumCtor { enum_name, variant_name, args } => {
+            Expr::EnumCtor {
+                enum_name,
+                variant_name,
+                args,
+            } => {
                 let qualified = format!("{}::{}", enum_name, variant_name);
-                if let Some(entry) = self.symbols.lookup(&qualified) {
-                    if let SymKind::EnumConstructor {
+                if let Some(entry) = self.symbols.lookup(&qualified)
+                    && let SymKind::EnumConstructor {
                         enum_name: _,
                         variant_name: _,
                         tag,
                         fields: _,
                     } = &entry.kind
-                    {
-                        for arg in args {
-                            self.compile_expr(arg);
-                        }
-                        self.emit_op(Opcode::MakeEnum(*tag, args.len() as u16));
-                        return;
+                {
+                    for arg in args {
+                        self.compile_expr(arg);
                     }
+                    self.emit_op(Opcode::MakeEnum(*tag, args.len() as u16));
+                    return;
                 }
                 self.error(format!("no enum constructor '{}'", qualified));
             }
@@ -941,7 +943,9 @@ impl<'a> FunctionCompiler<'a> {
                     }
                     _ => None,
                 });
-                let idx: u16 = field_idx.map(|i| i as u16).unwrap_or_else(|| self.chunk.add_field_name(field));
+                let idx: u16 = field_idx
+                    .map(|i| i as u16)
+                    .unwrap_or_else(|| self.chunk.add_field_name(field));
                 self.emit_op(Opcode::LoadField(idx));
             }
 
@@ -1323,7 +1327,9 @@ impl<'a> FunctionCompiler<'a> {
                                 None
                             }
                         });
-                        let idx: u16 = field_idx.map(|i| i as u16).unwrap_or_else(|| self.chunk.add_field_name(field_name));
+                        let idx: u16 = field_idx
+                            .map(|i| i as u16)
+                            .unwrap_or_else(|| self.chunk.add_field_name(field_name));
                         self.emit_op(Opcode::StoreField(idx));
                         self.emit_op(Opcode::Pop);
                     }
@@ -1473,7 +1479,9 @@ impl<'a> FunctionCompiler<'a> {
                     }
                     _ => None,
                 });
-                let idx: u16 = field_idx.map(|i| i as u16).unwrap_or_else(|| self.chunk.add_field_name(field));
+                let idx: u16 = field_idx
+                    .map(|i| i as u16)
+                    .unwrap_or_else(|| self.chunk.add_field_name(field));
                 self.emit_op(Opcode::StoreField(idx));
             }
             Expr::Index { obj, index } => {

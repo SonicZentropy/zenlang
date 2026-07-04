@@ -32,7 +32,12 @@ pub struct SourceLocation {
 
 impl SourceLocation {
     pub fn new(file: Option<PathBuf>, span: Span, line: usize, column: usize) -> Self {
-        Self { file, span, line, column }
+        Self {
+            file,
+            span,
+            line,
+            column,
+        }
     }
 }
 

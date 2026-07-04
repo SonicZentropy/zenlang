@@ -43,13 +43,22 @@ pub enum SymKind {
     Function(FnSignature),
     Struct(StructDef),
     Enum(EnumDef),
-    EnumConstructor { enum_name: String, variant_name: String, tag: u16, fields: Vec<Type> },
+    EnumConstructor {
+        enum_name: String,
+        variant_name: String,
+        tag: u16,
+        fields: Vec<Type>,
+    },
     TypeParam(String),
     Module(usize),
     /// A trait declaration with its method signatures.
     Trait(TraitDef),
     /// A type alias: `type Foo = Bar;` or `opaque type Foo = Bar;`
-    TypeAlias { type_params: Vec<TypeParam>, alias: Type, opaque: bool },
+    TypeAlias {
+        type_params: Vec<TypeParam>,
+        alias: Type,
+        opaque: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -76,9 +85,18 @@ pub struct SymbolTable {
     pub current_scope: usize,
 }
 
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SymbolTable {
     pub fn new() -> Self {
-        let global = Scope { symbols: HashMap::new(), parent: None };
+        let global = Scope {
+            symbols: HashMap::new(),
+            parent: None,
+        };
         Self {
             symbols: Vec::new(),
             scopes: vec![global],
@@ -88,7 +106,10 @@ impl SymbolTable {
 
     /// Enter a new nested scope.
     pub fn enter_scope(&mut self) {
-        let scope = Scope { symbols: HashMap::new(), parent: Some(self.current_scope) };
+        let scope = Scope {
+            symbols: HashMap::new(),
+            parent: Some(self.current_scope),
+        };
         self.scopes.push(scope);
         self.current_scope = self.scopes.len() - 1;
     }
@@ -109,10 +130,9 @@ impl SymbolTable {
         }
         let id = self.symbols.len();
         self.symbols.push((name.to_string(), kind.clone()));
-        self.scopes[self.current_scope].symbols.insert(
-            name.to_string(),
-            SymEntry { id, kind },
-        );
+        self.scopes[self.current_scope]
+            .symbols
+            .insert(name.to_string(), SymEntry { id, kind });
         Ok(id)
     }
 
@@ -123,9 +143,9 @@ impl SymbolTable {
             if let Some(entry) = self.scopes[scope].symbols.get(name) {
                 return Some(entry);
             }
-            match self.scopes[scope].parent {
-                Some(parent) => scope = parent,
-                None => return None,
+            {
+                let parent = self.scopes[scope].parent?;
+                scope = parent
             }
         }
     }
@@ -174,7 +194,9 @@ impl SymbolTable {
         let id = self.symbols.len();
         self.symbols.push((name.to_string(), kind.clone()));
         let entry = SymEntry { id, kind };
-        self.scopes[self.current_scope].symbols.insert(name.to_string(), entry);
+        self.scopes[self.current_scope]
+            .symbols
+            .insert(name.to_string(), entry);
         id
     }
 }

@@ -17,7 +17,10 @@ pub struct Handle {
 
 impl Handle {
     pub fn null() -> Self {
-        Handle { index: u32::MAX, generation: 0 }
+        Handle {
+            index: u32::MAX,
+            generation: 0,
+        }
     }
 
     pub fn is_null(&self) -> bool {
@@ -38,7 +41,11 @@ pub struct Slab<T> {
 
 impl<T> Slab<T> {
     pub fn new() -> Self {
-        Self { slots: Vec::new(), free: Vec::new(), generation_counter: 1 }
+        Self {
+            slots: Vec::new(),
+            free: Vec::new(),
+            generation_counter: 1,
+        }
     }
 
     pub fn insert(&mut self, value: T) -> Handle {
@@ -47,8 +54,13 @@ impl<T> Slab<T> {
             slot.generation = self.generation_counter;
             self.generation_counter += 1;
             slot.occupied = true;
-            unsafe { *slot.value.get() = Some(value); }
-            Handle { index: idx, generation: slot.generation }
+            unsafe {
+                *slot.value.get() = Some(value);
+            }
+            Handle {
+                index: idx,
+                generation: slot.generation,
+            }
         } else {
             let idx = self.slots.len() as u32;
             let generation = self.generation_counter;
@@ -58,29 +70,33 @@ impl<T> Slab<T> {
                 occupied: true,
                 value: UnsafeCell::new(Some(value)),
             });
-            Handle { index: idx, generation }
+            Handle {
+                index: idx,
+                generation,
+            }
         }
     }
 
     /// Read a value from the slab. Panics if the handle is stale or the slot is empty.
     pub fn get(&self, handle: Handle) -> &T {
         let slot = &self.slots[handle.index as usize];
-        assert!(slot.occupied && slot.generation == handle.generation,
-            "Slab::get: stale handle or empty slot");
-        unsafe {
-            (*slot.value.get()).as_ref().unwrap()
-        }
+        assert!(
+            slot.occupied && slot.generation == handle.generation,
+            "Slab::get: stale handle or empty slot"
+        );
+        unsafe { (*slot.value.get()).as_ref().unwrap() }
     }
 
     /// Mutate a value in the slab through a shared reference.
     /// Safe because the VM is single-threaded.
+    #[allow(clippy::mut_from_ref)]
     pub fn get_mut(&self, handle: Handle) -> &mut T {
         let slot = &self.slots[handle.index as usize];
-        assert!(slot.occupied && slot.generation == handle.generation,
-            "Slab::get_mut: stale handle or empty slot");
-        unsafe {
-            (*slot.value.get()).as_mut().unwrap()
-        }
+        assert!(
+            slot.occupied && slot.generation == handle.generation,
+            "Slab::get_mut: stale handle or empty slot"
+        );
+        unsafe { (*slot.value.get()).as_mut().unwrap() }
     }
 
     /// Remove a value from the slab, returning it. Returns `None` if the handle
@@ -126,7 +142,10 @@ impl<T> Slab<T> {
     pub fn iter_handles(&self) -> impl Iterator<Item = Handle> + '_ {
         self.slots.iter().enumerate().filter_map(move |(i, slot)| {
             if slot.occupied {
-                Some(Handle { index: i as u32, generation: slot.generation })
+                Some(Handle {
+                    index: i as u32,
+                    generation: slot.generation,
+                })
             } else {
                 None
             }
@@ -136,7 +155,9 @@ impl<T> Slab<T> {
 
 impl<T: Clone> Slab<T> {
     pub fn clone_all(&self) -> Vec<(Handle, T)> {
-        self.iter_handles().map(|h| (h, self.get(h).clone())).collect()
+        self.iter_handles()
+            .map(|h| (h, self.get(h).clone()))
+            .collect()
     }
 }
 

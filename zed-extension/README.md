@@ -1,6 +1,6 @@
 # Zenlang Zed Extension
 
-Provides [Zenlang](https://github.com/your-org/zenlang) support for Zed:
+Provides [Zenlang](https://github.com/SonicZentropy/zenlang) support for Zed:
 
 - Syntax highlighting (Tree-sitter)
 - LSP integration: diagnostics, completions, hover, document symbols, semantic tokens

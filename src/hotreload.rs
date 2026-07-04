@@ -121,16 +121,13 @@ impl HotReloader {
         let mut watch_paths = vec![self.root_path.clone()];
         watch_paths.extend(self.extra_paths.iter().cloned());
 
-        if let Ok(source) = std::fs::read_to_string(&self.root_path) {
-            if let Ok(tokens) = Lexer::new(&source).tokenize() {
-                if let Ok(mut program) = Parser::new(&source, &tokens).parse() {
-                    if let Ok(mod_paths) =
-                        mod_resolver::resolve_modules_with_paths(&mut program, &self.root_path)
-                    {
-                        watch_paths.extend(mod_paths);
-                    }
-                }
-            }
+        if let Ok(source) = std::fs::read_to_string(&self.root_path)
+            && let Ok(tokens) = Lexer::new(&source).tokenize()
+            && let Ok(mut program) = Parser::new(&source, &tokens).parse()
+            && let Ok(mod_paths) =
+                mod_resolver::resolve_modules_with_paths(&mut program, &self.root_path)
+        {
+            watch_paths.extend(mod_paths);
         }
 
         let mut new_mtimes = HashMap::new();

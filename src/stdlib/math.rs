@@ -24,7 +24,10 @@ fn as_f64(v: Option<&Value>) -> Result<f64> {
 
 fn vec_components(vm: &VM, v: &Value) -> Result<Vec<f64>> {
     match v {
-        Value::Array(h) => vm.arrays.get(*h).values
+        Value::Array(h) => vm
+            .arrays
+            .get(*h)
+            .values
             .iter()
             .map(|c| {
                 c.as_float().ok_or_else(|| Error::Script {

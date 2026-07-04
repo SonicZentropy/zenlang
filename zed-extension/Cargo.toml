@@ -1,7 +1,10 @@
 [package]
 name = "zenlang-zed-extension"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+publish = false
+
+[workspace]
 
 [lib]
 crate-type = ["cdylib"]

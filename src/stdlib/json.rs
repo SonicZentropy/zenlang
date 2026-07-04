@@ -1,18 +1,17 @@
-use std::rc::Rc;
 use serde_json;
+use std::rc::Rc;
 
 use crate::error::{Error, Result};
-use crate::value::{
-    ArrayData, EnumData, MapData, MapKey, StructData, Value,
-};
+use crate::value::{ArrayData, EnumData, MapData, MapKey, StructData, Value};
 use crate::vm::{VM, VMContext};
 
 /// Serialize a Zenlang `Value` to a JSON string.
 fn to_json_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let val = args.first().cloned().unwrap_or(Value::Nil);
     let json_val = value_to_json(ctx, &val)?;
-    let json_str = serde_json::to_string(&json_val)
-        .map_err(|e| Error::Script { msg: format!("JSON serialization error: {e}") })?;
+    let json_str = serde_json::to_string(&json_val).map_err(|e| Error::Script {
+        msg: format!("JSON serialization error: {e}"),
+    })?;
     Ok(Value::Str(json_str.into()))
 }
 
@@ -20,10 +19,16 @@ fn to_json_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 fn from_json_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let json_str = match args.first() {
         Some(Value::Str(s)) => s.as_ref().to_string(),
-        _ => return Err(Error::Script { msg: "from_json requires a string argument".into() }),
+        _ => {
+            return Err(Error::Script {
+                msg: "from_json requires a string argument".into(),
+            });
+        }
     };
-    let json_val: serde_json::Value = serde_json::from_str(&json_str)
-        .map_err(|e| Error::Script { msg: format!("JSON parse error: {e}") })?;
+    let json_val: serde_json::Value =
+        serde_json::from_str(&json_str).map_err(|e| Error::Script {
+            msg: format!("JSON parse error: {e}"),
+        })?;
     json_to_value(ctx, &json_val)
 }
 
@@ -33,24 +38,26 @@ fn value_to_json(ctx: &mut VMContext, val: &Value) -> Result<serde_json::Value> 
     match val {
         Value::Nil => Ok(serde_json::Value::Null),
         Value::Bool(b) => Ok(serde_json::Value::Bool(*b)),
-        Value::Int(n) => Ok(serde_json::Value::Number(
-            serde_json::Number::from(*n)
-        )),
+        Value::Int(n) => Ok(serde_json::Value::Number(serde_json::Number::from(*n))),
         Value::Float(f) => Ok(serde_json::Value::Number(
-            serde_json::Number::from_f64(*f).unwrap_or_else(|| serde_json::Number::from_f64(0.0).expect("0.0 is always a valid JSON number"))
+            serde_json::Number::from_f64(*f).unwrap_or_else(|| {
+                serde_json::Number::from_f64(0.0).expect("0.0 is always a valid JSON number")
+            }),
         )),
         Value::Str(s) => Ok(serde_json::Value::String(s.as_ref().to_string())),
         Value::Array(h) => {
             let data = vm.arrays.get(*h);
-            let elems: Result<Vec<serde_json::Value>> = data.values.iter()
-                .map(|v| value_to_json(ctx, v))
-                .collect();
+            let elems: Result<Vec<serde_json::Value>> =
+                data.values.iter().map(|v| value_to_json(ctx, v)).collect();
             Ok(serde_json::Value::Array(elems?))
         }
         Value::Struct(h, type_name) => {
             let data = vm.structs.get(*h);
             let mut map = serde_json::Map::new();
-            map.insert("__type".into(), serde_json::Value::String(type_name.clone()));
+            map.insert(
+                "__type".into(),
+                serde_json::Value::String(type_name.clone()),
+            );
             for (i, name) in data.field_names.iter().enumerate() {
                 let field_val = data.values.get(i).cloned().unwrap_or(Value::Nil);
                 map.insert(name.clone(), value_to_json(ctx, &field_val)?);
@@ -60,12 +67,12 @@ fn value_to_json(ctx: &mut VMContext, val: &Value) -> Result<serde_json::Value> 
         Value::Enum(h) => {
             let data = vm.enums.get(*h);
             let mut map = serde_json::Map::new();
-            map.insert("__tag".into(), serde_json::Value::Number(
-                serde_json::Number::from(data.tag)
-            ));
-            let fields: Result<Vec<serde_json::Value>> = data.fields.iter()
-                .map(|v| value_to_json(ctx, v))
-                .collect();
+            map.insert(
+                "__tag".into(),
+                serde_json::Value::Number(serde_json::Number::from(data.tag)),
+            );
+            let fields: Result<Vec<serde_json::Value>> =
+                data.fields.iter().map(|v| value_to_json(ctx, v)).collect();
             map.insert("fields".into(), serde_json::Value::Array(fields?));
             Ok(serde_json::Value::Object(map))
         }
@@ -86,7 +93,9 @@ fn value_to_json(ctx: &mut VMContext, val: &Value) -> Result<serde_json::Value> 
             let weak = vm.weaks.get(*h);
             if vm.weaks.is_valid(weak.target) {
                 let inner = match weak.kind {
-                    crate::value::WeakKind::Struct => Value::Struct(weak.target, weak.type_name.clone()),
+                    crate::value::WeakKind::Struct => {
+                        Value::Struct(weak.target, weak.type_name.clone())
+                    }
                     crate::value::WeakKind::Array => Value::Array(weak.target),
                     crate::value::WeakKind::Map => Value::Map(weak.target),
                 };
@@ -97,11 +106,12 @@ fn value_to_json(ctx: &mut VMContext, val: &Value) -> Result<serde_json::Value> 
                 Ok(serde_json::Value::Null)
             }
         }
-        Value::Range(_, _, _) | Value::Function(_)
-        | Value::NativeFunction(_) | Value::Closure(_)
-        | Value::Generator(_) | Value::Foreign(_) => {
-            Ok(serde_json::Value::Null)
-        }
+        Value::Range(_, _, _)
+        | Value::Function(_)
+        | Value::NativeFunction(_)
+        | Value::Closure(_)
+        | Value::Generator(_)
+        | Value::Foreign(_) => Ok(serde_json::Value::Null),
     }
 }
 
@@ -122,9 +132,7 @@ fn json_to_value(ctx: &mut VMContext, json: &serde_json::Value) -> Result<Value>
         }
         serde_json::Value::String(s) => Ok(Value::Str(s.as_str().into())),
         serde_json::Value::Array(arr) => {
-            let values: Result<Vec<Value>> = arr.iter()
-                .map(|v| json_to_value(ctx, v))
-                .collect();
+            let values: Result<Vec<Value>> = arr.iter().map(|v| json_to_value(ctx, v)).collect();
             let h = vm.arrays.insert(ArrayData { values: values? });
             Ok(Value::Array(h))
         }
@@ -134,29 +142,37 @@ fn json_to_value(ctx: &mut VMContext, json: &serde_json::Value) -> Result<Value>
                 let mut field_names = Vec::new();
                 let mut values = Vec::new();
                 for (key, val_json) in obj.iter() {
-                    if key == "__type" { continue; }
+                    if key == "__type" {
+                        continue;
+                    }
                     field_names.push(key.clone());
                     values.push(json_to_value(ctx, val_json)?);
                 }
-                let h = vm.structs.insert(StructData { values, field_names });
+                let h = vm.structs.insert(StructData {
+                    values,
+                    field_names,
+                });
                 return Ok(Value::Struct(h, type_name.clone()));
             }
             // Check for enum serialization: {"__tag": N, "fields": [...]}
-            if let Some(serde_json::Value::Number(tag_num)) = obj.get("__tag") {
-                if let Some(tag) = tag_num.as_u64() {
-                    let fields = match obj.get("fields") {
-                        Some(serde_json::Value::Array(arr)) => {
-                            let mut result = Vec::new();
-                            for v in arr {
-                                result.push(json_to_value(ctx, v)?);
-                            }
-                            result
+            if let Some(serde_json::Value::Number(tag_num)) = obj.get("__tag")
+                && let Some(tag) = tag_num.as_u64()
+            {
+                let fields = match obj.get("fields") {
+                    Some(serde_json::Value::Array(arr)) => {
+                        let mut result = Vec::new();
+                        for v in arr {
+                            result.push(json_to_value(ctx, v)?);
                         }
-                        _ => Vec::new(),
-                    };
-                    let h = vm.enums.insert(EnumData { tag: tag as u16, fields });
-                    return Ok(Value::Enum(h));
-                }
+                        result
+                    }
+                    _ => Vec::new(),
+                };
+                let h = vm.enums.insert(EnumData {
+                    tag: tag as u16,
+                    fields,
+                });
+                return Ok(Value::Enum(h));
             }
             // Default: serialize as Map
             let mut entries = std::collections::HashMap::new();
