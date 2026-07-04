@@ -23,6 +23,7 @@ mod json;
 mod log;
 mod map;
 mod math;
+mod set;
 
 /// Register all built-in stdlib functions with the given VM.
 pub fn register_builtins(vm: &mut VM) {
@@ -88,6 +89,9 @@ pub fn register_builtins(vm: &mut VM) {
 
     // JSON serialization
     json::register(vm);
+
+    // Set collection
+    set::register(vm);
 
     // Vector/scalar math for games (Vec2/Vec3, lerp/clamp, trig, RNG)
     math::register(vm);
@@ -536,6 +540,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
     sigs.extend(map::signatures());
     sigs.extend(log::signatures());
     sigs.extend(math::signatures());
+    sigs.extend(set::signatures());
     sigs
 }
 

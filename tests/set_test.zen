@@ -1,0 +1,23 @@
+let s = set_new();
+set_add(s, "apple");
+set_add(s, "banana");
+set_add(s, "apple"); // duplicate, should be ignored
+assert(set_len(s) == 2);
+assert(set_contains(s, "apple"));
+assert(set_contains(s, "banana"));
+assert(!set_contains(s, "cherry"));
+
+set_remove(s, "apple");
+assert(!set_contains(s, "apple"));
+assert(set_len(s) == 1);
+
+// from_array / to_array
+let arr = set_to_array(s);
+assert(len(arr) == 1);
+
+let s2 = set_from_array(["x", "y", "x"]);
+assert(set_len(s2) == 2);
+assert(set_contains(s2, "x"));
+assert(set_contains(s2, "y"));
+
+print("set test passed");
