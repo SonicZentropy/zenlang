@@ -352,42 +352,54 @@ Add Zen to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-zenlang = { git = "..." }
+zenlang = "0.1.0"
 ```
 
-Basic usage:
+### One-Shot
 
 ```rust
-use zenlang::{VM, Error};
-use zenlang::compiler::compile;
-use zenlang::stdlib::{native_names, register_builtins};
+use zenlang::run;
 
-let source = "fn main() { print(\"hello\"); }";
+let result = run("fn main() { print(\"hello\"); }")?;
+```
 
-// Full pipeline
-let tokens = zenlang::lexer::Lexer::new(source).tokenize()?;
-let mut program = zenlang::parser::Parser::new(&tokens).parse()?;
-let names = native_names();
-let mut symbols = zenlang::resolver::resolve_with_natives(&mut program, &names)?;
-let types = zenlang::typeck::check(&program, &mut symbols)?;
-let (fns, global_names) = compile(&program, &types, &symbols, &names, source)?;
+### Full Control
 
-let mut vm = VM::new();
-register_builtins(&mut vm);
-vm.load_bytecode(fns, global_names);
+```rust
+use std::rc::Rc;
+use zenlang::{VM, Value, CompileConfig};
+use zenlang::vm::VMContext;
+
+let mut vm = VM::new();  // builtins pre-registered
+
+// Register native functions
+vm.register_native("double", Rc::new(|_, args| {
+    let n = args.first().and_then(|v| v.as_int()).unwrap_or(0);
+    Ok(Value::Int(n * 2))
+}));
+
+// Load and run
+let source = "fn main() -> int { double(21) }";
+vm.exec(source)?;
+// or: vm.load(source)?; let result = vm.run_main()?;
+```
+
+### With Configuration
+
+```rust
+let config = CompileConfig {
+    type_check: true,
+    module_path: Some("scripts".into()),
+    ..Default::default()
+};
+vm.exec_with(source, &config)?;
+```
+
+### Loading Files
+
+```rust
+vm.load_file("scripts/game.zen")?;
 let result = vm.run_main()?;
-println!("{:?}", result);
-```
-
-### Registering Foreign Types
-
-```rust
-use zenlang::interop::ForeignTypeDef;
-use zenlang::value::Value;
-
-vm.register_type::<MyType>("MyType")
-    .field("x", |obj| Ok(Value::Int(obj.x as i64)), |obj, val| { obj.x = val.as_int()?; Ok(()) })
-    .method("do_stuff", |ctx, args| { /* ... */ Ok(Value::Nil) });
 ```
 
 ## Examples
@@ -398,7 +410,7 @@ All examples are in the [`examples/`](./examples/) directory.
 
 | Example | File | What it shows |
 |---------|------|---------------|
-| **basic_embedding** | [`basic_embedding.rs`](./examples/basic_embedding.rs) | Full compile-and-run pipeline, reading script return values |
+| **basic_embedding** | [`basic_embedding.rs`](./examples/basic_embedding.rs) | One-shot `vm.exec()` with return value |
 | **custom_natives** | [`custom_natives.rs`](./examples/custom_natives.rs) | Registering Rust functions (`double`, `add3`, stateful `tick` with `Rc<Cell>`) callable from scripts |
 | **foreign_types** | [`foreign_types.rs`](./examples/foreign_types.rs) | Exposing a Rust `Player` struct with fields (`name`, `health`) and methods (`heal_percent`) to scripts |
 | **cross_call** | [`cross_call.rs`](./examples/cross_call.rs) | Script calling Rust natives (`compute_stats`, `damage_formula`) and receiving structured return values |

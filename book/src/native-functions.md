@@ -2,80 +2,96 @@
 
 Register Rust functions to be callable from scripts.
 
-## Simple Native Functions
+## Simple Native Function
 
 ```rust
-use zenlang::native_fn;
+use std::rc::Rc;
+use zenlang::{VM, Value};
+use zenlang::vm::VMContext;
+use zenlang::error::Result;
 
-let mut vm = Vm::new();
+let mut vm = VM::new();
 
-// Simple function: add two integers
-vm.register_fn("add", |args| {
-    let a = args[0].as_i64()?;
-    let b = args[1].as_i64()?;
+vm.register_native("add", Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+    let a = args.first().and_then(|v| v.as_int()).unwrap_or(0);
+    let b = args.get(1).and_then(|v| v.as_int()).unwrap_or(0);
     Ok(Value::Int(a + b))
-});
-```
-
-## Native Function with VmContext (Calling Back Into Script)
-
-```rust
-use zenlang::vm::VmContext;
-
-vm.register_fn("on_collide", |args: &[Value], ctx: &mut VmContext| {
-    let entity = &args[0];
-    ctx.call("handle_collision", &[entity.clone()])
-});
-```
-
-## Batch Registration
-
-```rust
-fn register_game_api(vm: &mut Vm) {
-    vm.register_fn("spawn_enemy", |args| {
-        let x = args[0].as_f64()?;
-        let y = args[1].as_f64()?;
-        Ok(Value::from("enemy_01"))
-    });
-    vm.register_fn("play_sound", |args| {
-        let name = args[0].as_str()?.to_string();
-        audio_engine.play(&name);
-        Ok(Value::Void)
-    });
-    vm.register_fn("get_delta_time", |_| Ok(Value::Float(engine.dt())));
-}
-```
-
-## Returning Complex Values
-
-### Returning a Map
-
-```rust
-vm.register_fn("get_player_info", |_| {
-    let info = Value::new_map();
-    map_set(info, "name", Value::from("Hero"));
-    map_set(info, "hp", Value::Int(100));
-    Ok(info)
-});
+}));
 ```
 
 **Script side:**
 
 ```rust
-let info = get_player_info();
-print(info["name"]);
+print(add(3, 4));  // 7
 ```
+
+The closure signature must be `Fn(&mut VMContext, &[Value]) -> Result<Value>`.
+Use `Rc::new(...)` to wrap it.
+
+## Native Function with Callback Into Script
+
+```rust
+vm.register_native("on_collide", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+    let entity = &args[0];
+    ctx.call_value(entity, &[])?;
+    Ok(Value::Nil)
+}));
+```
+
+`ctx.call_value(callee, args)` calls a script function or closure from within
+a native function. The `callee` can be a `Value::Function(idx)` or a
+`Value::Closure(handle)`.
+
+## Batch Registration
+
+```rust
+fn register_game_api(vm: &mut VM) {
+    vm.register_native("spawn_enemy", Rc::new(|ctx, args| {
+        let x = args.get(0).and_then(|v| v.as_float()).unwrap_or(0.0);
+        let y = args.get(1).and_then(|v| v.as_float()).unwrap_or(0.0);
+        // ... spawn logic ...
+        Ok(Value::from("enemy_01"))
+    }));
+    vm.register_native("get_delta_time", Rc::new(|_, _| {
+        Ok(Value::Float(0.016)))
+    }));
+}
+```
+
+## Returning Values
+
+### Returning a Map
+
+Build maps from the script side via `map_new()` and `map_set()`. To create
+a map from Rust, call the built-in `map_new` through the VM, or use
+`Value` constructors after running script code that builds the map.
 
 ### Returning an Array
 
 ```rust
-vm.register_fn("get_inventory", |_| {
-    Ok(Value::from(vec![
+vm.register_native("get_inventory", Rc::new(|ctx, _| {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let arr = vm.make_array(vec![
         Value::from("sword"),
         Value::from("shield"),
         Value::from("potion"),
-    ]))
-});
+    ]);
+    Ok(arr)
+}));
+```
+
+`vm.make_array(values)` is the safe way to create a `Value::Array` from a
+Rust `Vec<Value>`.
+
+### Returning a Foreign Object
+
+```rust
+vm.register_native("create_player", Rc::new(|ctx, args| {
+    let name = args.first().and_then(|v| v.as_str()).unwrap_or("");
+    let player = Player::new(name);
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    Ok(vm.wrap_foreign("Player", player))
+}));
 ```
 
 ## Accepting Callbacks from Script
@@ -83,17 +99,16 @@ vm.register_fn("get_inventory", |_| {
 **Rust side:**
 
 ```rust
-// Store script callbacks and invoke them later
-let mut script_callbacks: Vec<Value> = Vec::new();
+let mut callbacks: Vec<Value> = Vec::new();
 
-vm.register_fn("on_button_click", |args: &[Value], _ctx: &mut VmContext| {
+vm.register_native("on_button_click", Rc::new(|ctx, args| {
     let callback = args[0].clone();
-    script_callbacks.push(callback);
-    Ok(Value::Void)
-});
+    callbacks.push(callback);
+    Ok(Value::Nil)
+}));
 
 // Later, invoke stored callbacks
-for cb in &script_callbacks {
+for cb in &callbacks {
     ctx.call_value(cb, &[])?;
 }
 ```
@@ -106,28 +121,33 @@ on_button_click(|| {
 });
 ```
 
-## Using the Macro
+## Using the `#[zen_native_fn]` Macro
 
 ```rust
-use zenlang::{native_fn, Value, VmError};
+use zenlang::{Value, zen_native_fn};
 
-#[native_fn]
-fn greet(name: Value) -> Result<Value, VmError> {
-    let name_str = name.as_str().ok_or(VmError::new("expected string"))?;
-    Ok(Value::from("Hello, {name_str}!"))
+#[zen_native_fn]
+fn greet(name: String) -> String {
+    format!("Hello, {name}!")
 }
 ```
 
+The macro wraps the function with the required `Rc<dyn Fn(...)>` signature and
+handles argument/value conversions automatically.
+
 ## Type Conversions
 
-The `From` trait is implemented for converting between Rust types and `Value`:
+`Value` implements `From` for common Rust types:
 
 ```rust
-use zenlang::value::{FromValue, ToValue};
+// Rust → Value
+let val: Value = 42.into();          // Value::Int(42)
+let val: Value = "hello".into();     // Value::Str(...)
+let val: Value = true.into();        // Value::Bool(true)
 
-// Convert Value → Rust
-let x: f64 = val.from_value()?;
-
-// Convert Rust → Value
-let val: Value = 42.0.into();
+// Value → Rust (via accessors)
+if let Some(n) = val.as_int() { /* i64 */ }
+if let Some(s) = val.as_str() { /* &str */ }
+if let Some(f) = val.as_float() { /* f64 */ }
+if let Some(b) = val.as_bool() { /* bool */ }
 ```

@@ -453,40 +453,51 @@ zenc dap                       # start debugger
 ### Basic VM
 
 ```rust
-use zenlang::vm::{Vm, VmConfig, VmContext};
-use zenlang::value::Value;
+use zenlang::VM;
 
-let mut vm = Vm::new();
-vm.eval("print(42)").unwrap();
+let mut vm = VM::new();  // builtins pre-registered
+let result = vm.exec("print(42); 1 + 2")?;
+println!("{:?}", result); // Int(3)
+```
+
+### One-Shot
+
+```rust
+use zenlang::run;
+let result = run("1 + 2 * 3")?;
 ```
 
 ### VM with Config
 
 ```rust
-let mut vm = Vm::with_config(VmConfig {
-    instruction_limit: Some(100_000),          // safety: max instructions
-    module_search_paths: vec!["scripts".into()],
+use zenlang::CompileConfig;
+
+let config = CompileConfig {
+    type_check: true,
+    module_path: Some("scripts".into()),
     ..Default::default()
-});
+};
+vm.exec_with(source, &config)?;
 ```
 
 ### Run a File
 
 ```rust
-vm.eval_file("scripts/main.zen").unwrap();
+vm.load_file("scripts/main.zen")?;
+let result = vm.run_main()?;
 ```
 
 ### Evaluate an Expression
 
 ```rust
-let result = vm.eval("1 + 2 * 3").unwrap();
+let result = vm.exec("1 + 2 * 3")?;
 assert_eq!(result.as_i64(), Some(7));
 ```
 
 ### Error Handling
 
 ```rust
-match vm.eval("bad_code") {
+match vm.exec("bad_code") {
     Ok(val) => println!("OK: {:?}", val),
     Err(zenlang::Error::Runtime(msg)) => eprintln!("Runtime: {msg}"),
     Err(zenlang::Error::Compile(errors)) => {
@@ -505,11 +516,17 @@ match vm.eval("bad_code") {
 **Rust side:**
 
 ```rust
-vm.register_fn("add", |args: &[Value]| -> Result<Value, VmError> {
-    let a = args[0].as_i64().ok_or(VmError::new("expected i64"))?;
-    let b = args[1].as_i64().ok_or(VmError::new("expected i64"))?;
+use std::rc::Rc;
+use zenlang::vm::VMContext;
+use zenlang::{VM, Value};
+
+let mut vm = VM::new();
+
+vm.register_native("add", Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+    let a = args[0].as_int().unwrap_or(0);
+    let b = args[1].as_int().unwrap_or(0);
     Ok(Value::Int(a + b))
-});
+}));
 ```
 
 **Script side:**
@@ -518,16 +535,16 @@ vm.register_fn("add", |args: &[Value]| -> Result<Value, VmError> {
 print(add(3, 4));  // 7
 ```
 
-### Native Function with VmContext (Call Back Into Script)
+### Native Function with VMContext (Call Back Into Script)
 
 **Rust side:**
 
 ```rust
-vm.register_fn("on_collide", |args: &[Value], ctx: &mut VmContext| -> Result<Value, VmError> {
+vm.register_native("on_collide", Rc::new(|ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
     let entity = &args[0];
-    // Call a Zenlang callback function
-    ctx.call("handle_collision", &[entity.clone()])
-});
+    ctx.call_value(entity, &[])?;
+    Ok(Value::Nil)
+}));
 ```
 
 **Script side:**
@@ -541,19 +558,21 @@ fn handle_collision(entity) {
 ### Register Multiple Functions at Once
 
 ```rust
-fn register_game_api(vm: &mut Vm) {
-    vm.register_fn("spawn_enemy", |args| {
-        let x = args[0].as_f64()?;
-        let y = args[1].as_f64()?;
-        // ... spawn logic ...
+use std::rc::Rc;
+
+fn register_game_api(vm: &mut VM) {
+    vm.register_native("spawn_enemy", Rc::new(|_, args| {
+        let x = args[0].as_float()?;
+        let y = args[1].as_float()?;
         Ok(Value::from("enemy_01"))
-    });
-    vm.register_fn("play_sound", |args| {
+    }));
+    vm.register_native("play_sound", Rc::new(|_, args| {
         let name = args[0].as_str()?.to_string();
-        audio_engine.play(&name);
-        Ok(Value::Void)
-    });
-    vm.register_fn("get_delta_time", |_| Ok(Value::Float(engine.dt())));
+        Ok(Value::Nil)
+    }));
+    vm.register_native("get_delta_time", Rc::new(|_, _| {
+        Ok(Value::Float(engine.dt()))
+    }));
 }
 ```
 
@@ -561,43 +580,45 @@ fn register_game_api(vm: &mut Vm) {
 
 ## Foreign Types (Rust Structs in Script)
 
+Use `#[derive(ZenForeign)]` and `#[zen_methods]` to expose Rust structs.
+
 ### Define and Register a Foreign Type
 
 **Rust side:**
 
 ```rust
-use zenlang::foreign_type;
+use zenlang::{VM, Value, ZenForeign, zen_methods};
 
-foreign_type! {
-    name: "Texture",
-    #[derive(Clone, Debug)]
-    pub struct Texture {
-        pub id: u32,
-        pub width: u32,
-        pub height: u32,
+#[derive(Clone, Debug, ZenForeign)]
+struct Player {
+    name: String,
+    health: i32,
+    max_health: i32,
+}
+
+#[zen_methods]
+impl Player {
+    fn new(name: &str) -> Self {
+        Self { name: name.to_string(), health: 100, max_health: 100 }
     }
-    impl Texture {
-        fn load(path: &str) -> Self {
-            // In real code, Texture::load_from_disk(path).unwrap_or_default()
-            Self { id: 1, width: 64, height: 64 }
-        }
-        fn get_size(&self) -> (i64, i64) {
-            (self.width as i64, self.height as i64)
-        }
-        fn is_valid(&self) -> bool {
-            self.id != 0
-        }
+    fn heal_percent(&self) -> f64 {
+        self.health as f64 / self.max_health as f64 * 100.0
     }
 }
+
+let mut vm = VM::new();
+Player::register_zen_foreign(&mut vm);
+Player::register_zen_methods(&mut vm);
 ```
 
 **Script side:**
 
 ```rust
-let tex = Texture::load("player.png");
-assert(tex.is_valid());
-let (w, h) = tex.get_size();
-print("texture size: {w} x {h}");
+let p = Player::new("Aria");
+print(p.name);         // field access
+print(p.health);       // field access
+print(p.heal_percent()); // method call
+p.health = 50;         // field mutation
 ```
 
 ### Foreign Type with Mutable State
@@ -605,33 +626,28 @@ print("texture size: {w} x {h}");
 **Rust side:**
 
 ```rust
-use zenlang::foreign_type;
+#[derive(Clone, Debug, ZenForeign)]
+struct Transform {
+    pub x: f64,
+    pub y: f64,
+    pub rotation: f64,
+    pub scale: f64,
+}
 
-foreign_type! {
-    name: "Transform",
-    #[derive(Clone, Debug, Default)]
-    pub struct Transform {
-        pub x: f64,
-        pub y: f64,
-        pub rotation: f64,
-        pub scale: f64,
+#[zen_methods]
+impl Transform {
+    fn new() -> Self {
+        Self { x: 0.0, y: 0.0, rotation: 0.0, scale: 1.0 }
     }
-    impl Transform {
-        fn new() -> Self {
-            Self::default()
-        }
-        fn translate(&mut self, dx: f64, dy: f64) {
-            self.x += dx;
-            self.y += dy;
-        }
-        fn get_rotation(&self) -> f64 {
-            self.rotation
-        }
-        fn set_rotation(&mut self, r: f64) {
-            self.rotation = r;
-        }
+    fn translate(&mut self, dx: f64, dy: f64) {
+        self.x += dx;
+        self.y += dy;
     }
 }
+
+let mut vm = VM::new();
+Transform::register_zen_foreign(&mut vm);
+Transform::register_zen_methods(&mut vm);
 ```
 
 **Script side:**
@@ -639,84 +655,26 @@ foreign_type! {
 ```rust
 let t = Transform::new();
 t.translate(10.0, 5.0);
-t.set_rotation(1.57);
+t.rotation = 1.57;
 assert(t.x == 10.0);
-```
-
-### Foreign Type with Enum-Style Variants
-
-**Rust side:**
-
-```rust
-use zenlang::foreign_type;
-
-foreign_type! {
-    name: "Shape",
-    #[derive(Clone, Debug)]
-    pub enum Shape {
-        Circle { radius: f64 },
-        Rect { w: f64, h: f64 },
-    }
-    impl Shape {
-        fn circle(radius: f64) -> Self {
-            Self::Circle { radius }
-        }
-        fn rect(w: f64, h: f64) -> Self {
-            Self::Rect { w, h }
-        }
-        fn area(&self) -> f64 {
-            match self {
-                Self::Circle { radius } => 3.14159 * radius * radius,
-                Self::Rect { w, h } => w * h,
-            }
-        }
-    }
-}
-```
-
-**Script side:**
-
-```rust
-let c = Shape::circle(5.0);
-let r = Shape::rect(3.0, 4.0);
-print(c.area());   // 78.53975
-print(r.area());   // 12.0
 ```
 
 ---
 
-## Passing Complicated Values
-
-### Returning a Map from Rust
-
-```rust
-vm.register_fn("get_player_info", |_| {
-    let info = map_new();
-    map_set(info, "name", Value::from("Hero"));
-    map_set(info, "hp", Value::Int(100));
-    map_set(info, "mana", Value::Int(50));
-    Ok(info)
-});
-```
-
-**Script side:**
-
-```rust
-let info = get_player_info();
-print(info["name"]);
-```
+## Passing Values
 
 ### Returning an Array from Rust
 
 ```rust
-vm.register_fn("get_inventory", |_| {
-    let items = vec![
+vm.register_native("get_inventory", Rc::new(|ctx, _| {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let arr = vm.make_array(vec![
         Value::from("sword"),
         Value::from("shield"),
         Value::from("potion"),
-    ];
-    Ok(Value::Array(Rc::new(RefCell::new(items))))
-});
+    ]);
+    Ok(arr)
+}));
 ```
 
 ### Accepting Callbacks from Script
@@ -724,12 +682,11 @@ vm.register_fn("get_inventory", |_| {
 **Rust side:**
 
 ```rust
-vm.register_fn("on_button_click", |args: &[Value], ctx: &mut VmContext| {
+vm.register_native("on_button_click", Rc::new(|ctx, args| {
     let callback = args[0].clone();
-    // Store it and call later
     callbacks.push(callback);
-    Ok(Value::Void)
-});
+    Ok(Value::Nil)
+}));
 
 // Later, invoke the stored callback
 for cb in &callbacks {
@@ -749,33 +706,24 @@ on_button_click(|| {
 
 ## Calling Into Script from Rust
 
-### Call a Named Function
+### Via `__main__`
 
 ```rust
-// Script defines: fn greet(name) { "Hello, {name}!" }
-let result = vm.call("greet", &[Value::from("World")])?;
-println!("{}", result.as_str().unwrap());  // "Hello, World!"
+// Script defines: fn main() -> int { 42 }
+vm.load("fn main() -> int { 42 }")?;
+let result = vm.run_main()?;
+println!("{:?}", result); // Int(42)
 ```
 
-### Call with VmContext Inside a Native Function
+### Via Stored Callback
+
+Inside a native function, use `ctx.call_value(callee, args)`:
 
 ```rust
-vm.register_fn("process_entity", |args: &[Value], ctx: &mut VmContext| {
-    let entity_id = &args[0];
-    // Call the script's per-entity update function
-    ctx.call("entity_update", &[entity_id.clone()])
-});
-```
-
-### Global Variable Access
-
-```rust
-// Script sets: let player_name = "Alice";
-if let Some(name) = vm.get_global("player_name") {
-    println!("Player: {:?}", name);
-}
-
-vm.set_global("player_name", Value::from("Bob"));
+vm.register_native("process_entity", Rc::new(|ctx, args| {
+    let callback = args[0].clone();
+    ctx.call_value(&callback, &[args[1].clone()])
+}));
 ```
 
 ---
@@ -785,40 +733,41 @@ vm.set_global("player_name", Value::from("Bob"));
 ### Rust Host
 
 ```rust
-use zenlang::vm::{Vm, VmConfig};
-use zenlang::value::Value;
+use std::rc::Rc;
+use zenlang::{VM, Value, CompileConfig};
+use zenlang::vm::VMContext;
 
 struct Engine {
-    vm: Vm,
+    vm: VM,
     dt: f64,
 }
 
 impl Engine {
     fn new() -> Self {
-        let mut vm = Vm::new();
+        let mut vm = VM::new();
 
-        // Register API
-        vm.register_fn("engine_spawn", |args| {
+        vm.register_native("engine_spawn", Rc::new(|_, args| {
             let kind = args[0].as_str()?;
-            let x = args[1].as_f64()?;
-            let y = args[2].as_f64()?;
+            let x = args[1].as_float()?;
+            let y = args[2].as_float()?;
             println!("spawn {kind} at ({x}, {y})");
             Ok(Value::from("entity_001"))
-        });
+        }));
 
-        vm.register_fn("engine_get_dt", |_| Ok(Value::Float(0.016)));
+        vm.register_native("engine_get_dt", Rc::new(|_, _| {
+            Ok(Value::Float(0.016))
+        }));
 
-        vm.eval_file("game.zen").unwrap();
-
+        vm.load_file("game.zen").unwrap();
         Engine { vm, dt: 0.016 }
     }
 
     fn update(&mut self) {
-        let _ = self.vm.call("on_update", &[Value::Float(self.dt)]);
+        let _ = self.vm.run_main();
     }
 
-    fn on_event(&mut self, event: &str) {
-        let _ = self.vm.call("on_event", &[Value::from(event)]);
+    fn on_event(&mut self, _event: &str) {
+        // Trigger script handlers via __main__ or stored callbacks
     }
 }
 ```
@@ -835,19 +784,9 @@ struct Player {
 
 let mut player = Player { name: "Hero", hp: 100, x: 0.0, y: 0.0 };
 
-fn on_update(dt) {
-    // Move player based on input
-    if is_key_down("right") { player.x = player.x + 100.0 * dt; }
-    if is_key_down("up")    { player.y = player.y - 100.0 * dt; }
-}
-
-fn on_event(event) {
-    if event == "collision" {
-        player.hp = player.hp - 10;
-        if player.hp <= 0 {
-            engine_spawn("explosion", player.x, player.y);
-        }
-    }
+fn main() {
+    if is_key_down("right") { player.x = player.x + 100.0 * engine_get_dt(); }
+    if is_key_down("up")    { player.y = player.y - 100.0 * engine_get_dt(); }
 }
 ```
 
@@ -855,33 +794,33 @@ fn on_event(event) {
 
 ## Hot Reload
 
-### Rust Side
+Use the `HotReloader` struct:
 
 ```rust
-vm.enable_hot_reload("scripts/", |vm: &mut Vm| {
-    println!("Scripts reloaded! FPS: {:.1}", current_fps);
-    // Globals are preserved automatically
-})?;
+use zenlang::hotreload::HotReloader;
+use zenlang::VM;
 
-// Keep the host running — the watcher thread handles changes
+let vm = VM::new();
+let mut reloader = HotReloader::new(["game.zen"], vm);
+
 loop {
-    engine.update();
-    std::thread::sleep(Duration::from_millis(16));
+    if reloader.tick()? {
+        println!("Scripts reloaded!");
+    }
+    // Access the VM: reloader.vm_mut()
+    std::thread::sleep(std::time::Duration::from_millis(16));
 }
 ```
 
-Hot reload preserves **global variable values** across recompilations. Function bodies, new globals, and removed globals are updated. Foreign registrations (`register_fn`, `foreign_type!`) survive unchanged.
+Hot reload preserves **global variable values** across recompilations. Function bodies, new globals, and removed globals are updated. Foreign registrations (`register_native`, `#[derive(ZenForeign)]`) survive unchanged.
 
 ---
 
-## Cargo.tomm Setup
+## Cargo.toml Setup
 
 ```toml
 [dependencies]
-zenlang = { git = "https://github.com/SonicZentropy/zenlang" }
-
-# Or with specific features:
-zenlang = { git = "https://github.com/SonicZentropy/zenlang", default-features = false, features = ["json", "fs", "lsp"] }
+zenlang = "0.1.0"
 ```
 
 ## Common Patterns

@@ -1,6 +1,7 @@
 # Hot Reload
 
-Zen can watch source files and recompile them at runtime while preserving global state.
+Zen can watch source files and recompile them at runtime while preserving
+global state.
 
 ## CLI Usage
 
@@ -10,16 +11,49 @@ zenc run --watch game.zen
 
 ## Programmatic Usage
 
-```rust
-let mut vm = Vm::new();
-vm.enable_hot_reload("scripts/", |vm: &mut Vm| {
-    println!("Scripts reloaded! FPS: {:.1}", current_fps);
-})?;
+Use the `HotReloader` struct:
 
-// Keep the host running — the watcher thread handles changes
+```rust
+use zenlang::hotreload::HotReloader;
+use zenlang::VM;
+
+let vm = VM::new();
+// Register natives, foreign types, etc. before creating the reloader:
+// vm.register_native("spawn", ...);
+
+let mut reloader = HotReloader::new(["game.zen"], vm);
+
 loop {
-    engine.update();
-    std::thread::sleep(Duration::from_millis(16));
+    if reloader.tick()? {
+        println!("Scripts reloaded!");
+    }
+    // Access the VM:
+    // let vm = reloader.vm_mut();
+    std::thread::sleep(std::time::Duration::from_millis(16));
+}
+```
+
+The first path is the entry script; additional paths are watched but don't
+trigger recompilation. Files pulled in via `mod name;` are auto-discovered.
+
+## Manual Reload
+
+```rust
+reloader.force_reload()?;
+```
+
+## Accessing the VM
+
+```rust
+let vm = reloader.vm();        // immutable reference
+let vm = reloader.vm_mut();    // mutable reference (e.g. to run main)
+```
+
+## Watched Paths
+
+```rust
+for path in reloader.watched_paths() {
+    println!("watching: {}", path.display());
 }
 ```
 
@@ -36,10 +70,10 @@ loop {
 
 ## Architecture
 
-The watcher runs in a separate thread using `notify`. When a change is detected:
+The reloader polls file modification times. When a change is detected:
 
-1. Reads the source file
-2. Compiles it
+1. Re-reads the entire entry script (and all transitively `mod`-included files)
+2. Re-lexes, re-parses, re-resolves, re-typechecks, and re-compiles
 3. Diffs the global variable table against the current VM state
-4. Preserves matching global values
-5. Replaces the compiled bytecode atomically
+4. Preserves matching global values via `reload_functions()`
+5. Replaces compiled bytecode atomically

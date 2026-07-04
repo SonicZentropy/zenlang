@@ -464,17 +464,42 @@ zenc dap                       # start debugger
 ### Basic VM
 
 ```rust
-use zenlang::vm::VM;
-use zenlang::value::Value;
+use zenlang::VM;
 
 let mut vm = VM::new();
-vm.run_main()?;
+let result = vm.exec("print(42); 1 + 2")?;
+println!("{:?}", result); // Int(3)
+```
+
+### One-Shot
+
+```rust
+use zenlang::run;
+let result = run("1 + 2 * 3")?;
+```
+
+### Two-Step (Register Natives + Load + Run)
+
+```rust
+use std::rc::Rc;
+use zenlang::{VM, Value};
+use zenlang::vm::VMContext;
+
+let mut vm = VM::new();
+vm.register_native("add", Rc::new(|_, args| {
+    let a = args[0].as_int().unwrap_or(0);
+    let b = args[1].as_int().unwrap_or(0);
+    Ok(Value::Int(a + b))
+}));
+vm.load("fn main() -> int { add(3, 4) }")?;
+let result = vm.run_main()?;
+println!("{:?}", result); // Int(7)
 ```
 
 ### Error Handling
 
 ```rust
-match vm.run_main() {
+match vm.exec("bad_code") {
     Ok(val) => println!("OK: {:?}", val),
     Err(e) => eprintln!("Error: {e}"),
 }
@@ -482,29 +507,29 @@ match vm.run_main() {
 
 ## Native Functions (Rust → Script)
 
-### Simple Native Function
+### Register a Native Function
 
 ```rust
-vm.register_fn("add", |args: &[Value]| {
-    let a = args[0].as_int().unwrap();
-    let b = args[1].as_int().unwrap();
+vm.register_native("add", Rc::new(|_ctx: &mut VMContext, args: &[Value]| -> Result<Value> {
+    let a = args[0].as_int().unwrap_or(0);
+    let b = args[1].as_int().unwrap_or(0);
     Ok(Value::Int(a + b))
-});
+}));
 ```
 
 ### Register Multiple Functions at Once
 
 ```rust
 fn register_game_api(vm: &mut VM) {
-    vm.register_fn("spawn_enemy", |args| {
+    vm.register_native("spawn_enemy", Rc::new(|_, args| {
         let x = args[0].as_float()?;
         let y = args[1].as_float()?;
         Ok(Value::from("enemy_01"))
-    });
-    vm.register_fn("play_sound", |args| {
+    }));
+    vm.register_native("play_sound", Rc::new(|_, args| {
         let name = args[0].as_str()?.to_string();
         Ok(Value::Nil)
-    });
+    }));
 }
 ```
 
@@ -512,81 +537,77 @@ fn register_game_api(vm: &mut VM) {
 
 ### Define and Register a Foreign Type
 
-```rust
-use zenlang::foreign_type;
+Use `#[derive(ZenForeign)]` and `#[zen_methods]`:
 
-foreign_type! {
-    name: "Texture",
-    #[derive(Clone, Debug)]
-    pub struct Texture {
-        pub id: u32,
-        pub width: u32,
-        pub height: u32,
+```rust
+use zenlang::{VM, Value, ZenForeign, zen_methods};
+
+#[derive(Clone, Debug, ZenForeign)]
+struct Player {
+    name: String,
+    health: i32,
+}
+
+#[zen_methods]
+impl Player {
+    fn new(name: &str) -> Self {
+        Self { name: name.to_string(), health: 100 }
     }
-    impl Texture {
-        fn load(path: &str) -> Self {
-            Self { id: 1, width: 64, height: 64 }
-        }
-        fn get_size(&self) -> (i64, i64) {
-            (self.width as i64, self.height as i64)
-        }
-        fn is_valid(&self) -> bool {
-            self.id != 0
-        }
+    fn heal_percent(&self) -> f64 {
+        self.health as f64 / 100.0
     }
 }
+
+let mut vm = VM::new();
+Player::register_zen_foreign(&mut vm);
+Player::register_zen_methods(&mut vm);
 ```
 
-### Foreign Type with Mutable State
+**Script side:**
 
 ```rust
-foreign_type! {
-    name: "Transform",
-    #[derive(Clone, Debug, Default)]
-    pub struct Transform {
-        pub x: f64,
-        pub y: f64,
-        pub rotation: f64,
-        pub scale: f64,
-    }
-    impl Transform {
-        fn new() -> Self { Self::default() }
-        fn translate(&mut self, dx: f64, dy: f64) {
-            self.x += dx;
-            self.y += dy;
-        }
-        fn get_rotation(&self) -> f64 { self.rotation }
-        fn set_rotation(&mut self, r: f64) { self.rotation = r; }
-    }
-}
+let p = Player::new("Aria");
+print(p.name);        // field access
+print(p.heal_percent()); // method call
+p.health = 50;        // field mutation
 ```
 
 ## Calling Into Script from Rust
 
-### Call a Named Function
+### Via `__main__`
+
+Define `fn main()` in the script and call `vm.run_main()`:
 
 ```rust
-let result = vm.call("greet", &[Value::from("World")])?;
-println!("{}", result.as_str().unwrap());
+vm.load("fn main() -> int { 42 }")?;
+let result = vm.run_main()?;
 ```
 
-### Global Variable Access
+### Via Stored Callbacks
+
+Script passes a closure to a native, which stores it and calls later:
 
 ```rust
-if let Some(name) = vm.get_global("player_name") {
-    println!("Player: {:?}", name);
-}
-
-vm.set_global("player_name", Value::from("Bob"));
+vm.register_native("on_update", Rc::new(|ctx, args| {
+    let callback = args[0].clone();
+    // store callback, call later via ctx.call_value(&callback, &[])
+    Ok(Value::Nil)
+}));
 ```
 
 ## Hot Reload
 
 ```rust
-vm.enable_hot_reload("scripts/", |vm: &mut VM| {
-    println!("Scripts reloaded!");
-    // Globals are preserved automatically
-})?;
+use zenlang::hotreload::HotReloader;
+
+let vm = VM::new();
+let mut reloader = HotReloader::new(["game.zen"], vm);
+loop {
+    if reloader.tick()? {
+        println!("Reloaded!");
+    }
+    std::thread::sleep(std::time::Duration::from_millis(16));
+}
 ```
 
 Hot reload preserves **global variable values** across recompilations. Function bodies, new globals, and removed globals are updated.
@@ -595,59 +616,5 @@ Hot reload preserves **global variable values** across recompilations. Function 
 
 ```toml
 [dependencies]
-zenlang = { git = "https://github.com/SonicZentropy/zenlang" }
-```
-
-## Game Loop
-
-```rust
-struct Game {
-    player_hp: i64,
-    score: i64,
-}
-
-impl Game {
-    fn new() -> Game { Game { player_hp: 100, score: 0 } }
-    fn update(&mut self, dt: f64) {
-        // game logic here
-    }
-    fn is_alive(&self) -> bool { self.player_hp > 0 }
-}
-```
-
-## Error Handling
-
-```rust
-fn load_config(path: str) -> Result<map, str> {
-    if !exists(path) {
-        return Err("file not found");
-    }
-    let content = read(path);
-    Ok(decode(content))
-}
-
-fn main() {
-    match load_config("settings.json") {
-        Ok(cfg) => print("loaded"),
-        Err(e) => print("error: {e}"),
-    };
-}
-```
-
-## State Machine
-
-```rust
-enum State { Idle, Running, Paused }
-
-struct Machine { state: State }
-
-impl Machine {
-    fn update(&mut self) {
-        match self.state {
-            Idle => { /* ... */ },
-            Running => { /* ... */ },
-            Paused => { /* ... */ },
-        };
-    }
-}
+zenlang = "0.1.0"
 ```

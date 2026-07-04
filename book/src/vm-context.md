@@ -1,36 +1,67 @@
 # Calling Back into Script
 
-From a native function, you can call back into the script by getting the `VmContext`.
+From a native function, you can call back into the script using `VMContext`.
+
+## The VMContext
+
+Every native function receives a `&mut VMContext` as its first argument.
+It provides a safe entry point for calling script functions and closures.
 
 ```rust
-use zenlang::vm::VmContext;
+use zenlang::vm::VMContext;
 
-fn register_hooks(vm: &mut Vm) {
-    vm.register_fn("on_update", |args, ctx: &mut VmContext| {
-        // Call a Zen function from Rust
-        let result = ctx.call("player_update", &[args[0].clone()])?;
-        Ok(result)
-    });
+fn register_hooks(vm: &mut VM) {
+    vm.register_native("on_update", Rc::new(|ctx: &mut VMContext, args: &[Value]| {
+        let callback = &args[0];
+        ctx.call_value(callback, &[])?;
+        Ok(Value::Nil)
+    }));
 }
 ```
 
-## Calling a Named Function
+## Calling a Named Script Function
+
+To call a named function from a native, pass the function value:
 
 ```rust
 // Script defines: fn greet(name) { "Hello, {name}!" }
-let result = vm.call("greet", &[Value::from("World")])?;
+
+// Inside a native function:
+let greet_fn = /* obtain the Value::Function for greet */;
+let result = ctx.call_value(&greet_fn, &[Value::from("World")])?;
 println!("{}", result.as_str().unwrap());  // "Hello, World!"
 ```
 
-## Global Variable Access
+## Accessing the VM from a Native
+
+For advanced use cases (creating arrays, wrapping foreign objects), you can
+access the VM directly through the raw pointer:
 
 ```rust
-// Script sets: let player_name = "Alice";
-if let Some(name) = vm.get_global("player_name") {
-    println!("Player: {:?}", name);
-}
+vm.register_native("make_items", Rc::new(|ctx, args| {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let arr = vm.make_array(vec![Value::from("a"), Value::from("b")]);
+    Ok(arr)
+}));
+```
 
-vm.set_global("player_name", Value::from("Bob"));
+## Timers
+
+Native functions can schedule script callbacks:
+
+```rust
+vm.register_native("schedule_boom", Rc::new(|ctx, _| {
+    let callback = /* a script closure */;
+    ctx.register_timer(callback, 3.0, None)?;        // one-shot after 3s
+    Ok(Value::Nil)
+}));
+```
+
+```rust
+ctx.register_timer(callback, delay, interval)?;
+// delay:      seconds until first fire
+// interval:   Some(dur) for repeating, None for one-shot
+ctx.remove_timer(id);
 ```
 
 ## Full End-to-End Example
@@ -38,38 +69,43 @@ vm.set_global("player_name", Value::from("Bob"));
 ### Rust Host
 
 ```rust
-use zenlang::vm::{Vm, VmConfig};
-use zenlang::value::Value;
+use std::rc::Rc;
+use zenlang::{VM, Value, CompileConfig};
+use zenlang::vm::VMContext;
+use zenlang::error::Result;
 
 struct Engine {
-    vm: Vm,
+    vm: VM,
     dt: f64,
 }
 
 impl Engine {
     fn new() -> Self {
-        let mut vm = Vm::new();
+        let mut vm = VM::new();
 
-        vm.register_fn("engine_spawn", |args| {
-            let kind = args[0].as_str()?;
-            let x = args[1].as_f64()?;
-            let y = args[2].as_f64()?;
+        vm.register_native("engine_spawn", Rc::new(|_, args| {
+            let kind = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let x = args.get(1).and_then(|v| v.as_float()).unwrap_or(0.0);
+            let y = args.get(2).and_then(|v| v.as_float()).unwrap_or(0.0);
             println!("spawn {kind} at ({x}, {y})");
             Ok(Value::from("entity_001"))
-        });
+        }));
 
-        vm.register_fn("engine_get_dt", |_| Ok(Value::Float(0.016)));
+        vm.register_native("engine_get_dt", Rc::new(|_, _| {
+            Ok(Value::Float(0.016))
+        }));
 
-        vm.eval_file("game.zen").unwrap();
+        vm.load_file("game.zen").unwrap();
         Engine { vm, dt: 0.016 }
     }
 
     fn update(&mut self) {
-        let _ = self.vm.call("on_update", &[Value::Float(self.dt)]);
+        // Call the script's on_update through __main__ or a stored callback
+        let _ = self.vm.run_main();
     }
 
     fn on_event(&mut self, event: &str) {
-        let _ = self.vm.call("on_event", &[Value::from(event)]);
+        // Trigger script handlers via a registered native that receives events
     }
 }
 ```
@@ -81,25 +117,8 @@ struct Player { name: str, hp: i64, x: f64, y: f64 }
 
 let mut player = Player { name: "Hero", hp: 100, x: 0.0, y: 0.0 };
 
-fn on_update(dt) {
-    if is_key_down("right") { player.x = player.x + 100.0 * dt; }
-    if is_key_down("up")    { player.y = player.y - 100.0 * dt; }
-}
-
-fn on_event(event) {
-    if event == "collision" {
-        player.hp = player.hp - 10;
-        if player.hp <= 0 {
-            engine_spawn("explosion", player.x, player.y);
-        }
-    }
+fn main() {
+    if is_key_down("right") { player.x = player.x + 100.0 * engine_get_dt(); }
+    if is_key_down("up")    { player.y = player.y - 100.0 * engine_get_dt(); }
 }
 ```
-
-## Why This Matters
-
-This enables patterns like:
-
-- **Callbacks** — Rust calls into script-defined event handlers
-- **Overridable behavior** — Scripts define functions that the engine calls
-- **Plugin systems** — Allow scripts to define game object behavior
