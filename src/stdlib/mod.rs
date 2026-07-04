@@ -374,11 +374,12 @@ fn assert_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Nil)
 }
 
-fn assert_eq_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+fn assert_eq_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     if args.len() < 2 {
         return Ok(Value::Nil);
     }
-    if args[0] != args[1] {
+    let vm: &crate::vm::VM = unsafe { &*ctx.raw_vm };
+    if !vm.values_equal(&args[0], &args[1]) {
         return Err(crate::error::Error::Script {
             msg: format!("assert_eq failed: {:?} != {:?}", args[0], args[1]),
         });
@@ -613,6 +614,17 @@ fn to_str_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
 /// script-visible `Option<T>` back (iterators, map lookups, etc).
 pub(crate) fn option_some(ctx: &mut VMContext, v: Value) -> Value {
     let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    option_some_vm(vm, v)
+}
+
+/// Build a `None` value using the built-in `Option` enum's convention (tag 1 = None).
+pub(crate) fn option_none(ctx: &mut VMContext) -> Value {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    option_none_vm(vm)
+}
+
+/// Build `Some(v)` from a `&mut VM` directly (no VMContext needed).
+pub(crate) fn option_some_vm(vm: &mut VM, v: Value) -> Value {
     let h = vm.enums.insert(EnumData {
         tag: 0,
         fields: vec![v],
@@ -620,9 +632,8 @@ pub(crate) fn option_some(ctx: &mut VMContext, v: Value) -> Value {
     Value::Enum(h)
 }
 
-/// Build a `None` value using the built-in `Option` enum's convention (tag 1 = None).
-pub(crate) fn option_none(ctx: &mut VMContext) -> Value {
-    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+/// Build `None` from a `&mut VM` directly (no VMContext needed).
+pub(crate) fn option_none_vm(vm: &mut VM) -> Value {
     let h = vm.enums.insert(EnumData {
         tag: 1,
         fields: vec![],

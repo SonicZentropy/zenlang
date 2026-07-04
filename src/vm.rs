@@ -1466,6 +1466,315 @@ impl VM {
                                 }
                             }
                         }
+                        Value::Array(h) => {
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
+                            let result = match method_name.as_str() {
+                                "push" => {
+                                    if let Some(val) = args.get(1) {
+                                        self.arrays.get_mut(*h).values.push(val.clone());
+                                    }
+                                    Value::Nil
+                                }
+                                "pop" => {
+                                    self.arrays.get_mut(*h).values.pop().unwrap_or(Value::Nil)
+                                }
+                                "len" | "count" => {
+                                    Value::Int(self.arrays.get(*h).values.len() as i64)
+                                }
+                                "insert" => {
+                                    if let (Some(Value::Int(idx)), Some(val)) =
+                                        (args.get(1), args.get(2))
+                                    {
+                                        let idx = *idx as usize;
+                                        let v = &mut self.arrays.get_mut(*h).values;
+                                        if idx <= v.len() {
+                                            v.insert(idx, val.clone());
+                                        }
+                                    }
+                                    Value::Nil
+                                }
+                                "remove" => {
+                                    if let Some(Value::Int(idx)) = args.get(1) {
+                                        let idx = *idx as usize;
+                                        let v = &mut self.arrays.get_mut(*h).values;
+                                        if idx < v.len() {
+                                            v.remove(idx)
+                                        } else {
+                                            Value::Nil
+                                        }
+                                    } else {
+                                        Value::Nil
+                                    }
+                                }
+                                "contains" => {
+                                    let val = args.get(1);
+                                    let found = val.is_some_and(|v| {
+                                        self.arrays.get(*h).values.contains(v)
+                                    });
+                                    Value::Bool(found)
+                                }
+                                "is_empty" => {
+                                    Value::Bool(self.arrays.get(*h).values.is_empty())
+                                }
+                                "clear" => {
+                                    self.arrays.get_mut(*h).values.clear();
+                                    Value::Nil
+                                }
+                                _ => {
+                                    return Err(self.runtime_error(format!(
+                                        "array has no method '{}'",
+                                        method_name
+                                    )));
+                                }
+                            };
+                            self.stack.push(result);
+                        }
+                        Value::Map(h) => {
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
+                            let result = match method_name.as_str() {
+                                "set" => {
+                                    if let (Some(key_val), Some(val)) =
+                                        (args.get(1), args.get(2))
+                                    {
+                                        if let Some(key) =
+                                            crate::value::MapKey::from_value(key_val)
+                                        {
+                                            self.maps
+                                                .get_mut(*h)
+                                                .entries
+                                                .insert(key, val.clone());
+                                        }
+                                    }
+                                    Value::Nil
+                                }
+                                "get" => {
+                                    if let Some(key_val) = args.get(1) {
+                                        let key =
+                                            crate::value::MapKey::from_value(key_val);
+                                        match key.and_then(|k| {
+                                            self.maps.get(*h).entries.get(&k).cloned()
+                                        }) {
+                                            Some(v) => {
+                                                crate::stdlib::option_some_vm(self, v)
+                                            }
+                                            None => {
+                                                crate::stdlib::option_none_vm(self)
+                                            }
+                                        }
+                                    } else {
+                                        crate::stdlib::option_none_vm(self)
+                                    }
+                                }
+                                "has" | "contains_key" => {
+                                    if let Some(key_val) = args.get(1) {
+                                        let key =
+                                            crate::value::MapKey::from_value(key_val);
+                                        Value::Bool(key.is_some_and(|k| {
+                                            self.maps
+                                                .get(*h)
+                                                .entries
+                                                .contains_key(&k)
+                                        }))
+                                    } else {
+                                        Value::Bool(false)
+                                    }
+                                }
+                                "remove" => {
+                                    if let Some(key_val) = args.get(1) {
+                                        let key =
+                                            crate::value::MapKey::from_value(key_val);
+                                        match key.and_then(|k| {
+                                            self.maps.get_mut(*h).entries.remove(&k)
+                                        }) {
+                                            Some(v) => {
+                                                crate::stdlib::option_some_vm(self, v)
+                                            }
+                                            None => {
+                                                crate::stdlib::option_none_vm(self)
+                                            }
+                                        }
+                                    } else {
+                                        crate::stdlib::option_none_vm(self)
+                                    }
+                                }
+                                "keys" => {
+                                    let keys: Vec<Value> = self
+                                        .maps
+                                        .get(*h)
+                                        .entries
+                                        .keys()
+                                        .map(|k| k.to_value())
+                                        .collect();
+                                    let arr = self.arrays.insert(
+                                        crate::value::ArrayData { values: keys },
+                                    );
+                                    Value::Array(arr)
+                                }
+                                "values" => {
+                                    let values: Vec<Value> = self
+                                        .maps
+                                        .get(*h)
+                                        .entries
+                                        .values()
+                                        .cloned()
+                                        .collect();
+                                    let arr = self.arrays.insert(
+                                        crate::value::ArrayData { values },
+                                    );
+                                    Value::Array(arr)
+                                }
+                                "len" | "count" => {
+                                    Value::Int(
+                                        self.maps.get(*h).entries.len() as i64,
+                                    )
+                                }
+                                "clear" => {
+                                    self.maps.get_mut(*h).entries.clear();
+                                    Value::Nil
+                                }
+                                "is_empty" => {
+                                    Value::Bool(
+                                        self.maps.get(*h).entries.is_empty(),
+                                    )
+                                }
+                                _ => {
+                                    return Err(self.runtime_error(format!(
+                                        "map has no method '{}'",
+                                        method_name
+                                    )));
+                                }
+                            };
+                            self.stack.push(result);
+                        }
+                        Value::Str(s) => {
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
+                            let result = match method_name.as_str() {
+                                "len" | "count" => {
+                                    Value::Int(s.len() as i64)
+                                }
+                                "contains" => {
+                                    if let Some(Value::Str(sub)) = args.get(1) {
+                                        Value::Bool(s.contains(sub.as_ref()))
+                                    } else {
+                                        Value::Bool(false)
+                                    }
+                                }
+                                "trim" => {
+                                    Value::Str(s.trim().into())
+                                }
+                                "to_upper" => {
+                                    let upper: String =
+                                        s.chars().flat_map(|c| c.to_uppercase()).collect();
+                                    Value::Str(upper.into())
+                                }
+                                "to_lower" => {
+                                    let lower: String =
+                                        s.chars().flat_map(|c| c.to_lowercase()).collect();
+                                    Value::Str(lower.into())
+                                }
+                                "substring" => {
+                                    match (args.get(1), args.get(2)) {
+                                        (Some(Value::Int(start)), Some(Value::Int(end))) => {
+                                            let start = *start as usize;
+                                            let end = (*end as usize).min(s.len());
+                                            if start >= s.len() || start >= end {
+                                                Value::Str("".into())
+                                            } else {
+                                                Value::Str(s[start..end].into())
+                                            }
+                                        }
+                                        _ => Value::Nil,
+                                    }
+                                }
+                                "is_empty" => {
+                                    Value::Bool(s.is_empty())
+                                }
+                                "starts_with" => {
+                                    if let Some(Value::Str(prefix)) = args.get(1) {
+                                        Value::Bool(s.starts_with(prefix.as_ref()))
+                                    } else {
+                                        Value::Bool(false)
+                                    }
+                                }
+                                "ends_with" => {
+                                    if let Some(Value::Str(suffix)) = args.get(1) {
+                                        Value::Bool(s.ends_with(suffix.as_ref()))
+                                    } else {
+                                        Value::Bool(false)
+                                    }
+                                }
+                                _ => {
+                                    return Err(self.runtime_error(format!(
+                                        "string has no method '{}'",
+                                        method_name
+                                    )));
+                                }
+                            };
+                            self.stack.push(result);
+                        }
+                        Value::Range(start, end, inclusive) => {
+                            let method_name = self
+                                .chunk()
+                                .method_names
+                                .get(method_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let args: Vec<Value> = self.stack.drain(args_start - 1..).collect();
+                            let result = match method_name.as_str() {
+                                "len" | "count" => {
+                                    let len = if *inclusive {
+                                        *end - *start + 1
+                                    } else {
+                                        *end - *start
+                                    };
+                                    Value::Int(len.max(0))
+                                }
+                                "contains" => {
+                                    if let Some(Value::Int(n)) = args.get(1) {
+                                        if *inclusive {
+                                            Value::Bool(*n >= *start && *n <= *end)
+                                        } else {
+                                            Value::Bool(*n >= *start && *n < *end)
+                                        }
+                                    } else {
+                                        Value::Bool(false)
+                                    }
+                                }
+                                "is_empty" => {
+                                    let len = if *inclusive {
+                                        *end - *start + 1
+                                    } else {
+                                        *end - *start
+                                    };
+                                    Value::Bool(len <= 0)
+                                }
+                                _ => {
+                                    return Err(self.runtime_error(format!(
+                                        "range has no method '{}'",
+                                        method_name
+                                    )));
+                                }
+                            };
+                            self.stack.push(result);
+                        }
                         _ => {
                             return Err(self.runtime_error(format!(
                                 "cannot call method on {}",

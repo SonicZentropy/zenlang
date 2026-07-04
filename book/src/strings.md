@@ -30,6 +30,20 @@ to_lower("XYZ");           // "xyz"
 substring("hello", 0, 2);  // "he"
 ```
 
+Method-call style is also supported:
+
+```rust
+"hello".len();              // 5
+"hello".contains("ell");    // true
+"  hi  ".trim();            // "hi"
+"abc".to_upper();           // "ABC"
+"XYZ".to_lower();           // "xyz"
+"hello".substring(0, 2);    // "he"
+"".is_empty();              // true
+"hello".starts_with("he");  // true
+"hello".ends_with("lo");    // true
+```
+
 ## Iteration
 
 Strings can be iterated character by character:

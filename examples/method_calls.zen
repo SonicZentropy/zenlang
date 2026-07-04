@@ -1,0 +1,39 @@
+// Method-call syntax for built-in types
+// Run with: zenc run examples/method_calls.zen
+
+let arr = [1, 2, 3];
+arr.push(4);
+assert(arr.len() == 4);
+assert(arr.pop() == 4);
+assert(!arr.is_empty());
+arr.insert(0, 99);
+assert(arr.remove(0) == 99);
+assert(arr.contains(2));
+arr.clear();
+assert(arr.is_empty());
+
+let s = "  Hello  ";
+assert(s.trim() == "Hello");
+assert(s.starts_with("  "));
+assert(s.ends_with("  "));
+assert(s.contains("llo"));
+assert_eq(s.to_upper(), "  HELLO  ");
+assert_eq(s.to_lower(), "  hello  ");
+assert_eq(s.substring(0, 5), "  Hel");
+
+let r = 0..5;
+assert(r.len() == 5);
+assert(r.contains(3));
+assert(!r.contains(5));
+
+let m = map_new();
+m.set("x", 10);
+m.set("y", 20);
+assert(m.has("x"));
+assert(m.contains_key("y"));
+assert_eq(m.len(), 2);
+assert_eq(m.get("x"), Some(10));
+m.clear();
+assert(m.is_empty());
+
+print("All method-call examples passed!");

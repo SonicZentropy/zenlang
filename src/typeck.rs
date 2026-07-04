@@ -498,7 +498,7 @@ impl<'a> TypeChecker<'a> {
                         Type::Bool
                     }
                     BinOp::And | BinOp::Or => {
-                        if !matches!(&lt, Type::Bool) {
+                        if !matches!(&lt, Type::Bool | Type::Any) {
                             self.error("logical operator requires bool operands");
                         }
                         Type::Bool
@@ -515,7 +515,7 @@ impl<'a> TypeChecker<'a> {
                         it
                     }
                     UnOp::Not => {
-                        if !matches!(it, Type::Bool) {
+                        if !matches!(it, Type::Bool | Type::Any) {
                             self.error("logical not requires bool");
                         }
                         Type::Bool
@@ -739,6 +739,23 @@ impl<'a> TypeChecker<'a> {
                     // (e.g. `.next()` on an iterator returned by `iter()`)
                     // can't be statically validated, so allow them through.
                     Type::Any => {
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        Type::Any
+                    }
+                    // `Type::Str` — built-in string with methods:
+                    // len, contains, trim, to_upper, to_lower, substring,
+                    // is_empty, starts_with, ends_with
+                    Type::Str => {
+                        for arg in args {
+                            self.check_expr(arg);
+                        }
+                        Type::Any
+                    }
+                    // `Type::Array(..)` — built-in array with methods:
+                    // push, pop, len, insert, remove, contains, is_empty, clear
+                    Type::Array(_) => {
                         for arg in args {
                             self.check_expr(arg);
                         }
@@ -1168,7 +1185,7 @@ impl<'a> TypeChecker<'a> {
             Expr::Range { start, end, .. } => {
                 self.check_expr(start);
                 self.check_expr(end);
-                Type::Unit // ranges are consumed by for-loops in compilation
+                Type::Any // ranges can be used as values with method calls
             }
             Expr::Lambda {
                 params,
