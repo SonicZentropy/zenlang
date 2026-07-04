@@ -568,43 +568,25 @@ fn register_game_api(vm: &mut Vm) {
 ```rust
 use zenlang::foreign_type;
 
-pub struct Texture {
-    pub id: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
 foreign_type! {
-    /// The name inside `type` is the Rust struct; the string is the Zenlang name.
-    type Texture = "Texture" {
-        fields {
-            width: i64,
-            height: i64,
+    name: "Texture",
+    #[derive(Clone, Debug)]
+    pub struct Texture {
+        pub id: u32,
+        pub width: u32,
+        pub height: u32,
+    }
+    impl Texture {
+        fn load(path: &str) -> Self {
+            // In real code, Texture::load_from_disk(path).unwrap_or_default()
+            Self { id: 1, width: 64, height: 64 }
         }
-        methods {
-            fn load(path: &str) -> Texture;
-            fn get_size(&self) -> (i64, i64);
-            fn is_valid(&self) -> bool;
+        fn get_size(&self) -> (i64, i64) {
+            (self.width as i64, self.height as i64)
         }
-    }
-}
-
-impl ForeignTexture {
-    fn load(path: &str) -> Result<Value, VmError> {
-        let tex = match Texture::load_from_disk(path) {
-            Ok(t) => t,
-            Err(e) => return Err(VmError::new(&format!("failed: {e}"))),
-        };
-        Ok(ForeignTexture::new(tex).into())
-    }
-
-    fn get_size(&self) -> Result<Value, VmError> {
-        let t = &self.0;
-        Ok((t.width as i64, t.height as i64).into())
-    }
-
-    fn is_valid(&self) -> Result<Value, VmError> {
-        Ok(Value::Bool(self.0.id != 0))
+        fn is_valid(&self) -> bool {
+            self.id != 0
+        }
     }
 }
 ```
@@ -623,42 +605,31 @@ print("texture size: {w} x {h}");
 **Rust side:**
 
 ```rust
-pub struct Transform {
-    pub x: f64, pub y: f64,
-    pub rotation: f64, pub scale: f64,
-}
+use zenlang::foreign_type;
 
 foreign_type! {
-    type Transform = "Transform" {
-        fields {
-            x: f64, y: f64,
+    name: "Transform",
+    #[derive(Clone, Debug, Default)]
+    pub struct Transform {
+        pub x: f64,
+        pub y: f64,
+        pub rotation: f64,
+        pub scale: f64,
+    }
+    impl Transform {
+        fn new() -> Self {
+            Self::default()
         }
-        methods {
-            fn new() -> Transform;
-            fn translate(&mut self, dx: f64, dy: f64);
-            fn get_rotation(&self) -> f64;
-            fn set_rotation(&mut self, r: f64);
+        fn translate(&mut self, dx: f64, dy: f64) {
+            self.x += dx;
+            self.y += dy;
         }
-    }
-}
-
-impl ForeignTransform {
-    fn new() -> Result<Value, VmError> {
-        Ok(ForeignTransform::new(Transform {
-            x: 0.0, y: 0.0, rotation: 0.0, scale: 1.0,
-        }).into())
-    }
-    fn translate(&mut self, dx: f64, dy: f64) -> Result<Value, VmError> {
-        self.0.x += dx;
-        self.0.y += dy;
-        Ok(Value::Void)
-    }
-    fn get_rotation(&self) -> Result<Value, VmError> {
-        Ok(Value::Float(self.0.rotation))
-    }
-    fn set_rotation(&mut self, r: f64) -> Result<Value, VmError> {
-        self.0.rotation = r;
-        Ok(Value::Void)
+        fn get_rotation(&self) -> f64 {
+            self.rotation
+        }
+        fn set_rotation(&mut self, r: f64) {
+            self.rotation = r;
+        }
     }
 }
 ```
@@ -677,33 +648,27 @@ assert(t.x == 10.0);
 **Rust side:**
 
 ```rust
-pub enum Shape {
-    Circle { radius: f64 },
-    Rect { w: f64, h: f64 },
-}
+use zenlang::foreign_type;
 
 foreign_type! {
-    type Shape = "Shape" {
-        fields {}
-        methods {
-            fn circle(radius: f64) -> Shape;
-            fn rect(w: f64, h: f64) -> Shape;
-            fn area(&self) -> f64;
+    name: "Shape",
+    #[derive(Clone, Debug)]
+    pub enum Shape {
+        Circle { radius: f64 },
+        Rect { w: f64, h: f64 },
+    }
+    impl Shape {
+        fn circle(radius: f64) -> Self {
+            Self::Circle { radius }
         }
-    }
-}
-
-impl ForeignShape {
-    fn circle(radius: f64) -> Result<Value, VmError> {
-        Ok(ForeignShape::new(Shape::Circle { radius }).into())
-    }
-    fn rect(w: f64, h: f64) -> Result<Value, VmError> {
-        Ok(ForeignShape::new(Shape::Rect { w, h }).into())
-    }
-    fn area(&self) -> Result<Value, VmError> {
-        match &self.0 {
-            Shape::Circle { radius } => Ok(Value::Float(3.14159 * radius * radius)),
-            Shape::Rect { w, h } => Ok(Value::Float(w * h)),
+        fn rect(w: f64, h: f64) -> Self {
+            Self::Rect { w, h }
+        }
+        fn area(&self) -> f64 {
+            match self {
+                Self::Circle { radius } => 3.14159 * radius * radius,
+                Self::Rect { w, h } => w * h,
+            }
         }
     }
 }

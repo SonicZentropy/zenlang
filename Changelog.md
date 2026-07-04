@@ -353,3 +353,13 @@ Add `Type::Any` variant, replace wildcard `Unit` usages, clean up `types_compati
 - `cargo build`: 0 warnings
 - `cargo test --lib`: 246 passed, 0 failed
 - `cargo run -- test`: 37/37 passed
+
+| # | Item | Status | Commit |
+|---|------|--------|--------|
+| 1 | Unified `foreign_type!` macro | ✅ Done | `e4e4674` |
+| 2 | Type name override `#[foreign(name = "...")]` | ✅ Done | `d1a4766` |
+| 3 | Safe constructor helper `VM::wrap_foreign()` | ✅ Done | `1f3788f` |
+| 4 | `Option<T>` field support | ✅ Done | `9b6c930` |
+| 5 | Default-constructor `#[foreign(default)]` | ✅ Done | `9b6c930` |
+| 6 | `ty_to_field_type` syn AST matching | ✅ Done | `7155d0a` |
+| 7 | Book documentation alignment | ✅ Done | `de276b0` |

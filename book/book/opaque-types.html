@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-3e7c156f.js";
+            window.path_to_searchindex_js = "searchindex-5a81131f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3f6421ed.js"></script>
@@ -175,7 +175,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="opaque-types"><a class="header" href="#opaque-types">Opaque Types</a></h1>
-<p>Opaque types are Rust-side types exposed to Zenlang through FFI. They are registered in Rust using the <code>foreign_type!</code> macro.</p>
+<p>Opaque types are Rust-side types exposed to Zenlang through FFI. They are registered in Rust using <a href="./foreign-types.html"><code>#[derive(ZenForeign)]</code> and <code>#[zen_methods]</code></a>, or the unified <code>foreign_type!</code> macro.</p>
 <h2 id="in-script"><a class="header" href="#in-script">In Script</a></h2>
 <p>Opaque types can be constructed and their methods called, but their internal layout is hidden:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
