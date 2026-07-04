@@ -17,6 +17,7 @@ use crate::vm::{VM, VMContext};
 use crate::zen_native_fn;
 
 mod datetime;
+mod deque;
 mod fs;
 mod iter;
 mod json;
@@ -89,6 +90,9 @@ pub fn register_builtins(vm: &mut VM) {
 
     // JSON serialization
     json::register(vm);
+
+    // Deque collection
+    deque::register(vm);
 
     // Set collection
     set::register(vm);
@@ -535,6 +539,7 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
         },
     ];
     sigs.extend(datetime::signatures());
+    sigs.extend(deque::signatures());
     sigs.extend(fs::signatures());
     sigs.extend(json::signatures());
     sigs.extend(map::signatures());

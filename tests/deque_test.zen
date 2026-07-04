@@ -1,0 +1,26 @@
+let d = deque_new();
+assert(deque_is_empty(d));
+assert(deque_len(d) == 0);
+
+deque_push_back(d, 10);
+deque_push_back(d, 20);
+deque_push_front(d, 5);
+assert(deque_len(d) == 3);
+assert(deque_peek_front(d) == 5);
+assert(deque_peek_back(d) == 20);
+
+assert(deque_pop_front(d) == 5);
+assert(deque_pop_back(d) == 20);
+assert(deque_len(d) == 1);
+
+assert(deque_pop_front(d) == 10);
+assert(deque_is_empty(d));
+
+// to_array
+deque_push_back(d, "a");
+deque_push_back(d, "b");
+deque_push_back(d, "c");
+let arr = deque_to_array(d);
+assert(len(arr) == 3);
+
+print("deque test passed");
