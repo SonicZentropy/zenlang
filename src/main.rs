@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::SystemTime;
 
 use clap::{Parser, Subcommand};
 
@@ -35,8 +37,16 @@ enum Command {
     Lsp,
     /// Start the DAP debug adapter server (stdin/stdout)
     Dap { path: camino::Utf8PathBuf },
-    /// Run tests
-    Test { paths: Vec<camino::Utf8PathBuf> },
+    /// Run tests (or benchmarks with --bench)
+    Test {
+        paths: Vec<camino::Utf8PathBuf>,
+        /// Re-run tests when files change
+        #[arg(long)]
+        watch: bool,
+        /// Run benchmarks from benches/ instead of tests/
+        #[arg(long)]
+        bench: bool,
+    },
 }
 
 fn main() -> zenlang::Result<()> {
@@ -52,7 +62,7 @@ fn main() -> zenlang::Result<()> {
         Some(Command::Repl) => run_repl(),
         Some(Command::Disasm { path }) => run_disasm(path),
         Some(Command::Check { path }) => run_check(path),
-        Some(Command::Test { paths }) => run_tests(paths),
+        Some(Command::Test { paths, watch, bench }) => run_tests(paths, *watch, *bench),
         Some(Command::Lsp) => {
             zenlang::lsp::run_server();
             Ok(())
@@ -102,72 +112,140 @@ fn run_script(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
     Ok(())
 }
 
-fn run_tests(paths: &[camino::Utf8PathBuf]) -> zenlang::Result<()> {
-    let test_files: Vec<camino::Utf8PathBuf> = if paths.is_empty() {
-        let test_dir = camino::Utf8Path::new("tests");
-        if !test_dir.is_dir() {
-            eprintln!("no tests/ directory found and no paths specified");
-            std::process::exit(1);
-        }
-        let mut files: Vec<_> = std::fs::read_dir("tests")
-            .map_err(|e| Error::Io { source: e })?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|s| s == "zen").unwrap_or(false))
-            .map(|e| camino::Utf8PathBuf::from_path_buf(e.path()).unwrap_or_default())
-            .filter(|p| !p.as_str().is_empty())
-            .collect();
-        files.sort();
-        files
-    } else {
-        paths.to_vec()
-    };
+fn run_tests(
+    paths: &[camino::Utf8PathBuf],
+    watch: bool,
+    bench: bool,
+) -> zenlang::Result<()> {
+    let dir = if bench { "benches" } else { "tests" };
+    let label = if bench { "benchmark" } else { "test" };
+
+    let test_files = discover_files(paths, dir)?;
 
     if test_files.is_empty() {
-        eprintln!("no test files found");
-        std::process::exit(0);
+        eprintln!("no {label} files found in {dir}/");
+        return Ok(());
     }
 
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    })
+    .ok();
+
+    loop {
+        let (passed, failed) = run_test_suite(&test_files, label)?;
+
+        let total = test_files.len();
+        println!("\n{passed}/{total} {label}s passed");
+        if failed > 0 && !watch {
+            std::process::exit(failed as i32);
+        }
+
+        if !watch {
+            break;
+        }
+
+        // Watch mode: poll for file changes
+        println!("\n  watching for changes... (Ctrl+C to stop)");
+        if !wait_for_changes(&test_files, &running) {
+            break;
+        }
+        println!();
+    }
+    Ok(())
+}
+
+/// Discover .zen files. If `paths` is non-empty, use those; otherwise scan `dir/`.
+fn discover_files(paths: &[camino::Utf8PathBuf], dir: &str) -> zenlang::Result<Vec<camino::Utf8PathBuf>> {
+    if !paths.is_empty() {
+        return Ok(paths.to_vec());
+    }
+    let test_dir = camino::Utf8Path::new(dir);
+    if !test_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .map_err(|e| Error::Io { source: e })?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|s| s == "zen").unwrap_or(false))
+        .map(|e| camino::Utf8PathBuf::from_path_buf(e.path()).unwrap_or_default())
+        .filter(|p| !p.as_str().is_empty())
+        .collect();
+    files.sort();
+    Ok(files)
+}
+
+/// Run a single test/bench file, returning Ok(()) on success.
+fn run_single_test(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
+    let source = std::fs::read_to_string(path.as_std_path())
+        .map_err(|e| Error::Io { source: e })?;
+    let mut vm = VM::new();
+    vm.load_with(&source, &zenlang::vm::CompileConfig {
+        module_path: path.parent().map(|p| p.as_std_path().to_path_buf()),
+        ..Default::default()
+    })?;
+    vm.run_main()?;
+    Ok(())
+}
+
+/// Run the full test suite, returning (passed, failed) counts.
+fn run_test_suite(
+    test_files: &[camino::Utf8PathBuf],
+    label: &str,
+) -> zenlang::Result<(usize, usize)> {
     let total = test_files.len();
     let mut passed = 0usize;
     let mut failed = 0usize;
 
-    for path in &test_files {
-        let source = match std::fs::read_to_string(path.as_std_path()) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("FAIL {path} — io error: {e}");
-                failed += 1;
-                continue;
-            }
-        };
+    for path in test_files {
+        let result = run_single_test(path);
 
-        let result = (|| -> zenlang::Result<()> {
-            let mut vm = VM::new();
-            vm.load_with(&source, &zenlang::vm::CompileConfig {
-                module_path: path.parent().map(|p| p.as_std_path().to_path_buf()),
-                ..Default::default()
-            })?;
-            vm.run_main()?;
-            Ok(())
-        })();
-
-        match result {
+        let status = if result.is_ok() { "PASS" } else { "FAIL" };
+        match &result {
             Ok(()) => {
-                println!("PASS {path}");
+                println!("{status} {path}");
                 passed += 1;
             }
             Err(e) => {
-                eprintln!("FAIL {path} — {e}");
+                eprintln!("{status} {path} — {e}");
                 failed += 1;
             }
         }
     }
 
-    println!("\n{passed}/{total} tests passed");
-    if failed > 0 {
-        std::process::exit(failed as i32);
+    Ok((passed, failed))
+}
+
+/// Poll test files for changes, sleeping ~500ms between checks.
+/// Returns `false` when the running flag is cleared (Ctrl+C).
+fn wait_for_changes(
+    files: &[camino::Utf8PathBuf],
+    running: &AtomicBool,
+) -> bool {
+    let mut mtimes: HashMap<camino::Utf8PathBuf, SystemTime> = HashMap::new();
+    for f in files {
+        if let Ok(meta) = std::fs::metadata(f.as_std_path()) {
+            if let Ok(mtime) = meta.modified() {
+                mtimes.insert(f.clone(), mtime);
+            }
+        }
     }
-    Ok(())
+
+    while running.load(Ordering::SeqCst) {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        for f in files {
+            if let Ok(meta) = std::fs::metadata(f.as_std_path()) {
+                if let Ok(mtime) = meta.modified() {
+                    if mtimes.get(f) != Some(&mtime) {
+                        return true; // change detected
+                    }
+                }
+            }
+        }
+    }
+    false // Ctrl+C
 }
 
 fn run_disasm(path: &camino::Utf8PathBuf) -> zenlang::Result<()> {
