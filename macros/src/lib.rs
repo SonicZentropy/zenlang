@@ -221,7 +221,11 @@ impl syn::parse::Parse for ZenNativeFnArgs {
 /// // Player::register_zen_foreign(&mut vm);
 /// ```
 /// Generate the getter body for an `Option<T>` field value.
-fn option_getter_expr(inner: &FieldType, field_name: &syn::Ident, _struct_name: &syn::Ident) -> proc_macro2::TokenStream {
+fn option_getter_expr(
+    inner: &FieldType,
+    field_name: &syn::Ident,
+    _struct_name: &syn::Ident,
+) -> proc_macro2::TokenStream {
     match inner {
         FieldType::String => quote! {
             ::std::result::Result::Ok(::zenlang::value::Value::Str(val.clone().into()))
@@ -256,7 +260,11 @@ fn option_getter_expr(inner: &FieldType, field_name: &syn::Ident, _struct_name: 
 }
 
 /// Generate the setter body for an `Option<T>` field value.
-fn option_setter_expr(inner: &FieldType, field_name: &syn::Ident, struct_name: &syn::Ident) -> proc_macro2::TokenStream {
+fn option_setter_expr(
+    inner: &FieldType,
+    field_name: &syn::Ident,
+    struct_name: &syn::Ident,
+) -> proc_macro2::TokenStream {
     match inner {
         FieldType::String => quote! {
             let s = val.as_str().map(|s| s.to_string()).unwrap_or_default();
@@ -432,8 +440,13 @@ fn option_return_conv(
         FieldType::I64 => quote! {
             ::zenlang::value::Value::Int(v)
         },
-        FieldType::I32 | FieldType::I16 | FieldType::I8
-        | FieldType::U64 | FieldType::U32 | FieldType::U16 | FieldType::U8 => quote! {
+        FieldType::I32
+        | FieldType::I16
+        | FieldType::I8
+        | FieldType::U64
+        | FieldType::U32
+        | FieldType::U16
+        | FieldType::U8 => quote! {
             ::zenlang::value::Value::Int(v as i64)
         },
         FieldType::F64 => quote! {
@@ -1058,8 +1071,8 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
             })
             .collect();
 
-            let param_idents: Vec<_> = (1..=param_types.len())
-                .map(|i| {
+        let param_idents: Vec<_> = (1..=param_types.len())
+            .map(|i| {
                 let id = syn::Ident::new(&format!("p{}", i), proc_macro2::Span::call_site());
                 quote! { #id }
             })
