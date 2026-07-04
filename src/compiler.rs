@@ -370,6 +370,13 @@ fn count_lambdas_in_expr(expr: &Expr) -> usize {
             fields.iter().map(|(_, v)| count_lambdas_in_expr(v)).sum()
         }
         Expr::Array(elems) => elems.iter().map(count_lambdas_in_expr).sum(),
+        Expr::Tuple(elems) => elems.iter().map(count_lambdas_in_expr).sum(),
+        Expr::Set(elems) => elems.iter().map(count_lambdas_in_expr).sum(),
+        Expr::Map(entries) => entries
+            .iter()
+            .flat_map(|(k, v)| [k, v])
+            .map(count_lambdas_in_expr)
+            .sum(),
         Expr::Range { start, end, .. } => count_lambdas_in_expr(start) + count_lambdas_in_expr(end),
         Expr::Return(Some(inner)) => count_lambdas_in_expr(inner),
         Expr::Yield(inner) => count_lambdas_in_expr(inner),
@@ -456,6 +463,22 @@ fn collect_free_vars_inner(expr: &Expr, own: &HashSet<String>, result: &mut Vec<
         Expr::Array(elems) => {
             for e in elems {
                 collect_free_vars_inner(e, own, result);
+            }
+        }
+        Expr::Tuple(elems) => {
+            for e in elems {
+                collect_free_vars_inner(e, own, result);
+            }
+        }
+        Expr::Set(elems) => {
+            for e in elems {
+                collect_free_vars_inner(e, own, result);
+            }
+        }
+        Expr::Map(entries) => {
+            for (k, v) in entries {
+                collect_free_vars_inner(k, own, result);
+                collect_free_vars_inner(v, own, result);
             }
         }
         Expr::Range { start, end, .. } => {
@@ -1369,6 +1392,30 @@ impl<'a> FunctionCompiler<'a> {
                     self.compile_expr(elem);
                 }
                 self.emit_op(Opcode::MakeArray(elems.len() as u16));
+            }
+
+            Expr::Tuple(elems) => {
+                for elem in elems {
+                    self.compile_expr(elem);
+                }
+                self.emit_op(Opcode::MakeArray(elems.len() as u16));
+            }
+
+            Expr::Set(elems) => {
+                for elem in elems {
+                    self.compile_expr(elem);
+                }
+                self.emit_op(Opcode::MakeArray(elems.len() as u16));
+            }
+
+            Expr::Map(entries) => {
+                self.compile_expr(&Expr::Ident("__make_map".into()));
+                for (key, value) in entries {
+                    self.compile_expr(key);
+                    self.compile_expr(value);
+                }
+                self.emit_op(Opcode::MakeArray(entries.len() as u16 * 2));
+                self.emit_op(Opcode::Call(1));
             }
 
             Expr::Range {

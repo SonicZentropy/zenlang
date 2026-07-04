@@ -1,0 +1,67 @@
+fn main() {
+    // --- Tuple literals ---
+    let tup = (1, "hello", true);
+    assert(len(tup) == 3);
+    assert(tup[0] == 1);
+    assert(tup[1] == "hello");
+    assert(tup[2] == true);
+
+    // Single-element tuple with trailing comma
+    let tup2 = (42,);
+    assert(len(tup2) == 1);
+    assert(tup2[0] == 42);
+
+    // Empty tuple is unit
+    let unit = ();
+    assert(unit == ());
+
+    // Nested tuples
+    let nested = ((1, 2), (3, 4));
+    assert(len(nested) == 2);
+    assert(nested[0][0] == 1);
+    assert(nested[0][1] == 2);
+    assert(nested[1][0] == 3);
+    assert(nested[1][1] == 4);
+
+    // Parenthesized expression (NOT a tuple)
+    let val = (1 + 2);
+    assert(val == 3);
+
+    // --- Set literals ---
+    let s = {1, 2, 3};
+    assert(len(s) == 3);
+
+    // Set with trailing comma
+    let s2 = {1, 2, 3,};
+    assert(len(s2) == 3);
+
+    // Single-element braces is still a block
+    let block = {42};
+    assert(block == 42);
+
+    // Nested sets
+    let nested_sets = {{1, 2}, {3, 4}};
+    assert(len(nested_sets) == 2);
+
+    // --- Map literals ---
+    let m = {"a": 1, "b": 2};
+    assert(map_get(m, "a") == Some(1));
+    assert(map_get(m, "b") == Some(2));
+    assert(map_has(m, "a"));
+    assert(!map_has(m, "c"));
+    assert(len(m) == 2);
+
+    // Empty map
+    let empty = {};
+    assert(len(empty) == 0);
+
+    // Map with mixed key types
+    let mixed = {"x": 10, 42: "answer"};
+    assert(map_get(mixed, "x") == Some(10));
+    assert(map_get(mixed, 42) == Some("answer"));
+
+    // Map with variables as keys
+    let k = "key";
+    let v_expr = {k: 99};
+    assert(map_get(v_expr, "key") == Some(99));
+}

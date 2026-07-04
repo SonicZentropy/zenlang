@@ -345,6 +345,12 @@ pub enum Expr {
     },
     /// Array literal: `[1, 2, 3]`.
     Array(Vec<Expr>),
+    /// Tuple literal: `(1, "hello")` or `(x,)`.
+    Tuple(Vec<Expr>),
+    /// Set literal: `{1, 2, 3}`.
+    Set(Vec<Expr>),
+    /// Map literal: `{"key": value}`.
+    Map(Vec<(Expr, Expr)>),
     /// Range literal: `0..5` or `0..=5`.
     Range {
         start: Box<Expr>,

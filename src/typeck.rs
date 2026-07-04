@@ -1217,6 +1217,25 @@ impl<'a> TypeChecker<'a> {
                 let inner = elem_types.first().cloned().unwrap_or(Type::Any);
                 Type::Array(Box::new(inner))
             }
+            Expr::Tuple(elems) => {
+                for elem in elems {
+                    self.check_expr(elem);
+                }
+                Type::Array(Box::new(Type::Any))
+            }
+            Expr::Set(elems) => {
+                for elem in elems {
+                    self.check_expr(elem);
+                }
+                Type::Array(Box::new(Type::Any))
+            }
+            Expr::Map(entries) => {
+                for (key, value) in entries {
+                    self.check_expr(key);
+                    self.check_expr(value);
+                }
+                Type::Any
+            }
             Expr::Range { start, end, .. } => {
                 self.check_expr(start);
                 self.check_expr(end);

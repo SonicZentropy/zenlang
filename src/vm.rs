@@ -2807,6 +2807,15 @@ pub mod tests {
     }
 
     #[test]
+    fn test_map_literal() {
+        // Map literal: create and query a map (result should be Some(1))
+        let result = try_run(r#"fn main() { let m = { "a": 1 }; map_get(m, "a") }"#).unwrap();
+        // The result should be Option::Some(1), which is an enum with tag 0 and field Int(1)
+        let expected = run(r#"Option::Some(1)"#);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
     fn test_stdlib_contains() {
         assert_eq!(
             run(r#"contains("hello world", "world")"#),

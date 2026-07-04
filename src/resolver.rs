@@ -747,6 +747,22 @@ impl Resolver {
                     self.resolve_expr(elem);
                 }
             }
+            Expr::Tuple(elems) => {
+                for elem in elems {
+                    self.resolve_expr(elem);
+                }
+            }
+            Expr::Set(elems) => {
+                for elem in elems {
+                    self.resolve_expr(elem);
+                }
+            }
+            Expr::Map(entries) => {
+                for (key, value) in entries {
+                    self.resolve_expr(key);
+                    self.resolve_expr(value);
+                }
+            }
             Expr::Range { start, end, .. } => {
                 self.resolve_expr(start);
                 self.resolve_expr(end);

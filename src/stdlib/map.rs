@@ -179,6 +179,32 @@ fn map_len_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(Value::Int(vm.maps.get(h).entries.len() as i64))
 }
 
+/// `__make_map(pairs)` — create a map from a flat array `[k1, v1, k2, v2, ...]`.
+/// Used by the compiler for map literal `{"key": value}` desugaring.
+fn __make_map_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let vm: &mut VM = unsafe { &mut *ctx.raw_vm };
+    let h = vm.maps.insert(MapData {
+        entries: HashMap::new(),
+    });
+    let pairs = match args.first() {
+        Some(Value::Array(h)) => &vm.arrays.get(*h).values,
+        _ => {
+            return Ok(Value::Map(h));
+        }
+    };
+    {
+        let map = &mut vm.maps.get_mut(h);
+        for chunk in pairs.chunks(2) {
+            if let [key_val, val] = chunk {
+                if let Some(key) = MapKey::from_value(key_val) {
+                    map.entries.insert(key, val.clone());
+                }
+            }
+        }
+    }
+    Ok(Value::Map(h))
+}
+
 /// `map_clear(m)` — removes all entries. Returns nil.
 fn map_clear_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     let h = match args.first() {
@@ -207,6 +233,7 @@ pub fn register(vm: &mut VM) {
     vm.register_native("map_values", Rc::new(map_values_impl));
     vm.register_native("map_len", Rc::new(map_len_impl));
     vm.register_native("map_clear", Rc::new(map_clear_impl));
+    vm.register_native("__make_map", Rc::new(__make_map_impl));
 }
 
 pub fn signatures() -> Vec<crate::symbol::FnSignature> {
@@ -270,6 +297,12 @@ pub fn signatures() -> Vec<crate::symbol::FnSignature> {
             name: "map_clear".into(),
             params: vec![("m".into(), Type::Any)],
             return_type: Some(Type::Unit),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "__make_map".into(),
+            params: vec![("pairs".into(), Type::Any)],
+            return_type: Some(Type::Any),
         },
     ]
 }

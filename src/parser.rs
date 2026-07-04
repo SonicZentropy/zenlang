@@ -72,6 +72,16 @@ impl Precedence {
 /// Consumes a token stream from the lexer and produces an AST ([`Program`]).
 /// Supports expressions, statements, declarations (fn, struct, enum, impl),
 /// patterns, type annotations, and generics.
+/// Classifies what a `{ ... }` braced expression represents.
+enum BracedLiteralType {
+    /// A block statement: `{ x }` or `{ let y = 1; y }`.
+    Block,
+    /// A set literal (at least one comma at top brace level): `{1, 2, 3}` or `{x,}`.
+    Set,
+    /// A map literal (colon found before any comma at top level): `{"key": value}`.
+    Map,
+}
+
 pub struct Parser<'a> {
     tokens: &'a [Spanned<Token>],
     current: usize,
@@ -851,20 +861,40 @@ impl<'a> Parser<'a> {
                 })
             }
 
-            // Grouping / Block / Unit
+            // Grouping / Tuple / Unit
             TokenKind::OpenParen => {
                 self.advance();
                 if self.r#match(TokenKind::CloseParen) {
                     Ok(Expr::Unit)
                 } else {
-                    let expr = self.expression(Precedence::Lowest)?;
-                    self.expect(TokenKind::CloseParen)?;
-                    Ok(expr)
+                    let first = self.expression(Precedence::Lowest)?;
+                    if self.check(&TokenKind::Comma) {
+                        // Tuple literal: (a, b, c) or (a,)
+                        let mut elems = vec![first];
+                        self.advance(); // consume comma
+                        while !self.check(&TokenKind::CloseParen) && !self.is_at_end() {
+                            elems.push(self.expression(Precedence::Lowest)?);
+                            self.r#match(TokenKind::Comma);
+                        }
+                        self.expect(TokenKind::CloseParen)?;
+                        Ok(Expr::Tuple(elems))
+                    } else {
+                        // Grouping: (expr)
+                        self.expect(TokenKind::CloseParen)?;
+                        Ok(first)
+                    }
                 }
             }
+            // Set / Map / Block
             TokenKind::OpenBrace => {
-                let block = self.block()?;
-                Ok(block)
+                match self.classify_braced_literal() {
+                    BracedLiteralType::Set => self.parse_set_literal(),
+                    BracedLiteralType::Map => self.parse_map_literal(),
+                    BracedLiteralType::Block => {
+                        let block = self.block()?;
+                        Ok(block)
+                    }
+                }
             }
 
             // Control flow (these consume their own keyword token)
@@ -1248,6 +1278,67 @@ impl<'a> Parser<'a> {
         }
         self.expect(TokenKind::CloseBrace)?;
         Ok(stmts)
+    }
+
+    /// Look ahead in the token stream to determine if `{ ... }` is a set, map, or block.
+    /// The current token is expected to be `OpenBrace` (not yet consumed).
+    fn classify_braced_literal(&self) -> BracedLiteralType {
+        let mut depth = 1u32;
+        let mut i = self.current + 1;
+        let mut saw_content = false;
+        while i < self.tokens.len() {
+            match &self.tokens[i].node.kind {
+                TokenKind::OpenBrace | TokenKind::OpenParen => depth += 1,
+                TokenKind::CloseBrace | TokenKind::CloseParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                TokenKind::Comma if depth == 1 => return BracedLiteralType::Set,
+                TokenKind::Colon if depth == 1 => return BracedLiteralType::Map,
+                _ => {
+                    if depth == 1 {
+                        saw_content = true;
+                    }
+                }
+            }
+            i += 1;
+        }
+        // `{}` with no content is an empty map literal
+        if !saw_content {
+            return BracedLiteralType::Map;
+        }
+        BracedLiteralType::Block
+    }
+
+    /// Parse `{ elem, elem, ... }` as a set literal.
+    /// Assumes `{` is the current token (consumed here).
+    fn parse_set_literal(&mut self) -> Result<Expr> {
+        self.advance(); // consume {
+        let mut elems = Vec::new();
+        while !self.check(&TokenKind::CloseBrace) && !self.is_at_end() {
+            elems.push(self.expression(Precedence::Lowest)?);
+            self.r#match(TokenKind::Comma);
+        }
+        self.expect(TokenKind::CloseBrace)?;
+        Ok(Expr::Set(elems))
+    }
+
+    /// Parse `{ key: value, ... }` as a map literal.
+    /// Assumes `{` is the current token (consumed here).
+    fn parse_map_literal(&mut self) -> Result<Expr> {
+        self.advance(); // consume {
+        let mut entries = Vec::new();
+        while !self.check(&TokenKind::CloseBrace) && !self.is_at_end() {
+            let key = self.expression(Precedence::Lowest)?;
+            self.expect(TokenKind::Colon)?;
+            let value = self.expression(Precedence::Lowest)?;
+            entries.push((key, value));
+            self.r#match(TokenKind::Comma);
+        }
+        self.expect(TokenKind::CloseBrace)?;
+        Ok(Expr::Map(entries))
     }
 
     // ---------- Match expression ----------

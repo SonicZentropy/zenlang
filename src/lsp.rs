@@ -1040,6 +1040,33 @@ fn find_definition_in_expr(expr: &Expr, source: &str, name: &str) -> Option<Span
             }
             None
         }
+        Expr::Tuple(elems) => {
+            for elem in elems {
+                if let Some(span) = find_definition_in_expr(elem, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Expr::Set(elems) => {
+            for elem in elems {
+                if let Some(span) = find_definition_in_expr(elem, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        Expr::Map(entries) => {
+            for (key, value) in entries {
+                if let Some(span) = find_definition_in_expr(key, source, name) {
+                    return Some(span);
+                }
+                if let Some(span) = find_definition_in_expr(value, source, name) {
+                    return Some(span);
+                }
+            }
+            None
+        }
         Expr::Range { start, end, .. } => find_definition_in_expr(start, source, name)
             .or_else(|| find_definition_in_expr(end, source, name)),
         Expr::Return(Some(inner)) => find_definition_in_expr(inner, source, name),
