@@ -3,3 +3,4 @@
 **/node_modules
 **/*.wasm
 **/tree-sitter.exe
+zenlang-lsp.log
