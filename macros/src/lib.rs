@@ -1194,52 +1194,36 @@ enum FieldType {
     Unknown,
 }
 
-/// Extract the inner type from `Option<T>` string representations.
-fn option_inner_type(ty_str: &str) -> Option<FieldType> {
-    for prefix in &[
-        "Option <",
-        "Option<",
-        "std :: option :: Option <",
-        "std :: option :: Option<",
-        "core :: option :: Option <",
-        "core :: option :: Option<",
-    ] {
-        if let Some(rest) = ty_str.strip_prefix(prefix) {
-            let inner_str = rest.trim_end_matches('>').trim();
-            return Some(match inner_str {
-                "String" | "std :: string :: String" | "alloc :: string :: String" => {
-                    FieldType::Option(Box::new(FieldType::String))
-                }
-                "i64" => FieldType::Option(Box::new(FieldType::I64)),
-                "i32" => FieldType::Option(Box::new(FieldType::I32)),
-                "i16" => FieldType::Option(Box::new(FieldType::I16)),
-                "i8" => FieldType::Option(Box::new(FieldType::I8)),
-                "u64" => FieldType::Option(Box::new(FieldType::U64)),
-                "u32" => FieldType::Option(Box::new(FieldType::U32)),
-                "u16" => FieldType::Option(Box::new(FieldType::U16)),
-                "u8" => FieldType::Option(Box::new(FieldType::U8)),
-                "f64" => FieldType::Option(Box::new(FieldType::F64)),
-                "f32" => FieldType::Option(Box::new(FieldType::F32)),
-                "bool" => FieldType::Option(Box::new(FieldType::Bool)),
-                s if s.contains("Value") => FieldType::Option(Box::new(FieldType::Value)),
-                _ => return None,
-            });
+/// Extract the last path ident from a `Type::Path`, ignoring leading segments.
+fn path_last_ident(ty: &Type) -> Option<(String, &syn::PathArguments)> {
+    if let Type::Path(type_path) = ty {
+        if let Some(seg) = type_path.path.segments.last() {
+            return Some((seg.ident.to_string(), &seg.arguments));
         }
     }
     None
 }
 
+/// Resolve a `syn::Type` to a `FieldType` using syn AST matching.
 fn ty_to_field_type(ty: &Type) -> FieldType {
-    let ty_str = quote!(#ty).to_string();
-    if let Some(ft) = option_inner_type(&ty_str) {
-        return ft;
+    // &str, &mut str
+    if let Type::Reference(ref_type) = ty {
+        if let Some((name, _)) = path_last_ident(ref_type.elem.as_ref()) {
+            if name == "str" {
+                return FieldType::String;
+            }
+        }
+        return FieldType::Unknown;
     }
-    match ty_str.as_str() {
-        "String"
-        | "std :: string :: String"
-        | "alloc :: string :: String"
-        | "& str"
-        | "&mut str" => FieldType::String,
+
+    let (name, args) = match path_last_ident(ty) {
+        Some(pair) => pair,
+        None => return FieldType::Unknown,
+    };
+
+    match name.as_str() {
+        "String" => FieldType::String,
+        "str" => FieldType::String,
         "i64" => FieldType::I64,
         "i32" => FieldType::I32,
         "i16" => FieldType::I16,
@@ -1251,18 +1235,42 @@ fn ty_to_field_type(ty: &Type) -> FieldType {
         "f64" => FieldType::F64,
         "f32" => FieldType::F32,
         "bool" => FieldType::Bool,
-        "Value"
-        | "crate :: value :: Value"
-        | "zenlang :: Value"
-        | ":: zenlang :: value :: Value" => FieldType::Value,
-        s if s.starts_with("Rc<") || s.starts_with("std :: rc :: Rc<") => {
-            if s.contains("RefCell<") || s.contains("RefCell <") {
+        "Value" => FieldType::Value,
+        "Option" => {
+            if let syn::PathArguments::AngleBracketed(ab) = args {
+                if let Some(syn::GenericArgument::Type(inner_ty)) = ab.args.first() {
+                    let inner = ty_to_field_type(inner_ty);
+                    match inner {
+                        FieldType::Unknown => FieldType::Unknown,
+                        _ => FieldType::Option(Box::new(inner)),
+                    }
+                } else {
+                    FieldType::Unknown
+                }
+            } else {
+                FieldType::Unknown
+            }
+        }
+        "Rc" => {
+            if let syn::PathArguments::AngleBracketed(ab) = args {
+                if let Some(syn::GenericArgument::Type(inner_ty)) = ab.args.first() {
+                    if let Some((inner_name, _)) = path_last_ident(inner_ty) {
+                        if inner_name == "RefCell" {
+                            return FieldType::ForeignReference;
+                        }
+                    }
+                }
+            }
+            FieldType::Unknown
+        }
+        _ => {
+            // Heuristic: types containing "Foreign" or "Value" in name
+            // are treated as foreign references
+            if name.contains("Foreign") || name.contains("Value") {
                 FieldType::ForeignReference
             } else {
                 FieldType::Unknown
             }
         }
-        _ if ty_str.contains("Foreign") || ty_str.contains("Value") => FieldType::ForeignReference,
-        _ => FieldType::Unknown,
     }
 }
