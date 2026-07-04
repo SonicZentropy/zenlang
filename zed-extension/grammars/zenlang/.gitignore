@@ -1,0 +1,5 @@
+**/target
+**/**pycache**
+**/node_modules
+**/*.wasm
+**/tree-sitter.exe

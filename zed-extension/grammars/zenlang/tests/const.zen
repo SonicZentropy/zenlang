@@ -1,0 +1,16 @@
+const MAX = 100;
+const PI: f64 = 3.14159;
+const NAME = "zen";
+const FLAG = true;
+
+assert(MAX == 100);
+assert(PI == 3.14159);
+assert(NAME == "zen");
+assert(FLAG == true);
+
+const LIMIT = 10;
+let x = LIMIT * 2;
+assert(x == 20);
+
+const NESTED = 42;
+assert(NESTED == 42);

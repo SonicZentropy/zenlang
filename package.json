@@ -1,0 +1,19 @@
+{
+  "name": "tree-sitter-zenlang",
+  "version": "0.1.0",
+  "description": "Zenlang grammar for tree-sitter",
+  "scripts": {
+    "build": "tree-sitter build --wasm",
+    "generate": "tree-sitter generate"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.zenlang",
+      "file-types": ["zen"],
+      "injection-regex": "^zenlang$"
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.26.9"
+  }
+}

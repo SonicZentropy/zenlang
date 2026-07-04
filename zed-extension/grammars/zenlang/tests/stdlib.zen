@@ -1,0 +1,88 @@
+fn main() {
+    // print: smoke test
+    print("hello from stdlib test");
+
+    // assert
+    assert(true);
+    assert(1 == 1);
+
+    // len (returns int)
+    assert(len("") == 0);
+    assert(len("abc") == 3);
+
+    // contains
+    assert(contains("hello world", "world"));
+    assert(!contains("hello world", "xyz"));
+
+    // trim
+    assert(trim("  hi  ") == "hi");
+
+    // to_upper / to_lower
+    assert(to_upper("abc") == "ABC");
+    assert(to_lower("XYZ") == "xyz");
+
+    // substring
+    assert(substring("hello", 0, 2) == "he");
+    assert(substring("hello", 1, 4) == "ell");
+
+    // abs
+    assert(abs(-5) == 5);
+    assert(abs(5) == 5);
+
+    // min / max
+    assert(min(3, 7) == 3);
+    assert(max(3, 7) == 7);
+    assert(min(-1, -5) == -5);
+
+    // sqrt
+    let s = sqrt(9.0);
+    assert(s > 2.0);
+    assert(s < 4.0);
+
+    // Array operations
+    let mut arr = [1, 2, 3];
+    push(arr, 4);
+    assert(len(arr) == 4);
+
+    let popped = pop(arr);
+    assert(popped == 4);
+    assert(len(arr) == 3);
+
+    let mut arr2 = [10, 20, 30, 40];
+    insert(arr2, 1, 15);
+    assert(arr2[0] == 10);
+    assert(arr2[1] == 15);
+    assert(arr2[2] == 20);
+
+    let removed = remove(arr2, 1);
+    assert(removed == 15);
+    assert(arr2[1] == 20);
+
+    // to_int
+    assert(to_int(42) == 42);
+    assert(to_int(true) == 1);
+    assert(to_int(false) == 0);
+
+    // to_float
+    let f1 = to_float(3);
+    assert(f1 > 2.9);
+    assert(f1 < 3.1);
+
+    // to_str
+    assert(to_str(42) == "42");
+    assert(to_str(true) == "true");
+
+    // type_of
+    assert(type_of(42) == "int");
+    assert(type_of("hi") == "str");
+    assert(type_of(()) == "nil");
+
+    // Option/Result helpers
+    assert(is_some(Some(1)));
+    assert(is_none(None));
+    assert(is_ok(Ok(1)));
+    assert(is_err(Err("err")));
+    assert(unwrap(Some(42)) == 42);
+    assert(unwrap_or(None, 99) == 99);
+    assert(expect(Some(1), "should work") == 1);
+}

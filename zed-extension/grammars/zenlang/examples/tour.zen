@@ -1,0 +1,255 @@
+// ============================================================
+// Zenlang Language Tour — demonstrates every language feature
+// ============================================================
+
+// Top-level declarations (type, struct, enum, trait, impl, fn, const, type alias)
+struct Point { x: i64, y: i64 }
+struct Circle { radius: f64 }
+struct Rect { width: f64, height: f64 }
+
+impl Point {
+    fn magnitude(&self) -> i64 { self.x * self.x + self.y * self.y }
+    fn double(&mut self) { self.x = self.x * 2; self.y = self.y * 2; }
+}
+
+trait Shape {
+    fn area(&self) -> f64;
+}
+impl Shape for Circle {
+    fn area(&self) -> f64 { self.radius * self.radius * 3.14159 }
+}
+impl Shape for Rect {
+    fn area(&self) -> f64 { self.width * self.height }
+}
+
+enum Color { Red, Green, Blue }
+enum Shape2 { Circle2(f64), Rect2(f64, f64) }
+enum Opt { SomeV(i64), NoneV }
+
+struct Wrapper<T> { value: T }
+
+fn fib(n) -> i64 {
+    if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+}
+fn add(a, b) { a + b }
+
+fn tr_ok() -> Result<i64, str> { Ok(42) }
+fn tr_double() -> Result<i64, str> {
+    let val = tr_ok()?;
+    Ok(val * 2)
+}
+
+fn main() {
+    // 1. Bindings
+    let x = 42;
+    let mut y = 10;
+    y = y + 1;
+    assert(y == 11);
+    assert(x == 42);
+
+    // 2. Const
+    const MAX = 100;
+    const PI: f64 = 3.14159;
+    assert(MAX == 100);
+
+    // 3. Type alias (compile-time only; use via top-level let)
+    type MyInt = i64;
+
+    // 4. Functions
+    assert(add(2, 3) == 5);
+    assert(fib(10) == 55);
+
+    // 5. Closures
+    let double_val = |x| x * 2;
+    assert(double_val(5) == 10);
+    let add_lam = |a, b| a + b;
+    assert(add_lam(3, 4) == 7);
+    let base = 10;
+    let adder = |x| x + base;
+    assert(adder(5) == 15);
+
+    // 6. Control Flow
+    let val = if true { 10 } else { 20 };
+    assert(val == 10);
+
+    let mut sum = 0;
+    for i in 0..5 { sum = sum + i; }
+    assert(sum == 10);
+
+    let mut sum2 = 0;
+    for i in 0..=5 { sum2 = sum2 + i; }
+    assert(sum2 == 15);
+
+    let mut w = 0;
+    while w < 3 { w = w + 1; }
+    assert(w == 3);
+
+    let mut l = 0;
+    loop {
+        l = l + 1;
+        if l == 3 { break; }
+    }
+    assert(l == 3);
+
+    // 7. Match
+    let c = Red;
+    let name = match c {
+        Red => "red",
+        Green => "green",
+        Blue => "blue",
+    };
+    assert(name == "red");
+
+    let m = 2;
+    let ms = match m {
+        1 => "one",
+        2 => "two",
+        _ => "other",
+    };
+    assert(ms == "two");
+
+    // 8. If let
+    let opt = SomeV(42);
+    if let SomeV(v) = opt {
+        assert(v == 42);
+    } else {
+        assert(false);
+    }
+
+    // 9. Try operator
+    let r = match (tr_double()) {
+        Ok(v) => v,
+        Err(_) => 0,
+    };
+    assert(r == 84);
+
+    // 10. Structs
+    let p = Point { x: 10, y: 20 };
+    assert(p.x == 10);
+    assert(p.y == 20);
+
+    let mut m2 = Point { x: 1, y: 2 };
+    m2.x = 100;
+    assert(m2.x == 100);
+
+    // 11. Enums with data
+    let s = Circle2(5.0);
+    let area = match s {
+        Circle2(r) => 3.14159 * r * r,
+        Rect2(w, h) => w * h,
+    };
+    assert(area > 78.5 && area < 78.6);
+
+    // 12. Impl / Methods
+    let pt = Point { x: 3, y: 4 };
+    assert(pt.magnitude() == 25);
+    let mut pt2 = Point { x: 2, y: 3 };
+    pt2.double();
+    assert(pt2.x == 4);
+    assert(pt2.y == 6);
+
+    // 13. Traits
+    let tc = Circle { radius: 2.0 };
+    let diff = tc.area() - 12.56636;
+    assert(diff < 0.001 && diff > -0.001);
+    let tr = Rect { width: 3.0, height: 4.0 };
+    assert(tr.area() == 12.0);
+
+    // 14. Generics
+    let w2 = Wrapper { value: 99 };
+    assert(w2.value == 99);
+
+    // 15. Arrays
+    let mut arr = [10, 20, 30];
+    assert(len(arr) == 3);
+    assert(arr[1] == 20);
+    push(arr, 40);
+    assert(len(arr) == 4);
+    assert(arr[3] == 40);
+    let last = pop(arr);
+    assert(last == 40);
+    assert(len(arr) == 3);
+
+    // 16. Strings
+    assert(len("Hello") == 5);
+    assert(contains("Hello Zenlang", "Zen"));
+    assert(trim("  spaced  ") == "spaced");
+    assert(to_upper("abc") == "ABC");
+    assert(to_lower("XYZ") == "xyz");
+    assert(substring("hello", 0, 2) == "he");
+
+    // 17. String Interpolation
+    let si_name = "Zen";
+    let si_ver = 1;
+    let si_msg = "Welcome to {si_name} v{si_ver}!";
+    assert(si_msg == "Welcome to Zen v1!");
+
+    // 18. Boolean & Comparison
+    assert(true && true);
+    assert(true || false);
+    assert(!false);
+    assert(1 == 1);
+    assert(1 != 2);
+    assert(1 < 2);
+    assert(2 > 1);
+
+    // 19. Bitwise Operators
+    assert(5 & 3 == 1);
+    assert(5 | 3 == 7);
+    assert(5 ^ 3 == 6);
+    assert(~0 == -1);
+    assert(1 << 3 == 8);
+    assert(8 >> 2 == 2);
+
+    // 20. Compound Assignment
+    let mut ca = 10;
+    ca += 5; assert(ca == 15);
+    ca -= 3; assert(ca == 12);
+    ca *= 2; assert(ca == 24);
+    ca /= 4; assert(ca == 6);
+    ca %= 4; assert(ca == 2);
+
+    // 21. Numeric Separators
+    assert(1_000_000 == 1000000);
+    assert(0xFF_FF == 65535);
+    assert(0b1010_1010 == 170);
+    assert(0o777 == 511);
+
+    // 22. Blocks
+    let bl = { let _a = 1; let _b = 2; _a + _b };
+    assert(bl == 3);
+
+    // 23. Built-in Functions
+    assert(abs(-5) == 5);
+    assert(min(3, 7) == 3);
+    assert(max(3, 7) == 7);
+    let bi_s = to_str(42);
+    assert(bi_s == "42");
+
+    // 24. type_of
+    assert(type_of(42) == "int");
+    assert(type_of("hi") == "str");
+    assert(type_of(()) == "nil");
+
+    // 25. Range
+    let mut rsum = 0;
+    for ri in 0..=3 { rsum = rsum + ri; }
+    assert(rsum == 6);
+
+    // 26. Iterators
+    let mut isum = 0;
+    for iv in [1, 2, 3] { isum = isum + iv; }
+    assert(isum == 6);
+
+    let ir = 0..3;
+    let mut irsum = 0;
+    for iv in ir { irsum = irsum + iv; }
+    assert(irsum == 3);
+
+    let it = iter([7, 8]);
+    assert(it.next() == Some(7));
+    assert(it.next() == Some(8));
+    assert(it.next() == None);
+
+    print("Zenlang tour complete!");
+}

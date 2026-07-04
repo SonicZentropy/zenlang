@@ -1,0 +1,8 @@
+mod math;
+mod greeting;
+use math::add;
+use greeting::hello;
+let result = add(3, 4);
+let msg = hello();
+assert(result == 7);
+assert(msg == "hello from module");

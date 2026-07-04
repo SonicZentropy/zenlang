@@ -1,0 +1,130 @@
+fn main() {
+    // Setup: create a test directory
+    let test_dir = "_test_fs";
+    let r1 = create_dir(test_dir);
+    match r1 {
+        Ok(_) => (),
+        Err(msg) => {
+            // May already exist from previous run; try to clean up and recreate
+            remove_dir(test_dir);
+            let r2 = create_dir(test_dir);
+            match r2 {
+                Ok(_) => (),
+                Err(msg) => assert(len(msg) > 0),
+            }
+        },
+    }
+
+    // --- File I/O ---
+
+    // write_file round-trip
+    let test_file = path_join(test_dir, "hello.txt");
+    let r3 = write_file(test_file, "Hello, World!\n");
+    match r3 {
+        Ok(_) => (),
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    // read_file
+    let r4 = read_file(test_file);
+    match r4 {
+        Ok(content) => assert(content == "Hello, World!\n"),
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    // append_file (uses writeln!, so adds its own newline)
+    let r5 = append_file(test_file, "Line 2");
+    match r5 {
+        Ok(_) => (),
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    // read_lines (splits on newlines)
+    let r6 = read_lines(test_file);
+    match r6 {
+        Ok(lines) => {
+            assert(len(lines) == 2);
+            assert(lines[0] == "Hello, World!");
+            assert(lines[1] == "Line 2");
+        },
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    // read_file after append
+    let r7 = read_file(test_file);
+    match r7 {
+        Ok(content) => {
+            assert(contains(content, "Hello, World!"));
+            assert(contains(content, "Line 2"));
+        },
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    // --- Path utilities ---
+
+    assert(path_join("a", "b") == "a\\b");
+    assert(path_basename("a/b/c.txt") == "c.txt");
+    assert(path_extension("a/b/c.txt") == "txt");
+    assert(path_extension("noext") == "");
+    assert(path_exists(test_dir));
+    assert(path_exists(test_file));
+
+    // --- Directory operations ---
+
+    // list_dir
+    let r8 = list_dir(test_dir);
+    match r8 {
+        Ok(entries) => {
+            assert(len(entries) == 1);
+            assert(entries[0] == "hello.txt");
+        },
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    assert(is_dir(test_dir));
+    assert(is_file(test_file));
+
+    // create_dirs (nested)
+    let nested = path_join(test_dir, "a/b/c");
+    let r9 = create_dirs(nested);
+    match r9 {
+        Ok(_) => (),
+        Err(msg) => assert(len(msg) > 0),
+    }
+    assert(is_dir(path_join(test_dir, "a/b/c")));
+
+    // list_dir after adding nested
+    let r10 = list_dir(test_dir);
+    match r10 {
+        Ok(entries) => {
+            assert(len(entries) >= 2);
+        },
+        Err(msg) => assert(len(msg) > 0),
+    }
+
+    // --- Error cases ---
+
+    // read_file on nonexistent file returns Err
+    let r11 = read_file("_test_fs/nonexistent.txt");
+    match r11 {
+        Ok(_) => assert(false),
+        Err(msg) => {
+            assert(len(msg) > 0);
+        },
+    }
+
+    // --- Cleanup ---
+
+    // Remove nested dirs (must remove files first)
+    let nested_file = path_join(path_join(test_dir, "a"), "nested.txt");
+    write_file(nested_file, "nested");
+    remove_file(nested_file);
+
+    // Remove a/b/c then a/b then a
+    remove_dir(path_join(path_join(test_dir, "a"), "b/c"));
+    remove_dir(path_join(test_dir, "a/b"));
+    remove_dir(path_join(test_dir, "a"));
+    // Remove test file and test dir
+    remove_file(test_file);
+    remove_dir(test_dir);
+}

@@ -1551,41 +1551,12 @@
         }
       ]
     },
-    "builtin_type": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "int"
-        },
-        {
-          "type": "STRING",
-          "value": "void"
-        },
-        {
-          "type": "STRING",
-          "value": "bool"
-        },
-        {
-          "type": "STRING",
-          "value": "str"
-        },
-        {
-          "type": "STRING",
-          "value": "f64"
-        }
-      ]
-    },
     "type": {
       "type": "CHOICE",
       "members": [
         {
           "type": "SYMBOL",
           "name": "type_identifier"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "builtin_type"
         },
         {
           "type": "SYMBOL",

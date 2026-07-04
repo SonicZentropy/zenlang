@@ -1,0 +1,4 @@
+// Top-level closures — basic test
+let double = |x| x * 2;
+let result = double(5);
+assert(result == 10);

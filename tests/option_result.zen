@@ -1,24 +1,18 @@
 fn main() {
     let x = Some(42);
-    let y: Option<int> = None;
+    let y :Option < int >  = None;
     let z = Ok("hello");
-    let w: Result<str, str> = Err("error");
-
+    let w :Result < str, str >  = Err("error");
     assert(is_some(x));
     assert(is_none(y));
     assert(is_ok(z));
     assert(is_err(w));
-
     match x {
-        Some(v) => assert(v == 42),
-        None => assert(false),
+        Some(v) => assert(v == 42), None => assert(false), 
     }
-
     match y {
-        Some(_v) => assert(false),
-        None => assert(true),
+        Some(_v) => assert(false), None => assert(true), 
     }
-
     assert(unwrap(x) == 42);
     assert(unwrap_or(x, 0) == 42);
     assert(unwrap_or(y, 99) == 99);

@@ -1,0 +1,11 @@
+[package]
+name = "zenlang-egor-edict-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+egor = "0.10"
+egor_glue = "0.10"
+edict = "0.6"
+zenlang = { path = "../.." }
+rand = "0.10.1"

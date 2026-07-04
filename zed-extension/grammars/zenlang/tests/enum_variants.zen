@@ -1,0 +1,86 @@
+// Test enum variant construction and match
+
+enum MyOption<T> {
+    MySome(T),
+    MyNone
+}
+
+enum MyResult<T, E> {
+    MyOk(T),
+    MyErr(E)
+}
+
+// Test pattern matching to extract values
+fn my_unwrap_or(opt: MyOption<i64>, default: i64) -> i64 {
+    match opt {
+        MySome(value) => value,
+        MyNone => default
+    }
+}
+
+fn divide(a: i64, b: i64) -> MyResult<i64, str> {
+    if b == 0 {
+        MyErr("division by zero")
+    } else {
+        MyOk(a / b)
+    }
+}
+
+fn main() {
+    // Data variant: construct and match
+    let x = MySome(42);
+    match x {
+        MySome(v) => assert(v == 42),
+        MyNone => assert(false),
+    }
+
+    // Unit variant: construct and match directly
+    let y = MyNone;
+    match y {
+        MySome(_) => assert(false),
+        MyNone => assert(true),
+    }
+
+    // Test inline match on enum constructor call
+    let has_value = match (MySome(10)) {
+        MySome(_) => true,
+        MyNone => false
+    };
+    assert(has_value == true);
+
+    // Test inline match on unit variant directly
+    let no_value_flag = match MyNone {
+        MySome(_) => true,
+        MyNone => false
+    };
+    assert(no_value_flag == false);
+
+    // Test function with match on enum parameter
+    let unwrapped = my_unwrap_or(MySome(5), 0);
+    assert(unwrapped == 5);
+
+    let default_unwrapped = my_unwrap_or(MyNone, 42);
+    assert(default_unwrapped == 42);
+
+    // Test Result-like with divide
+    let div_result = divide(10, 2);
+    let div_error = divide(5, 0);
+
+    let div_ok = match div_result {
+        MyOk(value) => value,
+        MyErr(_) => 0
+    };
+    assert(div_ok == 5);
+
+    let has_error = match div_error {
+        MyOk(_) => false,
+        MyErr(_) => true
+    };
+    assert(has_error == true);
+
+    let err_msg = match div_error {
+        MyOk(_) => "",
+        MyErr(msg) => msg
+    };
+    assert(err_msg == "division by zero");
+}

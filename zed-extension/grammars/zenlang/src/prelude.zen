@@ -1,0 +1,104 @@
+// Zenlang prelude — iterator adapters built on the `iter()`/`.next()`
+// protocol and closures, both already first-class language features. These
+// are plain Zenlang functions (not native Rust functions) because native
+// functions currently have no way to call back into a script-provided
+// closure; writing them here sidesteps that entirely and doubles as a
+// dogfooding test of the iterator protocol itself.
+//
+// All of these are eager: they fully drive the source iterator and return
+// a materialized array. That's simpler and enough for typical game-script
+// data sizes (inventories, entity lists, etc.); lazy chaining can be added
+// later without changing these signatures.
+
+fn map(iterable, f) {
+    let it = iter(iterable);
+    let mut result = [];
+    loop {
+        match it.next() {
+            Some(v) => { push(result, f(v)); }
+            None => { break; }
+        }
+    }
+    result
+}
+
+fn filter(iterable, pred) {
+    let it = iter(iterable);
+    let mut result = [];
+    loop {
+        match it.next() {
+            Some(v) => { if pred(v) { push(result, v); } }
+            None => { break; }
+        }
+    }
+    result
+}
+
+fn fold(iterable, init, f) {
+    let it = iter(iterable);
+    let mut acc = init;
+    loop {
+        match it.next() {
+            Some(v) => { acc = f(acc, v); }
+            None => { break; }
+        }
+    }
+    acc
+}
+
+fn enumerate(iterable) {
+    let it = iter(iterable);
+    let mut result = [];
+    let mut i = 0;
+    loop {
+        match it.next() {
+            Some(v) => { let cur = i; i = i + 1; push(result, [cur, v]); }
+            None => { break; }
+        }
+    }
+    result
+}
+
+fn take(iterable, n) {
+    let it = iter(iterable);
+    let mut result = [];
+    let mut i = 0;
+    loop {
+        if i >= n { break; }
+        match it.next() {
+            Some(v) => { i = i + 1; push(result, v); }
+            None => { break; }
+        }
+    }
+    result
+}
+
+fn zip(a, b) {
+    let ia = iter(a);
+    let ib = iter(b);
+    let mut result = [];
+    loop {
+        match ia.next() {
+            Some(av) => {
+                match ib.next() {
+                    Some(bv) => { push(result, [av, bv]); }
+                    None => { break; }
+                }
+            }
+            None => { break; }
+        }
+    }
+    result
+}
+
+fn collect(iterable) {
+    let it = iter(iterable);
+    let mut result = [];
+    loop {
+        match it.next() {
+            Some(v) => { push(result, v); }
+            None => { break; }
+        }
+    }
+    result
+}

@@ -1,0 +1,16 @@
+id = "zenlang"
+name = "Zenlang"
+version = "0.1.0"
+schema_version = 1
+authors = ["Zenlang Contributors"]
+description = "Zenlang language support — syntax highlighting, LSP diagnostics, completions, hover, and more."
+
+[grammars.zenlang]
+repository = "https://github.com/SonicZentropy/zenlang"
+rev = "master"
+
+[language_servers.zenlang-language-server]
+name = "Zenlang LSP"
+languages = ["Zenlang"]
+command = "zenc"
+args = ["lsp"]

@@ -1,0 +1,4 @@
+// Just calling adder(5) — no assert
+let base = 10;
+let adder = |x| x + base;
+let result = adder(5);

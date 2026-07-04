@@ -376,11 +376,6 @@
     "fields": {}
   },
   {
-    "type": "builtin_type",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "call_expression",
     "named": true,
     "fields": {},
@@ -1536,10 +1531,6 @@
           "named": true
         },
         {
-          "type": "builtin_type",
-          "named": true
-        },
-        {
           "type": "type_identifier",
           "named": true
         }
@@ -1825,10 +1816,6 @@
     "named": false
   },
   {
-    "type": "bool",
-    "named": false
-  },
-  {
     "type": "comment",
     "named": true,
     "extra": true
@@ -1839,10 +1826,6 @@
   },
   {
     "type": "enum",
-    "named": false
-  },
-  {
-    "type": "f64",
     "named": false
   },
   {
@@ -1878,10 +1861,6 @@
     "named": false
   },
   {
-    "type": "int",
-    "named": false
-  },
-  {
     "type": "let",
     "named": false
   },
@@ -1906,10 +1885,6 @@
     "named": false
   },
   {
-    "type": "str",
-    "named": false
-  },
-  {
     "type": "string_literal",
     "named": true
   },
@@ -1924,10 +1899,6 @@
   {
     "type": "type_identifier",
     "named": true
-  },
-  {
-    "type": "void",
-    "named": false
   },
   {
     "type": "while",

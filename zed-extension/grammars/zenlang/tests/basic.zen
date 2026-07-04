@@ -1,0 +1,5 @@
+assert(1 + 2 == 3);
+assert(true);
+assert(!false);
+assert("hello" != "world");
+assert(42);

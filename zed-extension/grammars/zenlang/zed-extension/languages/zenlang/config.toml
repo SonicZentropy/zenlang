@@ -1,0 +1,7 @@
+name = "Zenlang"
+grammar = "zenlang"
+path_suffixes = ["zen"]
+line_comments = ["// "]
+block_comments = ["/* ", " */"]
+tab_size = 4
+hard_tabs = false

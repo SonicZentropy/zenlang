@@ -1,0 +1,48 @@
+fn main() {
+    // Trig / scalar helpers
+    let s = sin(0.0);
+    assert(s > -0.001 && s < 0.001);
+    let c = cos(0.0);
+    assert(c > 0.999 && c < 1.001);
+    let a = atan2(1.0, 1.0);
+    assert(a > 0.785 && a < 0.786);
+
+    assert(lerp(0.0, 10.0, 0.5) == 5.0);
+    assert(clamp(15.0, 0.0, 10.0) == 10.0);
+    assert(clamp(-5.0, 0.0, 10.0) == 0.0);
+    assert(clamp(5.0, 0.0, 10.0) == 5.0);
+
+    // RNG (seeded, so results are deterministic for this test)
+    rand_seed(42);
+    let r1 = rand();
+    assert(r1 >= 0.0 && r1 < 1.0);
+    let ri = rand_range(0, 10);
+    assert(ri >= 0 && ri < 10);
+
+    // Vectors
+    let v1 = vec2(1.0, 2.0);
+    let v2 = vec2(3.0, 4.0);
+    let sum = vec_add(v1, v2);
+    assert(sum[0] == 4.0);
+    assert(sum[1] == 6.0);
+
+    let diff = vec_sub(v2, v1);
+    assert(diff[0] == 2.0);
+    assert(diff[1] == 2.0);
+
+    let scaled = vec_scale(v1, 2.0);
+    assert(scaled[0] == 2.0);
+    assert(scaled[1] == 4.0);
+
+    assert(vec_dot(v1, v2) == 11.0);
+
+    let v3 = vec3(3.0, 4.0, 0.0);
+    let l = vec_len(v3);
+    assert(l > 4.999 && l < 5.001);
+
+    let n = vec_normalize(v3);
+    let nl = vec_len(n);
+    assert(nl > 0.999 && nl < 1.001);
+
+    print("Math tests complete!");
+}

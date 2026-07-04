@@ -1,0 +1,26 @@
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+impl Point {
+    fn area(&self) -> i64 {
+        self.x * self.y
+    }
+}
+
+fn square(p: Point) -> i64 {
+    p.x * p.y
+}
+
+fn self_test(self: i64) -> i64 {
+    self + 1
+}
+
+fn main() {
+    // Phase 12: method call type-checking and runtime dispatch
+    let p = Point { x: 3, y: 4 };
+    assert(p.area() == 12);
+    assert(square(p) == 12);
+    assert(self_test(5) == 6);
+}
