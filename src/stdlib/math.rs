@@ -93,7 +93,7 @@ fn seed_from_time() -> u64 {
     nanos ^ 0x2545F4914F6CDD1D
 }
 
-fn next_u64() -> u64 {
+pub fn next_u64() -> u64 {
     RNG_STATE.with(|s| {
         let mut x = *s.borrow();
         x ^= x << 13;
@@ -203,6 +203,34 @@ fn vec_normalize_impl(ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
     Ok(make_vec(vm, a.iter().map(|x| x / len).collect()))
 }
 
+fn deg_to_rad_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let d = as_f64(args.first())?;
+    Ok(Value::Float(d * std::f64::consts::PI / 180.0))
+}
+
+fn rad_to_deg_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let r = as_f64(args.first())?;
+    Ok(Value::Float(r * 180.0 / std::f64::consts::PI))
+}
+
+fn smoothstep_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let edge0 = as_f64(args.first())?;
+    let edge1 = as_f64(args.get(1))?;
+    let x = as_f64(args.get(2))?;
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    Ok(Value::Float(t * t * (3.0 - 2.0 * t)))
+}
+
+fn remap_impl(_ctx: &mut VMContext, args: &[Value]) -> Result<Value> {
+    let val = as_f64(args.first())?;
+    let in_low = as_f64(args.get(1))?;
+    let in_high = as_f64(args.get(2))?;
+    let out_low = as_f64(args.get(3))?;
+    let out_high = as_f64(args.get(4))?;
+    let t = (val - in_low) / (in_high - in_low);
+    Ok(Value::Float(out_low + t * (out_high - out_low)))
+}
+
 pub fn register(vm: &mut VM) {
     vm.register_native("sin", Rc::new(sin_impl));
     vm.register_native("cos", Rc::new(cos_impl));
@@ -223,6 +251,12 @@ pub fn register(vm: &mut VM) {
     vm.register_native("vec_dot", Rc::new(vec_dot_impl));
     vm.register_native("vec_len", Rc::new(vec_len_impl));
     vm.register_native("vec_normalize", Rc::new(vec_normalize_impl));
+
+    // Extra math helpers
+    vm.register_native("deg_to_rad", Rc::new(deg_to_rad_impl));
+    vm.register_native("rad_to_deg", Rc::new(rad_to_deg_impl));
+    vm.register_native("smoothstep", Rc::new(smoothstep_impl));
+    vm.register_native("remap", Rc::new(remap_impl));
 }
 
 pub fn signatures() -> Vec<crate::symbol::FnSignature> {
@@ -342,6 +376,30 @@ pub fn signatures() -> Vec<crate::symbol::FnSignature> {
             name: "vec_normalize".into(),
             params: vec![("a".into(), Type::Any)],
             return_type: Some(Type::Any),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "deg_to_rad".into(),
+            params: vec![("deg".into(), Type::F64)],
+            return_type: Some(Type::F64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "rad_to_deg".into(),
+            params: vec![("rad".into(), Type::F64)],
+            return_type: Some(Type::F64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "smoothstep".into(),
+            params: vec![("edge0".into(), Type::F64), ("edge1".into(), Type::F64), ("x".into(), Type::F64)],
+            return_type: Some(Type::F64),
+        },
+        FnSignature {
+            type_params: vec![],
+            name: "remap".into(),
+            params: vec![("val".into(), Type::F64), ("in_low".into(), Type::F64), ("in_high".into(), Type::F64), ("out_low".into(), Type::F64), ("out_high".into(), Type::F64)],
+            return_type: Some(Type::F64),
         },
     ]
 }

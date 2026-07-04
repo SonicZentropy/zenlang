@@ -16,16 +16,21 @@ use crate::value::{EnumData, Value, WeakData, WeakKind};
 use crate::vm::{VM, VMContext};
 use crate::zen_native_fn;
 
+mod base64;
+mod color;
 mod datetime;
 mod deque;
 mod fs;
+mod hash;
 mod iter;
 mod json;
 mod log;
 mod map;
 mod math;
+mod noise;
 mod set;
 mod sorted_map;
+mod uuid;
 
 /// Register all built-in stdlib functions with the given VM.
 pub fn register_builtins(vm: &mut VM) {
@@ -100,6 +105,21 @@ pub fn register_builtins(vm: &mut VM) {
 
     // SortedMap collection
     sorted_map::register(vm);
+
+    // Base64 encoding
+    base64::register(vm);
+
+    // UUID generation
+    uuid::register(vm);
+
+    // Hashing utilities
+    hash::register(vm);
+
+    // Noise functions (perlin2d, simplex2d, fbm2d)
+    noise::register(vm);
+
+    // Color utilities
+    color::register(vm);
 
     // Vector/scalar math for games (Vec2/Vec3, lerp/clamp, trig, RNG)
     math::register(vm);
@@ -551,6 +571,11 @@ pub fn native_fn_sigs() -> Vec<FnSignature> {
     sigs.extend(math::signatures());
     sigs.extend(set::signatures());
     sigs.extend(sorted_map::signatures());
+    sigs.extend(base64::signatures());
+    sigs.extend(uuid::signatures());
+    sigs.extend(hash::signatures());
+    sigs.extend(noise::signatures());
+    sigs.extend(color::signatures());
     sigs
 }
 
