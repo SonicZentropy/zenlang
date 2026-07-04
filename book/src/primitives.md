@@ -32,3 +32,29 @@ let c: f64 = 42;  // f64
 | Type | Description |
 |------|-------------|
 | `void` | No value (unit type). Used for functions with no return value |
+
+## Dynamic Type
+
+| Type | Description |
+|------|-------------|
+| `any` | Dynamic type that accepts any value, bypassing type checking |
+
+Use `any` to opt out of type checking for a specific variable or parameter:
+
+```rust
+let x: any = 42;        // ok
+x = "hello";            // ok — no type error
+x = [1, 2, 3];          // ok
+
+fn process(val: any) {   // parameter accepts any type
+    print(val);
+}
+
+process(42);             // ok
+process("hello");        // ok
+```
+
+The `any` type is compatible with all other types. It's useful for:
+- Interfacing with dynamic/foreign data
+- Writing generic code without type parameters
+- Prototyping before adding type annotations

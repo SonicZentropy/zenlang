@@ -2641,4 +2641,132 @@ pub mod tests {
             result.err()
         );
     }
+
+    #[test]
+    fn test_any_type_basic() {
+        // any type should accept any value
+        let source = r#"
+            let x: any = 42;
+            x
+        "#;
+        assert_eq!(run(source), Value::Int(42));
+    }
+
+    #[test]
+    fn test_any_type_reassignment() {
+        // any type should allow reassignment to different types
+        let source = r#"
+            let x: any = 42;
+            x = "hello";
+            x
+        "#;
+        assert_eq!(run(source), Value::Str("hello".into()));
+    }
+
+    #[test]
+    fn test_any_type_string() {
+        // any type should accept strings
+        let source = r#"
+            let x: any = "hello";
+            x
+        "#;
+        assert_eq!(run(source), Value::Str("hello".into()));
+    }
+
+    #[test]
+    fn test_any_type_bool() {
+        // any type should accept booleans
+        let source = r#"
+            let x: any = true;
+            x
+        "#;
+        assert_eq!(run(source), Value::Bool(true));
+    }
+
+    #[test]
+    fn test_any_type_array() {
+        // any type should accept arrays
+        let source = r#"
+            let x: any = [1, 2, 3];
+            x
+        "#;
+        let result = run(source);
+        assert!(matches!(result, Value::Array(_)));
+    }
+
+    #[test]
+    fn test_any_type_function_param() {
+        // function with any parameter should accept any type
+        let source = r#"
+            fn process(val: any) { val }
+            process(42)
+        "#;
+        assert_eq!(run(source), Value::Int(42));
+    }
+
+    #[test]
+    fn test_any_type_function_param_reassignment() {
+        // function with any parameter should accept different types
+        let source = r#"
+            fn process(val: any) { val }
+            let a = process(42);
+            let b = process("hello");
+            b
+        "#;
+        assert_eq!(run(source), Value::Str("hello".into()));
+    }
+
+    #[test]
+    fn test_any_type_return() {
+        // function returning any should work
+        let source = r#"
+            fn get_value() -> any { 42 }
+            get_value()
+        "#;
+        assert_eq!(run(source), Value::Int(42));
+    }
+
+    #[test]
+    fn test_any_type_compatible_with_i64() {
+        // any should be compatible with i64
+        let source = r#"
+            let x: any = 42;
+            let y: i64 = x;
+            y
+        "#;
+        assert_eq!(run(source), Value::Int(42));
+    }
+
+    #[test]
+    fn test_any_type_compatible_with_str() {
+        // any should be compatible with str
+        let source = r#"
+            let x: any = "hello";
+            let y: str = x;
+            y
+        "#;
+        assert_eq!(run(source), Value::Str("hello".into()));
+    }
+
+    #[test]
+    fn test_any_type_compatible_with_bool() {
+        // any should be compatible with bool
+        let source = r#"
+            let x: any = true;
+            let y: bool = x;
+            y
+        "#;
+        assert_eq!(run(source), Value::Bool(true));
+    }
+
+    #[test]
+    fn test_any_type_infer_from_any() {
+        // assigning from any should result in any
+        let source = r#"
+            let x: any = 42;
+            let y = x;
+            y
+        "#;
+        assert_eq!(run(source), Value::Int(42));
+    }
 }

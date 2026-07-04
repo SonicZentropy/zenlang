@@ -7,6 +7,7 @@ and a tight bytecode VM.
 ## Features
 
 - **Rust-like syntax**: `let`, `const`, `fn`, `if`/`else`, `if let`/`while let`, `while`, `for`, `match`, `struct`, `enum`, `impl`, method calls, `?` try operator.
+- **Dynamic typing**: `any` type for opting out of type checking — compatible with all types.
 - **Type aliases**: `type Name = ExistingType;` — create shorthand names for complex types.
 - **Pub visibility**: `pub fn`, `pub struct`, `pub enum`, `pub const`, `pub type`, `pub use`, `pub mod` — tracked in the AST (enforcement coming in a future module system).
 - **Generics (type-erased)**: generic functions, structs, enums, and impl blocks with `<T>` syntax — no monomorphization, compiles once.
@@ -227,6 +228,20 @@ Create shorthand names for complex types:
 type MyInt = i64;
 
 let n: MyInt = 42;
+```
+
+### Dynamic Typing with `any`
+
+Use the `any` type to opt out of type checking — it accepts any value:
+
+```rust
+let x: any = 42;        // ok
+x = "hello";            // ok — no type error
+x = [1, 2, 3];          // ok
+
+fn process(val: any) {   // parameter accepts any type
+    print(val);
+}
 ```
 
 ### Pub Visibility

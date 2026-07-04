@@ -994,3 +994,46 @@ fn test_private_by_default() {
         other => panic!("expected Fn, got: {other:?}"),
     }
 }
+
+#[test]
+fn test_any_type_parses() {
+    let source = "let x: any = 42;";
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let program = Parser::new(source, &tokens).parse().unwrap();
+    assert_eq!(program.stmts.len(), 1);
+    match &program.stmts[0].node {
+        Stmt::Let { type_ann, .. } => {
+            assert_eq!(type_ann.as_ref().unwrap(), &Type::Any);
+        }
+        other => panic!("expected Let, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_any_type_in_function_param() {
+    let source = "fn process(val: any) { val }";
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let program = Parser::new(source, &tokens).parse().unwrap();
+    assert_eq!(program.stmts.len(), 1);
+    match &program.stmts[0].node {
+        Stmt::Fn { params, .. } => {
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].type_ann, Some(Type::Any));
+        }
+        other => panic!("expected Fn, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_any_type_in_return_type() {
+    let source = "fn get_value() -> any { 42 }";
+    let tokens = Lexer::new(source).tokenize().unwrap();
+    let program = Parser::new(source, &tokens).parse().unwrap();
+    assert_eq!(program.stmts.len(), 1);
+    match &program.stmts[0].node {
+        Stmt::Fn { return_type, .. } => {
+            assert_eq!(return_type.as_ref().unwrap(), &Type::Any);
+        }
+        other => panic!("expected Fn, got: {other:?}"),
+    }
+}
