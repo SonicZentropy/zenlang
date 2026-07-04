@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5a81131f.js";
+            window.path_to_searchindex_js = "searchindex-6f3bc274.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3f6421ed.js"></script>
@@ -190,6 +190,19 @@ let mut x = 42;                      // inferred: i64
 }
 <span class="boring">}</span></code></pre>
 <p>Inference works across function boundaries, so function return types are inferred from their body.</p>
+<h2 id="opting-out-with-any"><a class="header" href="#opting-out-with-any">Opting Out with <code>any</code></a></h2>
+<p>Use the <code>any</code> type to bypass type checking entirely. Variables and parameters typed as <code>any</code> accept any value:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x: any = 42;        // ok
+x = "hello";            // ok — no type error
+x = [1, 2, 3];          // ok
+
+fn process(val: any) {   // parameter accepts any type
+    print(val);
+}
+<span class="boring">}</span></code></pre>
+<p>This is useful when working with dynamic data or when you want to defer type decisions.</p>
 
                     </main>
 

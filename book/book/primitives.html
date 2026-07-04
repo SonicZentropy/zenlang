@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5a81131f.js";
+            window.path_to_searchindex_js = "searchindex-6f3bc274.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3f6421ed.js"></script>
@@ -227,6 +227,37 @@ let c: f64 = 42;  // f64
 </tbody>
 </table>
 </div>
+<h2 id="dynamic-type"><a class="header" href="#dynamic-type">Dynamic Type</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>any</code></td><td>Dynamic type that accepts any value, bypassing type checking</td></tr>
+</tbody>
+</table>
+</div>
+<p>Use <code>any</code> to opt out of type checking for a specific variable or parameter:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x: any = 42;        // ok
+x = "hello";            // ok — no type error
+x = [1, 2, 3];          // ok
+
+fn process(val: any) {   // parameter accepts any type
+    print(val);
+}
+
+process(42);             // ok
+process("hello");        // ok
+<span class="boring">}</span></code></pre>
+<p>The <code>any</code> type is compatible with all other types. It’s useful for:</p>
+<ul>
+<li>Interfacing with dynamic/foreign data</li>
+<li>Writing generic code without type parameters</li>
+<li>Prototyping before adding type annotations</li>
+</ul>
 
                     </main>
 

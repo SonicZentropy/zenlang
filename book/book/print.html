@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5a81131f.js";
+            window.path_to_searchindex_js = "searchindex-6f3bc274.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3f6421ed.js"></script>
@@ -1058,6 +1058,37 @@ let c: f64 = 42;  // f64
 </tbody>
 </table>
 </div>
+<h2 id="dynamic-type"><a class="header" href="#dynamic-type">Dynamic Type</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>any</code></td><td>Dynamic type that accepts any value, bypassing type checking</td></tr>
+</tbody>
+</table>
+</div>
+<p>Use <code>any</code> to opt out of type checking for a specific variable or parameter:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x: any = 42;        // ok
+x = "hello";            // ok — no type error
+x = [1, 2, 3];          // ok
+
+fn process(val: any) {   // parameter accepts any type
+    print(val);
+}
+
+process(42);             // ok
+process("hello");        // ok
+<span class="boring">}</span></code></pre>
+<p>The <code>any</code> type is compatible with all other types. It’s useful for:</p>
+<ul>
+<li>Interfacing with dynamic/foreign data</li>
+<li>Writing generic code without type parameters</li>
+<li>Prototyping before adding type annotations</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="structural-typing"><a class="header" href="#structural-typing">Structural Typing</a></h1>
 <p>Zenlang uses <strong>structural typing</strong> for nominal types (structs). Two struct types are compatible if they have the same field names and types, regardless of their declaration names.</p>
@@ -1091,6 +1122,19 @@ let mut x = 42;                      // inferred: i64
 }
 <span class="boring">}</span></code></pre>
 <p>Inference works across function boundaries, so function return types are inferred from their body.</p>
+<h2 id="opting-out-with-any"><a class="header" href="#opting-out-with-any">Opting Out with <code>any</code></a></h2>
+<p>Use the <code>any</code> type to bypass type checking entirely. Variables and parameters typed as <code>any</code> accept any value:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x: any = 42;        // ok
+x = "hello";            // ok — no type error
+x = [1, 2, 3];          // ok
+
+fn process(val: any) {   // parameter accepts any type
+    print(val);
+}
+<span class="boring">}</span></code></pre>
+<p>This is useful when working with dynamic data or when you want to defer type decisions.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="opaque-types"><a class="header" href="#opaque-types">Opaque Types</a></h1>
 <p>Opaque types are Rust-side types exposed to Zenlang through FFI. They are registered in Rust using <a href="#foreign-types"><code>#[derive(ZenForeign)]</code> and <code>#[zen_methods]</code></a>, or the unified <code>foreign_type!</code> macro.</p>
