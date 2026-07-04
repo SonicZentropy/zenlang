@@ -790,8 +790,8 @@ mod tests {
     }
     #[test]
     fn test_from_f64() {
-        let v: Value = 3.14f64.into();
-        assert!((v.as_float().unwrap() - 3.14).abs() < 1e-10);
+        let v: Value = 2.71f64.into();
+        assert!((v.as_float().unwrap() - 2.71).abs() < 1e-10);
     }
     #[test]
     fn test_from_bool() {
@@ -833,7 +833,7 @@ mod tests {
     }
     #[test]
     fn test_try_from_bool_ok() {
-        assert_eq!(bool::try_from(Value::Bool(true)).unwrap(), true);
+        assert!(bool::try_from(Value::Bool(true)).unwrap());
     }
     #[test]
     fn test_try_from_bool_err() {

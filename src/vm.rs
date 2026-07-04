@@ -1863,7 +1863,6 @@ pub mod tests {
     use crate::compiler;
     use crate::lexer::Lexer;
     use crate::parser::Parser;
-    use crate::value::ForeignObject;
 
     fn run(source: &str) -> Value {
         let tokens = Lexer::new(source).tokenize().unwrap();
@@ -1921,7 +1920,7 @@ pub mod tests {
     }
     #[test]
     fn test_float_literal() {
-        assert_eq!(run("3.14"), Value::Float(3.14));
+        assert_eq!(run("2.71"), Value::Float(2.71));
     }
     #[test]
     fn test_bool_literal() {

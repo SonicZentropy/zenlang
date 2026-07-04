@@ -252,7 +252,7 @@ fn option_getter_expr(
             ::std::result::Result::Ok(val.clone())
         },
         _ => syn::Error::new_spanned(
-            &syn::Ident::new("type", proc_macro2::Span::call_site()),
+            syn::Ident::new("type", proc_macro2::Span::call_site()),
             format!("unsupported Option inner type for field '{}'", field_name),
         )
         .to_compile_error(),
@@ -318,7 +318,7 @@ fn option_setter_expr(
             ::zenlang::interop::with_foreign_mut::<#struct_name, _, _>(vm, obj, |p| { p.#field_name = ::std::option::Option::Some(val); ::std::result::Result::Ok(()) })
         },
         _ => syn::Error::new_spanned(
-            &syn::Ident::new("type", proc_macro2::Span::call_site()),
+            syn::Ident::new("type", proc_macro2::Span::call_site()),
             format!("unsupported Option inner type for field '{}'", field_name),
         )
         .to_compile_error(),
@@ -476,16 +476,13 @@ fn option_return_conv(
 /// Extract the Zenlang type name from `#[foreign(name = "...")]` attribute.
 fn foreign_type_name(input: &DeriveInput) -> String {
     for attr in &input.attrs {
-        if attr.path().is_ident("foreign") {
-            if let syn::Meta::NameValue(nv) = &attr.meta {
-                if nv.path.is_ident("name") {
-                    if let syn::Expr::Lit(expr_lit) = &nv.value {
-                        if let syn::Lit::Str(s) = &expr_lit.lit {
-                            return s.value();
-                        }
-                    }
-                }
-            }
+        if attr.path().is_ident("foreign")
+            && let syn::Meta::NameValue(nv) = &attr.meta
+            && nv.path.is_ident("name")
+            && let syn::Expr::Lit(expr_lit) = &nv.value
+            && let syn::Lit::Str(s) = &expr_lit.lit
+        {
+            return s.value();
         }
     }
     // Default to the Rust struct name
@@ -941,11 +938,10 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                             quote! { let #pname = args[#fi].clone(); }
                         }
                         FieldType::Option(inner) => {
-                            let opt_conv = option_param_conv(&inner, &pname, fi);
-                            opt_conv
+                            option_param_conv(&inner, &pname, fi)
                         }
                         FieldType::Unknown => {
-                            return syn::Error::new_spanned(
+                            syn::Error::new_spanned(
                                 ty,
                                 format!(
                                     "unsupported field type '{}' in constructor of '{}'",
@@ -1053,11 +1049,10 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         quote! { let #pname = args[#fi].clone(); }
                     }
                     FieldType::Option(inner) => {
-                        let opt_conv = option_param_conv(&inner, &pname, fi);
-                        opt_conv
+                        option_param_conv(&inner, &pname, fi)
                     }
                     FieldType::Unknown => {
-                        return syn::Error::new_spanned(
+                        syn::Error::new_spanned(
                             ty,
                             format!(
                                 "unsupported field type '{}' in ZenForeign struct '{}'",
@@ -1133,10 +1128,7 @@ pub fn zen_methods(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         ::std::result::Result::Ok(s.#method_ident(#(#param_idents)*))
                     }
                 }
-                FieldType::Option(inner) => {
-                    let opt_ret = option_return_conv(&inner, method_ident, &param_idents);
-                    opt_ret
-                }
+                FieldType::Option(inner) => option_return_conv(&inner, method_ident, &param_idents),
                 FieldType::Unknown => {
                     return syn::Error::new_spanned(
                         ty,
@@ -1209,10 +1201,10 @@ enum FieldType {
 
 /// Extract the last path ident from a `Type::Path`, ignoring leading segments.
 fn path_last_ident(ty: &Type) -> Option<(String, &syn::PathArguments)> {
-    if let Type::Path(type_path) = ty {
-        if let Some(seg) = type_path.path.segments.last() {
-            return Some((seg.ident.to_string(), &seg.arguments));
-        }
+    if let Type::Path(type_path) = ty
+        && let Some(seg) = type_path.path.segments.last()
+    {
+        return Some((seg.ident.to_string(), &seg.arguments));
     }
     None
 }
@@ -1220,13 +1212,11 @@ fn path_last_ident(ty: &Type) -> Option<(String, &syn::PathArguments)> {
 /// Resolve a `syn::Type` to a `FieldType` using syn AST matching.
 fn ty_to_field_type(ty: &Type) -> FieldType {
     // &str, &mut str
-    if let Type::Reference(ref_type) = ty {
-        if let Some((name, _)) = path_last_ident(ref_type.elem.as_ref()) {
-            if name == "str" {
-                return FieldType::String;
-            }
-        }
-        return FieldType::Unknown;
+    if let Type::Reference(ref_type) = ty
+        && let Some((name, _)) = path_last_ident(ref_type.elem.as_ref())
+        && name == "str"
+    {
+        return FieldType::String;
     }
 
     let (name, args) = match path_last_ident(ty) {
@@ -1250,29 +1240,25 @@ fn ty_to_field_type(ty: &Type) -> FieldType {
         "bool" => FieldType::Bool,
         "Value" => FieldType::Value,
         "Option" => {
-            if let syn::PathArguments::AngleBracketed(ab) = args {
-                if let Some(syn::GenericArgument::Type(inner_ty)) = ab.args.first() {
-                    let inner = ty_to_field_type(inner_ty);
-                    match inner {
-                        FieldType::Unknown => FieldType::Unknown,
-                        _ => FieldType::Option(Box::new(inner)),
-                    }
-                } else {
-                    FieldType::Unknown
+            if let syn::PathArguments::AngleBracketed(ab) = args
+                && let Some(syn::GenericArgument::Type(inner_ty)) = ab.args.first()
+            {
+                let inner = ty_to_field_type(inner_ty);
+                match inner {
+                    FieldType::Unknown => FieldType::Unknown,
+                    _ => FieldType::Option(Box::new(inner)),
                 }
             } else {
                 FieldType::Unknown
             }
         }
         "Rc" => {
-            if let syn::PathArguments::AngleBracketed(ab) = args {
-                if let Some(syn::GenericArgument::Type(inner_ty)) = ab.args.first() {
-                    if let Some((inner_name, _)) = path_last_ident(inner_ty) {
-                        if inner_name == "RefCell" {
-                            return FieldType::ForeignReference;
-                        }
-                    }
-                }
+            if let syn::PathArguments::AngleBracketed(ab) = args
+                && let Some(syn::GenericArgument::Type(inner_ty)) = ab.args.first()
+                && let Some((inner_name, _)) = path_last_ident(inner_ty)
+                && inner_name == "RefCell"
+            {
+                return FieldType::ForeignReference;
             }
             FieldType::Unknown
         }

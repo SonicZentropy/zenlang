@@ -14,6 +14,7 @@ fn parse(source: &str) -> crate::error::Result<crate::ast::Program> {
 }
 
 // Test generic function parsing
+#[test]
 fn test_generic_fn() {
     let prog = parse("fn identity<T>(x: T) -> T { x }").unwrap();
     assert_eq!(prog.stmts.len(), 1);
@@ -23,7 +24,6 @@ fn test_generic_fn() {
             type_params,
             params,
             return_type,
-            body: _,
             ..
         } => {
             assert_eq!(name, "identity");
@@ -32,7 +32,8 @@ fn test_generic_fn() {
             assert_eq!(params.len(), 1);
             assert_eq!(params[0].name, "x");
             assert!(return_type.is_some());
-            assert_eq!(return_type.as_ref().unwrap(), &Type::Generic("T".into()));
+            // Parser returns Named("T"), resolver converts to Generic("T")
+            assert_eq!(return_type.as_ref().unwrap(), &Type::Named("T".into()));
         }
         _ => panic!("expected fn stmt"),
     }
@@ -172,21 +173,13 @@ fn test_enum_variant_construction_and_match() {
             assert_eq!(type_params.len(), 0);
             assert_eq!(variants.len(), 2);
             // Check MySome variant has one field
-            match &variants[0] {
-                EnumVariant { name, fields } => {
-                    assert_eq!(name, "MySome");
-                    assert_eq!(fields.len(), 1);
-                }
-                _ => panic!("expected MySome variant"),
-            }
+            let EnumVariant { name, fields } = &variants[0];
+            assert_eq!(name, "MySome");
+            assert_eq!(fields.len(), 1);
             // Check MyNone variant has no fields
-            match &variants[1] {
-                EnumVariant { name, fields } => {
-                    assert_eq!(name, "MyNone");
-                    assert_eq!(fields.len(), 0);
-                }
-                _ => panic!("expected MyNone variant"),
-            }
+            let EnumVariant { name, fields } = &variants[1];
+            assert_eq!(name, "MyNone");
+            assert_eq!(fields.len(), 0);
         }
         _ => panic!("expected enum stmt"),
     }
@@ -210,7 +203,6 @@ fn test_enum_variant_construction_and_match() {
             name,
             params,
             return_type,
-            body: _,
             ..
         } => {
             assert_eq!(name, "describe_color");
@@ -225,7 +217,6 @@ fn test_enum_variant_construction_and_match() {
             name,
             params,
             return_type,
-            body: _,
             ..
         } => {
             assert_eq!(name, "my_is_some");
@@ -240,7 +231,6 @@ fn test_enum_variant_construction_and_match() {
             name,
             params,
             return_type,
-            body: _,
             ..
         } => {
             assert_eq!(name, "my_unwrap_or");
@@ -256,7 +246,6 @@ fn test_enum_variant_construction_and_match() {
             name,
             params,
             return_type,
-            body: _,
             ..
         } => {
             assert_eq!(name, "divide");
@@ -648,7 +637,6 @@ fn test_trait_resolve_and_symbol() {
 #[test]
 fn test_trait_impl_pipeline() {
     use crate::compiler;
-    use crate::value::Value;
     use crate::vm::VM;
 
     let source = r#"
@@ -680,7 +668,6 @@ fn test_trait_impl_pipeline() {
 #[test]
 fn test_trait_impl_trait_for_type_pipeline() {
     use crate::compiler;
-    use crate::value::Value;
     use crate::vm::VM;
 
     let source = r#"
@@ -791,7 +778,7 @@ fn test_const_declaration_parses() {
 
 #[test]
 fn test_const_declaration_with_type_annotation() {
-    let source = "const PI: f64 = 3.14;";
+    let source = "const E: f64 = 2.71;";
     let tokens = Lexer::new(source).tokenize().unwrap();
     let program = Parser::new(source, &tokens).parse().unwrap();
     assert_eq!(program.stmts.len(), 1);
@@ -802,11 +789,11 @@ fn test_const_declaration_with_type_annotation() {
             init,
             ..
         } => {
-            assert_eq!(name, "PI");
+            assert_eq!(name, "E");
             assert!(type_ann.is_some());
             assert_eq!(type_ann.as_ref().unwrap(), &Type::F64);
             match init {
-                Expr::Float(n) => assert!((n - 3.14).abs() < f64::EPSILON),
+                Expr::Float(n) => assert!((n - 2.71).abs() < f64::EPSILON),
                 other => panic!("expected Float, got: {other:?}"),
             }
         }

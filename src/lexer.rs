@@ -586,10 +586,10 @@ mod tests {
 
     #[test]
     fn test_numbers() {
-        let tokens = Lexer::new("42 3.14 0xff 0o77 0b1010").tokenize().unwrap();
+        let tokens = Lexer::new("42 2.71 0xff 0o77 0b1010").tokenize().unwrap();
         let expected: Vec<TokenKind> = vec![
             TokenKind::Int(42),
-            TokenKind::Float(3.14),
+            TokenKind::Float(2.71),
             TokenKind::Int(255),
             TokenKind::Int(63),
             TokenKind::Int(10),
