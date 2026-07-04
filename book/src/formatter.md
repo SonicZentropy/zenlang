@@ -1,6 +1,6 @@
 # Formatter
 
-Zenlang's formatter is built into the LSP via `textDocument/formatting` and `textDocument/rangeFormatting`.
+Zen's formatter is built into the LSP via `textDocument/formatting` and `textDocument/rangeFormatting`.
 
 ## Features
 

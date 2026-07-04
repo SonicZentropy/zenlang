@@ -1,4 +1,4 @@
-# Zenlang
+# Zen
 
 A lightweight, embeddable Rust-like scripting language designed for game engines and
 real-time applications. No borrow checker, no GC — just `Rc`-based reference counting
@@ -348,7 +348,7 @@ produces owned tokens; no interning table is needed at this scale.
 
 ## Embedding
 
-Add Zenlang to your `Cargo.toml`:
+Add Zen to your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -416,7 +416,7 @@ cargo run --example hot_reload
 ### Engine integration examples (standalone crates)
 
 These are full crate directories with their own `Cargo.toml`, showing how to embed
-Zenlang in real game engines.
+Zen in real game engines.
 
 | Example | Directory | Engine | What it shows |
 |---------|-----------|--------|---------------|

@@ -1,6 +1,6 @@
 # Standard Library
 
-The Zenlang standard library provides built-in functions, types, and modules available to all scripts.
+The Zen standard library provides built-in functions, types, and modules available to all scripts.
 
 - [Core Functions](stdlib-core.md)
 - [Math and Vectors](stdlib-math.md)

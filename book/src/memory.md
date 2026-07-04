@@ -1,6 +1,6 @@
 # Memory Management
 
-Zenlang uses a simple, deterministic memory strategy: no garbage collector and no borrow checker.
+Zen uses a simple, deterministic memory strategy: no garbage collector and no borrow checker.
 
 ## Value Representation
 
@@ -28,7 +28,7 @@ pub enum Value {
 
 ## No GC Pauses
 
-Because Zenlang uses `Rc` instead of a tracing GC, there are no stop-the-world pauses. Memory is reclaimed deterministically when reference counts drop to zero.
+Because Zen uses `Rc` instead of a tracing GC, there are no stop-the-world pauses. Memory is reclaimed deterministically when reference counts drop to zero.
 
 ## Arena / Slab Allocator
 

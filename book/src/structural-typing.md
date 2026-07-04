@@ -1,6 +1,6 @@
 # Structural Typing
 
-Zenlang uses **structural typing** for nominal types (structs). Two struct types are compatible if they have the same field names and types, regardless of their declaration names.
+Zen uses **structural typing** for nominal types (structs). Two struct types are compatible if they have the same field names and types, regardless of their declaration names.
 
 ```rust
 struct Point { x: i64, y: i64 }

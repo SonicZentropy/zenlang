@@ -1,6 +1,6 @@
 # LSP Server
 
-Zenlang includes a Language Server Protocol implementation. Start it with:
+Zen includes a Language Server Protocol implementation. Start it with:
 
 ```bash
 zenc lsp

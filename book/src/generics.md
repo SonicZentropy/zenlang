@@ -1,6 +1,6 @@
 # Generics
 
-Zenlang supports generic type parameters with `<T>` syntax. Generics are **type-erased** — there is no monomorphization. All values are `Value` enum variants at runtime.
+Zen supports generic type parameters with `<T>` syntax. Generics are **type-erased** — there is no monomorphization. All values are `Value` enum variants at runtime.
 
 ## Generic Functions
 

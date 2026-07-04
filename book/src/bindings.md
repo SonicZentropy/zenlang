@@ -6,7 +6,7 @@ Use `let` to bind a value to a name. Bindings are **immutable by default**.
 
 ```rust
 let x = 42;
-let name = "Zenlang";
+let name = "Zen";
 let pi: f64 = 3.14159;  // with type annotation
 ```
 

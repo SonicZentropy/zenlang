@@ -1,6 +1,6 @@
 # Cargo Features and Setup
 
-## Adding Zenlang as a Dependency
+## Adding Zen as a Dependency
 
 ```toml
 [dependencies]

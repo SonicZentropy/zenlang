@@ -1,6 +1,6 @@
 # Type Inference
 
-Zenlang has full type inference — type annotations are usually optional.
+Zen has full type inference — type annotations are usually optional.
 
 ```rust
 fn add(a, b) = a + b;                // inferred: fn(i64, i64) -> i64

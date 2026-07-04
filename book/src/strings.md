@@ -4,7 +4,7 @@ Strings are reference-counted, immutable text values.
 
 ```rust
 let s = "hello";
-let name = "Zenlang";
+let name = "Zen";
 ```
 
 ## String Interpolation

@@ -1,6 +1,6 @@
 # Foreign Types
 
-Expose Rust types to Zenlang with fields and methods using the `#[derive(ZenForeign)]`
+Expose Rust types to Zen with fields and methods using the `#[derive(ZenForeign)]`
 and `#[zen_methods]` macros.
 
 ## Basic Usage
@@ -75,7 +75,7 @@ This derive macro generates a `register_zen_foreign()` method that:
 
 Supported field types:
 
-| Rust Type | Zenlang Type | Notes |
+| Rust Type | Zen Type | Notes |
 |-----------|-------------|-------|
 | `String` | `Str` | |
 | `i64`, `i32`, `i16`, `i8` | `Int` | Casts on set |
@@ -88,7 +88,7 @@ Supported field types:
 ### `#[zen_methods]`
 
 This attribute macro generates `register_zen_methods()` which registers all methods
-in the impl block as callable from Zenlang.
+in the impl block as callable from Zen.
 
 **Methods without `&self`** that return `Self` are treated as **constructors** and
 registered as native functions. They can be called like `TypeName::method(...)` in script.
@@ -113,7 +113,7 @@ Generates a `<fn_name>_sig()` function returning a `FnSignature`.
 
 ## Type Name Customization
 
-By default the Zenlang type name matches the Rust struct name. Override it with
+By default the Zen type name matches the Rust struct name. Override it with
 `#[foreign(name = "...")]`:
 
 ```rust

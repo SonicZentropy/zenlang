@@ -1,6 +1,6 @@
 # Tooling
 
-Zenlang ships with a suite of developer tools.
+Zen ships with a suite of developer tools.
 
 - [LSP Server](lsp.md)
 - [Formatter](formatter.md)

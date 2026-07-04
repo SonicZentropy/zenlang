@@ -1,6 +1,6 @@
 # Bytecode and VM Architecture
 
-Zenlang compiles source code directly to bytecode (no intermediate representation) and executes it on a register-based stack VM.
+Zen compiles source code directly to bytecode (no intermediate representation) and executes it on a register-based stack VM.
 
 ## VM Design
 

@@ -1,6 +1,6 @@
 # Generators and Coroutines
 
-Zenlang supports generator functions that can yield multiple values over time using the `yield` keyword.
+Zen supports generator functions that can yield multiple values over time using the `yield` keyword.
 
 ## Defining a Generator
 

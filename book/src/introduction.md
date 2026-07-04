@@ -1,10 +1,10 @@
 # Introduction
 
-**Zenlang** is a lightweight, embeddable Rust-like scripting language designed for **game engines and real-time applications**. It is implemented in Rust and available as a library crate (`zenlang`) with a CLI binary (`zenc`).
+**Zen** is a lightweight, embeddable Rust-like scripting language designed for **game engines and real-time applications**. It is implemented in Rust and available as a library crate (`zenlang`) with a CLI binary (`zenc`).
 
 ## Design Philosophy
 
-Zenlang was created for developers who want a familiar, ergonomic scripting language that integrates tightly with Rust without the overhead of a full language runtime.
+Zen was created for developers who want a familiar, ergonomic scripting language that integrates tightly with Rust without the overhead of a full language runtime.
 
 - **Rust-like syntax** — Familiar to Rust developers, reducing the learning curve for game programmers.
 - **No borrow checker** — Skips Rust's ownership system to keep implementation simple and predictable at the cost of compile-time memory guarantees.
@@ -16,7 +16,7 @@ Zenlang was created for developers who want a familiar, ergonomic scripting lang
 
 ## Use Cases
 
-- **Game scripting** — Embed Zenlang in your game engine for moddable, hot-reloadable game logic.
+- **Game scripting** — Embed Zen in your game engine for moddable, hot-reloadable game logic.
 - **Real-time applications** — Configurable instruction limits prevent runaway scripts from freezing the host.
 - **Prototyping** — Rapid iteration with REPL and hot reload.
 - **Education** — Rust-like syntax without the borrow checker makes it approachable for learners.

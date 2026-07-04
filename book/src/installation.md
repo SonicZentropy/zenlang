@@ -2,7 +2,7 @@
 
 ## Building from Source
 
-Zenlang is a Rust project. You'll need the Rust toolchain installed (https://rustup.rs).
+Zen is a Rust project. You'll need the Rust toolchain installed (https://rustup.rs).
 
 ```bash
 git clone https://github.com/SonicZentropy/zenlang

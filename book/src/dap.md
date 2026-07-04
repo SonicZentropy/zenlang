@@ -1,6 +1,6 @@
 # Debug Adapter Protocol
 
-Zenlang supports the Debug Adapter Protocol for step-through debugging.
+Zen supports the Debug Adapter Protocol for step-through debugging.
 
 ```bash
 zenc dap

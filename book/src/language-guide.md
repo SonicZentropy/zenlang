@@ -1,6 +1,6 @@
 # Language Guide
 
-This chapter covers every feature of the Zenlang language.
+This chapter covers every feature of the Zen language.
 
 - [Bindings and Constants](bindings.md)
 - [Functions and Closures](functions.md)

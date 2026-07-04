@@ -1,6 +1,6 @@
 # Type System
 
-This chapter covers the Zenlang type system.
+This chapter covers the Zen type system.
 
 - [Primitive Types](primitives.md)
 - [Structural Typing](structural-typing.md)

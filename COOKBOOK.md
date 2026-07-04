@@ -1,6 +1,6 @@
-# Zenlang Cookbook
+# Zen Cookbook
 
-A quick-reference cheatsheet for common tasks in Zenlang.
+A quick-reference cheatsheet for common tasks in Zen.
 
 ## Basics
 

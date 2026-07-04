@@ -1,6 +1,6 @@
 # Embedding the VM
 
-Add Zenlang as a dependency and create a VM:
+Add Zen as a dependency and create a VM:
 
 ```rust
 use zenlang::vm::Vm;

@@ -1,6 +1,6 @@
 # Hot Reload
 
-Zenlang can watch source files and recompile them at runtime while preserving global state.
+Zen can watch source files and recompile them at runtime while preserving global state.
 
 ## CLI Usage
 

@@ -1,11 +1,11 @@
 # Common Patterns
 
-A quick-reference collection of common idioms and patterns in Zenlang.
+A quick-reference collection of common idioms and patterns in Zen.
 
 ## Hello World
 
 ```rust
-print("Hello, Zenlang!");
+print("Hello, Zen!");
 ```
 
 ## Bindings
@@ -340,7 +340,7 @@ zip(["a", "b"], [1, 2]);          // [["a",1],["b",2]]
 use std::json::*;
 
 let m = map_new();
-map_set(m, "name", "Zenlang");
+map_set(m, "name", "Zen");
 let json = encode(m);
 let data = decode(json);
 ```

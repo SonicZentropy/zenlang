@@ -1,6 +1,6 @@
 # Rust Interop
 
-Zenlang's primary design goal is seamless Rust integration.
+Zen's primary design goal is seamless Rust integration.
 
 - [Embedding the VM](embedding.md)
 - [Registering Native Functions](native-functions.md)
@@ -11,4 +11,4 @@ Zenlang's primary design goal is seamless Rust integration.
 
 ## Full Example
 
-For a complete walkthrough including a Rust engine host and Zenlang script working together, see [Calling Back into Script](vm-context.md#full-end-to-end-example).
+For a complete walkthrough including a Rust engine host and Zen script working together, see [Calling Back into Script](vm-context.md#full-end-to-end-example).

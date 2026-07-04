@@ -14,4 +14,4 @@ zenc disasm script.zen
 - **Function Table** — Function signatures and entry points
 - **Global Table** — Global variable definitions
 
-This is useful for debugging the compiler and understanding how Zenlang code maps to VM instructions.
+This is useful for debugging the compiler and understanding how Zen code maps to VM instructions.

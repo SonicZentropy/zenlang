@@ -7,7 +7,7 @@ use zenlang::vm::VmContext;
 
 fn register_hooks(vm: &mut Vm) {
     vm.register_fn("on_update", |args, ctx: &mut VmContext| {
-        // Call a Zenlang function from Rust
+        // Call a Zen function from Rust
         let result = ctx.call("player_update", &[args[0].clone()])?;
         Ok(result)
     });

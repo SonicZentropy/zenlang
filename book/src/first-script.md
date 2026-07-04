@@ -3,7 +3,7 @@
 Create a file called `hello.zen`:
 
 ```rust
-print("Hello, Zenlang!");
+print("Hello, Zen!");
 ```
 
 Run it:
@@ -12,7 +12,7 @@ Run it:
 zenc run hello.zen
 ```
 
-You should see `Hello, Zenlang!` printed to the terminal.
+You should see `Hello, Zen!` printed to the terminal.
 
 ## REPL
 

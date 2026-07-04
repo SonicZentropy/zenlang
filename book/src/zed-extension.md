@@ -1,6 +1,6 @@
 # Zed Editor Extension
 
-A Zed extension for Zenlang is available at `extensions/zenlang/` in the repository.
+A Zed extension for Zen is available at `extensions/zenlang/` in the repository.
 
 ## Features
 

@@ -1,6 +1,6 @@
 # Opaque Types
 
-Opaque types are Rust-side types exposed to Zenlang through FFI. They are registered in Rust using [`#[derive(ZenForeign)]` and `#[zen_methods]`](./foreign-types.md), or the unified `foreign_type!` macro.
+Opaque types are Rust-side types exposed to Zen through FFI. They are registered in Rust using [`#[derive(ZenForeign)]` and `#[zen_methods]`](./foreign-types.md), or the unified `foreign_type!` macro.
 
 ## In Script
 
