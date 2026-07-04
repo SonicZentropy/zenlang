@@ -820,7 +820,7 @@ Hot reload preserves **global variable values** across recompilations. Function 
 
 ```toml
 [dependencies]
-zenlang = "0.3.0"
+zenlang = "0.4.0"
 ```
 
 ## Common Patterns

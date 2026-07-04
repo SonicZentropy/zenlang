@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.0] — 2026-07-04
+
+### Language
+- Pipe operator `|>` : `x |> f` desugars to `f(x)` at parse time — no runtime overhead
+- Partial application `_` : `map(_, f)` desugars to `|__p0| map(__p0, f)` at parse time
+- 14 lazy iterator adapters: `map`, `filter`, `take`, `skip`, `chain`, `zip`, `enumerate`, `step_by`, `cycle`, `inspect`, `flatten`, `flat_map`, `scan` — all native Rust, zero intermediate allocations
+- 13 terminal iterator operations: `count`, `all`, `any`, `find`, `position`, `sum`, `product`, `min`, `max`, `join`, `partition`, `fold`, `collect`
+- `clock()` native: returns nanoseconds since epoch for benchmarking
+
+### Type Checker
+- `Type::Iter(Box<Type>)` — new AST variant tracking lazy iterator types
+- Indexing into a `Type::Iter` is now a compile-time error: "cannot index lazy iterator; call collect() to materialize it into an array"
+- Tightened `Expr::Index` for known non-indexable types: structs, scalars, functions, and `unknown` all produce clear errors
+
+### Prelude
+- All prelude iterator functions (`map`, `filter`, `fold`, etc.) migrated from Zen-language prelude to native Rust — `prelude.zen` is now a documentation placeholder
+- ~2x faster adapter performance vs the old eager Zen prelude (measured on 100K elements)
+
+### Documentation
+- `book/src/stdlib-iter.md` — rewritten with full lazy adapter + terminal op reference
+- `examples/tour.zen` — updated with pipe operator and iterator chaining examples
+- All version references updated to 0.4.0
+
 ## [0.3.0] — 2026-07-04
 
 ### Language

@@ -4,7 +4,7 @@ Add Zen as a dependency:
 
 ```toml
 [dependencies]
-zenlang = "0.3.0"
+zenlang = "0.4.0"
 ```
 
 ## Basic Usage
