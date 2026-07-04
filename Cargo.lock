@@ -63,7 +63,9 @@ dependencies = [
 
 [[package]]
 name = "arena-b"
-version = "1.1.0"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2698a6984b49c64fb429d69da47229e987c3b409c1e85c6e6de9560a517acedb"
 dependencies = [
  "cfg-if",
  "libc",
@@ -1278,12 +1280,23 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "url",
- "zenlang-macros",
+ "zenlang-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "zenlang-macros"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "zenlang-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2e37d3fe30a236f5def633aeb0476ebfd3035950ed5dd91b20ff4893849c810"
 dependencies = [
  "proc-macro2",
  "quote",
