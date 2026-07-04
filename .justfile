@@ -47,7 +47,7 @@ test-verbose:
 
 # Run specific test by name pattern
 test-filter pattern:
-    cargo test {{pattern}}
+    cargo test {{ pattern }}
 
 # ──────────────────────────────────────────────
 # Run
@@ -55,7 +55,7 @@ test-filter pattern:
 
 # Run a script file
 run file:
-    cargo run -- run {{file}}
+    cargo run -- run {{ file }}
 
 # Run in REPL mode
 repl:
@@ -63,11 +63,11 @@ repl:
 
 # Type-check a script
 check-script file:
-    cargo run -- check {{file}}
+    cargo run -- check {{ file }}
 
 # Disassemble a script
 disasm file:
-    cargo run -- disasm {{file}}
+    cargo run -- disasm {{ file }}
 
 # Install zenc binary
 install:
@@ -138,6 +138,10 @@ ci: fmt-check clippy test
 
 # Full rebuild: clean, check, build, test
 rebuild: clean check build test
+
+publish:
+    cd ./macros && cargo publish
+    cargo publish
 
 # Run the tour example
 tour:
