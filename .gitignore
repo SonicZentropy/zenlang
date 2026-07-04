@@ -4,3 +4,4 @@
 **/*.wasm
 **/tree-sitter.exe
 zenlang-lsp.log
+book/book
